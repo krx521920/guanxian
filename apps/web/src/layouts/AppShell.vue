@@ -17,14 +17,16 @@ const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.va
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
 
 function switchRole(event: Event) {
+  if (!auth.isDemoMode) return
   const role = (event.target as HTMLSelectElement).value as UserRole
   router.push(auth.switchRole(role))
   profileOpen.value = false
 }
 
-function logout() {
-  auth.logout()
-  router.push('/login')
+async function logout() {
+  profileOpen.value = false
+  await auth.logout()
+  if (auth.isDemoMode) await router.push('/login')
 }
 </script>
 
@@ -67,10 +69,12 @@ function logout() {
             <span class="chevron">⌄</span>
           </button>
           <div v-if="profileOpen" class="profile-menu">
-            <label>演示身份切换</label>
-            <select :value="auth.user.value?.role" @change="switchRole">
-              <option v-for="(user, role) in auth.demoUsers" :key="role" :value="role">{{ user.title }}</option>
-            </select>
+            <template v-if="auth.isDemoMode">
+              <label>本地测试身份</label>
+              <select :value="auth.user.value?.role" @change="switchRole">
+                <option v-for="(user, role) in auth.demoUsers" :key="role" :value="role">{{ user.title }}</option>
+              </select>
+            </template>
             <button @click="logout">退出登录</button>
           </div>
         </div>

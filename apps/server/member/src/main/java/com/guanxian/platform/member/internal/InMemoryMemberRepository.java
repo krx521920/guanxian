@@ -1,6 +1,7 @@
 package com.guanxian.platform.member.internal;
 
 import com.guanxian.platform.member.api.MemberProfile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -10,7 +11,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 @Repository
-final class InMemoryMemberRepository implements MemberRepository {
+@ConditionalOnProperty(name = "guanxian.member.repository", havingValue = "memory")
+class InMemoryMemberRepository implements MemberRepository {
     private final ConcurrentMap<UUID, MemberProfile> members = new ConcurrentHashMap<>();
 
     @Override

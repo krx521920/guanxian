@@ -564,4 +564,20 @@ describe('request', () => {
 
     await expect(request('/members')).rejects.toBe(networkError)
   })
+  it('adds the in-memory OIDC access token without overriding caller authorization', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ code: 'OK', data: 'done' })))
+    vi.stubGlobal('fetch', fetchMock)
+    const { request } = await loadRequest()
+    const { setAccessToken } = await import('./token-store')
+    setAccessToken('verified-access-token')
+
+    await request('/members')
+    let headers = new Headers((fetchMock.mock.calls[0]?.[1] as RequestInit).headers)
+    expect(headers.get('Authorization')).toBe('Bearer verified-access-token')
+
+    await request('/members', { headers: { Authorization: 'Bearer caller-token' } })
+    headers = new Headers((fetchMock.mock.calls[1]?.[1] as RequestInit).headers)
+    expect(headers.get('Authorization')).toBe('Bearer caller-token')
+  })
+
 })

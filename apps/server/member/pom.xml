@@ -6,6 +6,7 @@
     <artifactId>member</artifactId>
     <dependencies>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>shared-kernel</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-jdbc</artifactId></dependency>
         <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-core</artifactId></dependency>
     </dependencies>
 </project>

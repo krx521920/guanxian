@@ -5,6 +5,7 @@ export const protectedRouteRoles: Record<string, readonly UserRole[]> = {
   '/association': associationRoles,
   '/enterprise': enterpriseRoles,
   '/members': associationRoles,
+  '/members/edit': associationRoles,
   '/policies': allRoles,
   '/matching': allRoles,
   '/collaborations': allRoles,

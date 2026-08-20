@@ -10,6 +10,7 @@ describe('protected route permissions', () => {
       '/enterprise',
       '/matching',
       '/members',
+      '/members/edit',
       '/policies',
     ])
     Object.values(protectedRouteRoles).forEach((roles) => expect(roles.length).toBeGreaterThan(0))
@@ -23,6 +24,7 @@ describe('protected route permissions', () => {
     expect(protectedRouteRoles['/association']).not.toContain('ENTERPRISE_MEMBER')
     expect(protectedRouteRoles['/enterprise']).not.toContain('ASSOCIATION_OPERATOR')
     expect(protectedRouteRoles['/members']).not.toContain('ENTERPRISE_ADMIN')
+    expect(protectedRouteRoles['/members/edit']).toEqual(protectedRouteRoles['/members'])
     expect(protectedRouteRoles['/policies']).toEqual([...ROLES])
     expect(protectedRouteRoles['/matching']).toEqual([...ROLES])
     expect(protectedRouteRoles['/collaborations']).toEqual([...ROLES])

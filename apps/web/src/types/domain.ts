@@ -14,6 +14,7 @@ export interface SessionUser {
   role: UserRole
   organization: string
   title: string
+  permissions: string[]
 }
 
 export type StatusTone = 'success' | 'warning' | 'info' | 'neutral' | 'danger'
@@ -45,6 +46,45 @@ export interface MemberEnterprise {
   completeness: number
   status: '已认证' | '待完善' | '待审核'
   updatedAt: string
+}
+
+export type MemberStatus = 'ACTIVE' | 'PENDING_REVIEW' | 'INCOMPLETE' | 'DISABLED'
+
+export interface MemberProfile {
+  id: string
+  name: string
+  unifiedSocialCreditCode: string | null
+  category: string
+  address: string | null
+  contactName: string | null
+  contactPhone: string | null
+  introduction: string | null
+  capabilities: string[]
+  products: string[]
+  cooperationNeeds: string[]
+  status: MemberStatus
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MemberUpsertPayload {
+  name: string
+  unifiedSocialCreditCode: string | null
+  category: string
+  address: string | null
+  contactName: string | null
+  contactPhone: string | null
+  introduction: string | null
+  capabilities: string[]
+  products: string[]
+  cooperationNeeds: string[]
+  status: MemberStatus
+}
+
+export interface VersionedMember {
+  member: MemberProfile
+  etag: string
 }
 
 export interface Policy {

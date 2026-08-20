@@ -11,7 +11,6 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -70,19 +69,38 @@ services:
     environment:
       SERVER_PORT: 8080
       AI_SERVICE_BASE_URL: http://ai:8001
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-guanxian}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-guanxian}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      GUANXIAN_MEMBER_REPOSITORY: postgres
+      GUANXIAN_SECURITY_MODE: ${GUANXIAN_SECURITY_MODE:-jwt}
+      GUANXIAN_JWT_ISSUER_URI: ${GUANXIAN_JWT_ISSUER_URI:-}
+      GUANXIAN_JWT_JWK_SET_URI: ${GUANXIAN_JWT_JWK_SET_URI:-}
+      GUANXIAN_JWT_PRINCIPAL_CLAIM: ${GUANXIAN_JWT_PRINCIPAL_CLAIM:-preferred_username}
     ports:
       - "${SERVER_PORT:-8080}:8080"
     depends_on:
-      - ai
-      - postgres
-      - redis
-      - minio
+      ai:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
   web:
     profiles: ["app"]
     build:
       context: ./apps/web
+      args:
+        VITE_AUTH_MODE: oidc
+        VITE_OIDC_AUTHORITY: ${WEB_OIDC_AUTHORITY}
+        VITE_OIDC_CLIENT_ID: ${WEB_OIDC_CLIENT_ID:-guanxian-web}
+        VITE_OIDC_REDIRECT_URI: ${WEB_OIDC_REDIRECT_URI:-http://localhost:8081/auth/callback}
+        VITE_OIDC_POST_LOGOUT_REDIRECT_URI: ${WEB_OIDC_POST_LOGOUT_REDIRECT_URI:-http://localhost:8081/login}
+        VITE_OIDC_SCOPE: ${WEB_OIDC_SCOPE:-openid profile email}
     ports:
       - "${WEB_HTTP_PORT:-8081}:80"
     depends_on:

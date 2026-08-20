@@ -1,6 +1,6 @@
 # 管线智联后端
 
-北京地下管线协会 AI 管理协作平台的 Java 21 / Spring Boot 3 模块化单体后端骨架。第一阶段采用内存数据实现可运行闭环，模块边界已为后续接入 PostgreSQL、对象存储和独立 AI 服务预留。
+北京地下管线协会 AI 管理协作平台的 Java 21 / Spring Boot 3 模块化单体后端。会员档案默认持久化到 PostgreSQL，数据库结构由 Flyway 管理；生产认证默认使用 OIDC/JWT。
 
 ## 模块划分
 
@@ -8,7 +8,7 @@
 | --- | --- |
 | `bootstrap` | 应用启动、健康检查、协会/企业工作台聚合 |
 | `shared-kernel` | 统一响应、业务异常、参数校验错误结构、请求追踪过滤器 |
-| `iam` | 当前用户、演示账号、RBAC 与安全错误响应 |
+| `iam` | OIDC/JWT 资源服务器、当前用户、RBAC 与安全错误响应 |
 | `member` | 会员企业档案、企业基础 CRUD、供生态模块使用的查询接口 |
 | `policy` | 政策标准列表与检索 |
 | `ecosystem` | 生态匹配列表、匹配请求、可解释规则评分 |
@@ -19,32 +19,30 @@
 
 ## 本地启动
 
-环境要求：JDK 21、Maven 3.9+。
+环境要求：JDK 21、Maven 3.9+、PostgreSQL 16，以及能够签发 JWT 的 OIDC 身份提供方。复制根目录 `.env.example` 后，至少替换数据库密码、Issuer 和 JWK Set 地址；默认运行模式不会创建演示账号。
 
 ```bash
 cd apps/server
-mvn clean test
+mvn clean verify
 mvn -pl bootstrap -am spring-boot:run
 ```
+
+应用启动时由 Flyway 按顺序执行 `V1__create_platform_schema.sql` 和 `V2__extend_enterprise_member_profile.sql`。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行 V1/V2；迁移使用幂等 DDL，并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+
+生产默认 `GUANXIAN_SECURITY_MODE=jwt`。必须配置：
+
+- `GUANXIAN_JWT_ISSUER_URI`：令牌 `iss` 的精确值。
+- `GUANXIAN_JWT_JWK_SET_URI`：身份提供方公开密钥地址。
+- `GUANXIAN_JWT_PRINCIPAL_CLAIM`：默认 `preferred_username`。
+- JWT 的 `roles`、`realm_access.roles` 或 `permissions` 声明；后端只接受平台白名单角色和权限。
+
+开发或自动化测试必须显式设置 `GUANXIAN_SECURITY_MODE=demo` 和 `GUANXIAN_MEMBER_REPOSITORY=memory`。演示模式在 `prod` / `production` Profile 下会拒绝启动；默认配置和 Compose 均使用 PostgreSQL + JWT。
 
 默认监听 `http://localhost:8080`，公开健康检查：
 
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
-
-业务接口当前使用 HTTP Basic 演示鉴权：
-
-| 账号 | 密码 | 角色与用途 |
-| --- | --- | --- |
-| `system-admin` | `system123` | `SYSTEM_ADMIN`，系统级演示管理员 |
-| `association-admin` | `admin123` | `ASSOCIATION_ADMIN`，协会管理员 |
-| `association-operator` | `operator123` | `ASSOCIATION_OPERATOR`，协会业务运营 |
-| `enterprise-admin` | `enterprise123` | `ENTERPRISE_ADMIN`，企业管理员 |
-| `enterprise-member` | `member123` | `ENTERPRISE_MEMBER`，企业普通成员（只读） |
-| `observer` | `observer123` | 额外只读观察员，只能查看企业和政策 |
-
-演示账号仅用于开发骨架，禁止直接用于生产。设置 `GUANXIAN_DEMO_USERS_ENABLED=false` 后，所有内置账号都会失效且认证保持默认拒绝。启用 `prod` 或 `production` Profile 时，如果没有显式关闭演示账号，应用将拒绝启动，避免硬编码密码被误带入生产。生产阶段应替换为 OIDC/JWT 或统一身份平台，并增加企业数据范围约束。
 
 ## 首批接口
 
@@ -90,9 +88,9 @@ curl -u enterprise-admin:enterprise123 \
 
 会员企业状态只接受 `ACTIVE`、`PENDING_REVIEW`、`INCOMPLETE`、`DISABLED`（忽略大小写及首尾空白）；空值仍按 `ACTIVE` 处理。统一社会信用代码入库前会去除首尾空白并转为大写，唯一性判断使用规范化后的值。
 
-会员应用服务通过模块内部 `MemberRepository` 端口访问数据，当前由 `InMemoryMemberRepository` 提供进程内适配。业务校验与写操作的单 JVM 串行语义保持不变；接入 PostgreSQL 时应新增持久化适配器，并由数据库唯一约束和事务保证跨实例一致性。
+会员应用服务通过模块内部 `MemberRepository` 端口访问数据。默认 `PostgresMemberRepository` 使用 JDBC 映射 JSONB 列，并由数据库唯一索引和版本条件语句保证跨实例一致性；`InMemoryMemberRepository` 只在测试配置中创建。
 
-单个会员的 `GET`、`POST` 和 `PUT` 响应返回强 `ETag`，其值对应响应体中的非负 `version`，例如 `ETag: "3"`。`PUT` 和 `DELETE` 必须携带上次读取到的单个强标签 `If-Match: "3"`：缺失返回 `428 PRECONDITION_REQUIRED`，弱标签、通配符、多值或非法格式返回 `400 INVALID_IF_MATCH`，版本过期返回 `412 PRECONDITION_FAILED`。创建版本为 `0`，每次成功更新递增 1；服务层与仓储层都进行版本条件检查。未来数据库适配器必须用 `UPDATE/DELETE ... WHERE id=? AND version=?` 等原子 CAS 实现，不能先查后无条件写。
+单个会员的 `GET`、`POST` 和 `PUT` 响应返回强 `ETag`，其值对应响应体中的非负 `version`，例如 `ETag: "3"`。`PUT` 和 `DELETE` 必须携带上次读取到的单个强标签 `If-Match: "3"`：缺失返回 `428 PRECONDITION_REQUIRED`，弱标签、通配符、多值或非法格式返回 `400 INVALID_IF_MATCH`，版本过期返回 `412 PRECONDITION_FAILED`。创建版本为 `0`，每次成功更新递增 1；PostgreSQL 更新和删除均以版本作为原子条件。
 
 `capabilities`、`products` 和 `cooperationNeeds` 每个列表最多 50 项，元素仍执行各自长度限制，避免单个企业档案形成无界集合。
 
@@ -125,7 +123,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-当前基线（2026-08-15）：65 项 JUnit/ArchUnit 测试全部通过；PIT 对 179 个变异体捕获 162 个，13 个存活、4 个无覆盖，变异分数 91%，测试强度 93%，变异代码行覆盖 370/387（96%）。
+历史 PIT 基线（2026-08-15）：179 个变异体捕获 162 个，变异分数 91%。PostgreSQL/Flyway 与 JWT 改造新增了迁移保真、生产认证护栏和令牌角色映射测试；准确测试数量和变异得分以当次 Maven/PIT 输出为准。没有 Docker 时，Testcontainers 迁移测试会明确跳过，CI 必须提供 Docker 才能把它作为门禁。
 
 ## Docker
 
@@ -137,8 +135,8 @@ docker run --rm -p 8080:8080 guanxian-server:dev
 
 ## 下一阶段
 
-1. 为现有会员仓储端口增加 PostgreSQL 适配器，并增加 Flyway 迁移、数据库唯一约束和事务。
+1. 将企业编辑权限限制到 JWT 所属企业，增加数据范围与审计日志。
 2. 接入 Excel 批量导入、审核、数据质量评分和附件存储。
-3. 将企业编辑权限限制到当前账号所属企业，增加数据可见范围与审计日志。
+3. 为 PostgreSQL 增加备份恢复演练、只读副本与连接池监控。
 4. 将 `ai-adapter` 的规则实现替换为 AI 服务 HTTP 客户端，加入超时、重试、熔断与人工确认。
 5. 将协作事项升级为需求受理、推荐确认、沟通跟进、结果反馈的状态机。

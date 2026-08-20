@@ -1,3 +1,5 @@
+import { getAccessToken } from './token-store'
+
 interface ApiEnvelopeCandidate<T> {
   code: unknown
   message?: string
@@ -56,6 +58,8 @@ function prepareHeaders(headersInit?: HeadersInit): { headers: Headers; requestI
   entries.forEach(([name, value]) => {
     if (name.toLowerCase() !== requestIdHeader.toLowerCase()) headers.append(name, value)
   })
+  const accessToken = getAccessToken()
+  if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`)
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   headers.set(requestIdHeader, requestId)
 
@@ -97,6 +101,7 @@ export async function request<T>(
   path: string,
   options: RequestInit = {},
   mock?: () => Promise<T> | T,
+  observeResponse?: (response: Response) => void,
 ): Promise<T> {
   const { headers, requestId } = prepareHeaders(options.headers)
   const controller = new AbortController()
@@ -131,6 +136,7 @@ export async function request<T>(
         headers,
         signal: controller.signal,
       })
+      observeResponse?.(response)
     } catch (error) {
       if (abortSource === 'timeout') {
         throw new ApiRequestError('请求超时', requestId, undefined, 'REQUEST_TIMEOUT')

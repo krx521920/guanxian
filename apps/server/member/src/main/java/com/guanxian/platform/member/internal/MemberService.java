@@ -7,6 +7,7 @@ import com.guanxian.platform.shared.error.ConflictException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -19,6 +20,8 @@ import java.util.UUID;
 @Service
 public class MemberService implements MemberDirectory {
     private final MemberRepository repository;
+    @Value("${guanxian.member.seed-demo-data:false}")
+    private boolean seedDemoData;
 
     MemberService(MemberRepository repository) {
         this.repository = repository;
@@ -26,6 +29,9 @@ public class MemberService implements MemberDirectory {
 
     @PostConstruct
     void seed() {
+        if (!seedDemoData || !repository.findAll().isEmpty()) {
+            return;
+        }
         create(new MemberUpsertRequest(
                 "京城管网科技有限公司", "91110000DEMO00001", "智慧管网",
                 "北京市海淀区", "张工", "13800000001", "提供地下管线监测与数字化平台服务",

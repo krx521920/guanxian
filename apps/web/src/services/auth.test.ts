@@ -20,6 +20,8 @@ function createStorage(initial?: Record<string, string>): Storage {
 
 async function loadAuth(session = createStorage(), legacy = createStorage()) {
   vi.resetModules()
+  vi.stubEnv('VITE_AUTH_MODE', 'demo')
+  vi.stubEnv('MODE', 'test')
   vi.stubGlobal('sessionStorage', session)
   vi.stubGlobal('localStorage', legacy)
   const module = await import('./auth')
@@ -32,6 +34,7 @@ describe('useAuth', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -45,7 +48,7 @@ describe('useAuth', () => {
   ])('logs %s in and returns its authorized workspace', async (role, expectedRoute) => {
     const { auth, session } = await loadAuth()
 
-    expect(auth.login(role)).toBe(expectedRoute)
+    expect(auth.loginDemo(role)).toBe(expectedRoute)
     expect(auth.isAuthenticated.value).toBe(true)
     expect(auth.user.value?.role).toBe(role)
     expect(session.getItem(ROLE_STORAGE_KEY)).toBe(role)
@@ -55,17 +58,17 @@ describe('useAuth', () => {
     const { auth } = await loadAuth()
 
     expect(auth.demoUsers).toEqual({
-      SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员' },
-      ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员' },
-      ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员' },
-      ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员' },
-      ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理' },
+      SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [] },
+      ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [] },
+      ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [] },
+      ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [] },
+      ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [] },
     })
   })
 
   it('switches identities and persists the new account', async () => {
     const { auth, session } = await loadAuth()
-    auth.login('ASSOCIATION_OPERATOR')
+    auth.loginDemo('ASSOCIATION_OPERATOR')
 
     expect(auth.switchRole('ENTERPRISE_ADMIN')).toBe('/enterprise')
     expect(auth.user.value?.organization).toBe('京城管网科技有限公司')
@@ -74,7 +77,7 @@ describe('useAuth', () => {
 
   it('logs out and removes the persisted session', async () => {
     const { auth, session } = await loadAuth()
-    auth.login('ASSOCIATION_ADMIN')
+    auth.loginDemo('ASSOCIATION_ADMIN')
 
     auth.logout()
 
@@ -95,6 +98,7 @@ describe('useAuth', () => {
       role: 'ENTERPRISE_MEMBER',
       organization: '京城管网科技有限公司',
       title: '市场经理',
+      permissions: [],
     })
   })
 
@@ -130,8 +134,23 @@ describe('useAuth', () => {
     const { auth } = await loadAuth(blockedStorage)
 
     expect(auth.user.value).toBeNull()
-    expect(() => auth.login('ASSOCIATION_OPERATOR')).not.toThrow()
+    expect(() => auth.loginDemo('ASSOCIATION_OPERATOR')).not.toThrow()
     expect(auth.user.value?.role).toBe('ASSOCIATION_OPERATOR')
     expect(auth.isAuthenticated.value).toBe(true)
   })
+  it('disables demo identity switching unconditionally in production builds', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_AUTH_MODE', 'demo')
+    vi.stubEnv('MODE', 'production')
+    vi.stubGlobal('sessionStorage', createStorage({ [ROLE_STORAGE_KEY]: 'SYSTEM_ADMIN' }))
+    vi.stubGlobal('localStorage', createStorage())
+
+    const module = await import('./auth')
+    const auth = module.useAuth()
+
+    expect(auth.isDemoMode).toBe(false)
+    expect(auth.user.value).toBeNull()
+    expect(() => auth.loginDemo('SYSTEM_ADMIN')).toThrow('生产认证不允许切换演示身份')
+  })
+
 })

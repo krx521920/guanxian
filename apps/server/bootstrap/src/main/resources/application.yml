@@ -3,6 +3,19 @@ spring:
     name: guanxian-server
   jackson:
     default-property-inclusion: non_null
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/guanxian}
+    username: ${SPRING_DATASOURCE_USERNAME:guanxian}
+    password: ${SPRING_DATASOURCE_PASSWORD:change_me}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
+      minimum-idle: ${DB_POOL_MIN_IDLE:2}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-migration-naming: true
 
 server:
   port: 8080
@@ -18,5 +31,13 @@ management:
       show-details: never
 
 guanxian:
+  member:
+    repository: ${GUANXIAN_MEMBER_REPOSITORY:postgres}
+    association-name: ${GUANXIAN_ASSOCIATION_NAME:北京地下管线协会}
+    seed-demo-data: ${GUANXIAN_SEED_DEMO_DATA:false}
   security:
-    demo-users-enabled: ${GUANXIAN_DEMO_USERS_ENABLED:true}
+    mode: ${GUANXIAN_SECURITY_MODE:jwt}
+    jwt:
+      issuer-uri: ${GUANXIAN_JWT_ISSUER_URI:}
+      jwk-set-uri: ${GUANXIAN_JWT_JWK_SET_URI:}
+      principal-claim: ${GUANXIAN_JWT_PRINCIPAL_CLAIM:preferred_username}

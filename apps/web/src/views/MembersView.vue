@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -38,7 +39,7 @@ onMounted(load)
               <td><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td>
               <td>{{ item.products.join('、') }}</td>
               <td><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td>
-              <td><StatusBadge :value="item.status" /></td><td class="table-muted">{{ item.updatedAt }}</td><td><button class="row-action">查看</button></td>
+              <td><StatusBadge :value="item.status" /></td><td class="table-muted">{{ item.updatedAt }}</td><td><RouterLink class="row-action" :to="`/members/${item.id}/edit`">编辑</RouterLink></td>
             </tr>
           </tbody>
         </table>

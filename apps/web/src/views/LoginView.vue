@@ -1,20 +1,32 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ROLES, type UserRole } from '../types/domain'
 import { roleDescriptions, roleLabels } from '../config/roles'
 import { useAuth } from '../services/auth'
 
+const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
 const selectedRole = ref<UserRole>('ASSOCIATION_ADMIN')
 const loading = ref(false)
+const localError = ref<string | null>(null)
 
 async function login() {
   loading.value = true
-  await new Promise((resolve) => window.setTimeout(resolve, 260))
-  await router.push(auth.login(selectedRole.value))
-  loading.value = false
+  localError.value = null
+  try {
+    if (auth.isDemoMode) {
+      await router.push(auth.loginDemo(selectedRole.value))
+      return
+    }
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    await auth.login(redirect)
+  } catch {
+    localError.value = '无法发起身份认证，请联系系统管理员检查 OIDC 配置。'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -44,21 +56,26 @@ async function login() {
     <section class="login-panel">
       <form class="login-card" @submit.prevent="login">
         <div class="mobile-brand"><div class="brand-mark"><span /><span /><span /></div><strong>管线智联</strong></div>
-        <span class="eyebrow">DEMO ACCESS</span>
+        <span class="eyebrow">{{ auth.isDemoMode ? 'LOCAL DEMO' : 'SECURE ACCESS' }}</span>
         <h2>欢迎使用管理协作平台</h2>
-        <p>请选择演示身份进入对应工作空间</p>
+        <p>{{ auth.isDemoMode ? '请选择本地测试身份' : '使用统一身份认证安全登录' }}</p>
 
-        <div class="role-options">
+        <div v-if="auth.isDemoMode" class="role-options">
           <label v-for="role in ROLES" :key="role" :class="{ selected: selectedRole === role }">
             <input v-model="selectedRole" type="radio" name="role" :value="role" />
             <span class="role-radio" />
             <span><strong>{{ roleLabels[role] }}</strong><small>{{ roleDescriptions[role] }}</small></span>
           </label>
         </div>
+        <div v-else class="secure-login-note">
+          <strong>统一身份认证</strong>
+          <span>登录后，平台将使用身份提供方签发的短期令牌，并由后端校验角色和权限。</span>
+        </div>
+        <p v-if="localError || auth.error.value" class="form-error">{{ localError || auth.error.value }}</p>
         <button class="primary-button login-submit" type="submit" :disabled="loading">
-          {{ loading ? '正在进入…' : '进入平台' }} <span>→</span>
+          {{ loading ? '正在跳转…' : auth.isDemoMode ? '进入本地测试环境' : '统一身份登录' }} <span>→</span>
         </button>
-        <div class="demo-tip"><b>演示模式</b> 当前使用本地模拟数据，可随时在右上角切换身份。</div>
+        <div v-if="auth.isDemoMode" class="demo-tip"><b>仅限本地/测试</b> 生产构建不会启用身份切换。</div>
       </form>
     </section>
   </main>
