@@ -1,0 +1,2 @@
+schemathesis==4.24.3
+pip-audit==2.10.1

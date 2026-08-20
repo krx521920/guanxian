@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: guanxian-server
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+guanxian:
+  security:
+    demo-users-enabled: ${GUANXIAN_DEMO_USERS_ENABLED:true}

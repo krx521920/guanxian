@@ -1,0 +1,47 @@
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Secrets and local runtime
+.env
+.env.*
+!.env.example
+*.local
+logs/
+tmp/
+.tools/
+test-results/
+reports/
+zap-reports/
+.schemathesis/
+
+# Java
+**/target/
+*.class
+
+# Node
+**/node_modules/
+**/dist/
+**/.vite/
+**/coverage/
+**/reports/mutation/
+**/.stryker-tmp/
+
+# Python
+**/__pycache__/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.venv/
+*.py[cod]
+
+# Generated product-document working files (kept locally, not source code)
+/docx_work/
+/xlsx_work/
+/outputs/
+/*.docx
+/*.xlsx
+/*.pdf

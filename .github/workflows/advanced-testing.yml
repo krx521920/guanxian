@@ -1,0 +1,155 @@
+name: Advanced Testing
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 18 * * 5"
+
+permissions:
+  contents: read
+
+jobs:
+  java-mutation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn --batch-mode --no-transfer-progress -pl bootstrap -am verify -Pmutation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pit-mutation-report
+          path: apps/server/bootstrap/target/pit-reports/
+          if-no-files-found: warn
+
+  web-mutation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run mutation
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stryker-mutation-report
+          path: apps/web/reports/mutation/
+          if-no-files-found: warn
+
+  ai-mutation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            services/ai/requirements*.txt
+            tests/requirements.txt
+      - run: python -m pip install -r requirements-dev.txt
+      - run: mutmut run
+      - run: mutmut results
+
+  ai-schema-fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/ai/requirements*.txt
+      - name: Install and start AI service
+        run: |
+          python -m pip install -r services/ai/requirements-dev.txt -r tests/requirements.txt
+          cd services/ai
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 18001 > ../../ai-fuzz.log 2>&1 &
+          echo $! > ../../ai-fuzz.pid
+      - name: Wait for OpenAPI
+        run: |
+          for i in {1..30}; do curl -fsS http://127.0.0.1:18001/openapi.json && exit 0; sleep 1; done
+          cat ai-fuzz.log
+          exit 1
+      - name: Schemathesis schema-aware fuzzing
+        run: schemathesis run --max-examples 50 --workers 2 http://127.0.0.1:18001/openapi.json
+
+  api-load:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Build and start server
+        run: |
+          cd apps/server
+          mvn --batch-mode --no-transfer-progress verify
+          java -jar bootstrap/target/bootstrap-0.1.0-SNAPSHOT.jar --server.port=18080 > ../../server-load.log 2>&1 &
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do curl -fsS http://127.0.0.1:18080/api/v1/health && exit 0; sleep 1; done
+          cat server-load.log
+          exit 1
+      - name: k6 load thresholds
+        run: >-
+          docker run --rm --network host
+          -e BASE_URL=http://127.0.0.1:18080
+          -e PROFILE=load
+          -v "$PWD/tests/performance:/scripts:ro"
+          grafana/k6:2.1.0 run /scripts/api-load.js
+
+  zap-api-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/ai/requirements.txt
+      - name: Start AI service
+        run: |
+          python -m pip install -r services/ai/requirements.txt
+          cd services/ai
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 18001 > ../../ai-zap.log 2>&1 &
+      - name: Wait for API
+        run: |
+          for i in {1..30}; do curl -fsS http://127.0.0.1:18001/openapi.json && exit 0; sleep 1; done
+          cat ai-zap.log
+          exit 1
+      - name: OWASP ZAP active API scan
+        run: |
+          mkdir -p test-results/zap
+          chmod 777 test-results/zap
+          cp tests/security/zap-rules.conf test-results/zap/zap-rules.conf
+          docker run --rm --network host \
+            -v "$PWD/test-results/zap:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-api-scan.py -t http://127.0.0.1:18001/openapi.json -f openapi \
+            -c zap-rules.conf -r zap-api.html -J zap-api.json -I
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-api-report
+          path: test-results/zap/
+          if-no-files-found: warn

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "ai_service",
+    "listen": "0.0.0.0:18002",
+    "upstream": "ai:8001",
+    "enabled": true
+  }
+]
