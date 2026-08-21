@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS object_file (
   association_id UUID REFERENCES association(id),
   enterprise_id UUID REFERENCES enterprise(id),
   bucket_name VARCHAR(100) NOT NULL,
-  object_key VARCHAR(500) NOT NULL UNIQUE,
+  object_key VARCHAR(500) NOT NULL,
   original_filename VARCHAR(255) NOT NULL,
   media_type VARCHAR(200) NOT NULL,
   size_bytes BIGINT NOT NULL CHECK (size_bytes >= 0),
@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS object_file (
   visibility VARCHAR(32) NOT NULL DEFAULT 'PRIVATE',
   uploaded_by_subject VARCHAR(200) NOT NULL,
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  deleted_at TIMESTAMPTZ
+  deleted_at TIMESTAMPTZ,
+  UNIQUE (bucket_name, object_key)
 );
 
 CREATE INDEX IF NOT EXISTS object_file_scope_time_idx
@@ -140,9 +141,20 @@ CREATE TABLE IF NOT EXISTS model_execution (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE policy_impact_analysis
-  ADD CONSTRAINT policy_impact_model_execution_fk
-  FOREIGN KEY (model_execution_id) REFERENCES model_execution(id);
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'policy_impact_model_execution_fk'
+      AND conrelid = 'policy_impact_analysis'::regclass
+  ) THEN
+    ALTER TABLE policy_impact_analysis
+      ADD CONSTRAINT policy_impact_model_execution_fk
+      FOREIGN KEY (model_execution_id) REFERENCES model_execution(id);
+  END IF;
+END
+$;
 
 CREATE TABLE IF NOT EXISTS notification_subscription (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
