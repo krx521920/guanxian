@@ -60,6 +60,15 @@ class CrossAssociationServiceTest {
     }
 
     @Test
+    void reversePendingAccessRequestIsRejected() {
+        service.createAccessRequest(
+                new CrossAssociationDtos.AccessRequestCreate(null, TARGET, "first"), reviewer(SOURCE));
+
+        assertThrows(ConflictException.class, () -> service.createAccessRequest(
+                new CrossAssociationDtos.AccessRequestCreate(null, SOURCE, "reverse"), reviewer(TARGET)));
+    }
+
+    @Test
     void accessReviewIsTargetScoped() {
         var created = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
