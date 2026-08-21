@@ -7,6 +7,7 @@ public interface ChatModelProvider {
     String providerName();
     boolean enabled();
     ChatResult complete(ChatRequest request);
+    default BigDecimal estimateCost(int inputTokens, int outputTokens) { return BigDecimal.ZERO; }
 
     record Message(String role, String content) {
         public Message {
