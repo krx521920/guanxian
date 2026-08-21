@@ -35,6 +35,8 @@ management:
       show-details: never
 
 guanxian:
+  business:
+    repository: ${GUANXIAN_BUSINESS_REPOSITORY:postgres}
   member:
     repository: ${GUANXIAN_MEMBER_REPOSITORY:postgres}
     association-name: ${GUANXIAN_ASSOCIATION_NAME:北京地下管线协会}
