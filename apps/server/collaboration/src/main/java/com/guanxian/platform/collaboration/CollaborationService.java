@@ -1,27 +1,276 @@
 package com.guanxian.platform.collaboration;
 
+import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.NotFoundException;
+import com.guanxian.platform.shared.error.PreconditionFailedException;
+import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.ActorScopeResolver;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class CollaborationService {
-    private final List<CollaborationView> items = List.of(
-            new CollaborationView("C001", "高压燃气管道零泄漏阀门联合评估",
-                    List.of("北京市政建设集团", "北方阀门制造有限公司"), "徐明", "联合评估", "高",
-                    "确认试验场地与技术参数", LocalDate.of(2026, 8, 18), 62),
-            new CollaborationView("C002", "老旧街区地下管线综合探测需求对接",
-                    List.of("首都城市更新", "中勘研究院"), "陈晓", "方案沟通", "中",
-                    "上传初步勘察方案", LocalDate.of(2026, 8, 21), 38),
-            new CollaborationView("C003", "监测平台与数字孪生底座联合方案",
-                    List.of("北方燃气安全", "京城管网"), "王志远", "待受理", "中",
-                    "确认双方技术联系人", LocalDate.of(2026, 8, 23), 16),
-            new CollaborationView("C004", "非开挖修复评价标准案例征集",
-                    List.of("北京地下管线协会", "北京建工市政"), "张全超", "已完成", "低",
-                    "归档评审意见", LocalDate.of(2026, 8, 12), 100));
+    private static final Set<String> EDITABLE = Set.of("DRAFT", "REJECTED");
+    private static final Map<String, Set<String>> TRANSITIONS = Map.of(
+            "OPEN", Set.of("IN_PROGRESS"),
+            "IN_PROGRESS", Set.of("OPEN", "COMPLETED"),
+            "COMPLETED", Set.of("OPEN"));
+
+    private final CollaborationStore store;
+    private final ActorScopeResolver actorScopeResolver;
+
+    public CollaborationService(CollaborationStore store, ActorScopeResolver actorScopeResolver) {
+        this.store = store;
+        this.actorScopeResolver = actorScopeResolver;
+    }
 
     public List<CollaborationView> findAll() {
-        return items;
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return List.of();
+        }
+        return findAll(actorScopeResolver.resolve(authentication));
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaborationView> findAll(ActorScope actor) {
+        return store.list(actor, null, false, 0, 100);
+    }
+
+    @Transactional(readOnly = true)
+    public CollaborationPage<CollaborationView> page(
+            ActorScope actor, String query, boolean includeDeleted, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        boolean allowedDeleted = includeDeleted && canManageDeleted(actor);
+        return new CollaborationPage<>(
+                store.list(actor, query, allowedDeleted, safePage * safeSize, safeSize),
+                store.count(actor, query, allowedDeleted), safePage, safeSize);
+    }
+
+    @Transactional(readOnly = true)
+    public CollaborationView get(UUID id, ActorScope actor, boolean includeDeleted) {
+        boolean allowedDeleted = includeDeleted && canManageDeleted(actor);
+        return store.find(id, actor, allowedDeleted)
+                .orElseThrow(() -> new NotFoundException("collaboration", id));
+    }
+
+    @Transactional
+    public CollaborationView create(CollaborationUpsertRequest request, ActorScope actor) {
+        UUID associationId = requireAssociation(actor);
+        UUID enterpriseId;
+        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
+            enterpriseId = null;
+        } else if (actor.isEnterpriseAdmin() && actor.enterpriseId() != null) {
+            enterpriseId = actor.enterpriseId();
+        } else {
+            throw scopeViolation();
+        }
+        CollaborationView created = store.create(associationId, enterpriseId, request, actor);
+        store.recordChange(actor, "CREATE", created, null);
+        return created;
+    }
+
+    @Transactional
+    public CollaborationView update(
+            UUID id, long expectedVersion, CollaborationUpsertRequest request, ActorScope actor) {
+        CollaborationView current = get(id, actor, false);
+        requireManager(actor, current);
+        requireState(current.stage(), EDITABLE, "collaboration must be DRAFT or REJECTED to edit");
+        requireVersion(current.version(), expectedVersion);
+        CollaborationView updated = store.update(id, expectedVersion, request, actor)
+                .orElseThrow(CollaborationService::stale);
+        store.recordChange(actor, "UPDATE", updated, null);
+        return updated;
+    }
+
+    @Transactional
+    public CollaborationView submit(UUID id, long expectedVersion, ActorScope actor) {
+        CollaborationView current = get(id, actor, false);
+        requireManager(actor, current);
+        requireState(current.stage(), EDITABLE, "only a draft or rejected collaboration can be submitted");
+        return transition(current, expectedVersion, "PENDING_REVIEW", false, "SUBMIT", null, actor);
+    }
+
+    @Transactional
+    public CollaborationView review(
+            UUID id,
+            long expectedVersion,
+            CollaborationReviewRequest request,
+            ActorScope actor) {
+        requireReviewer(actor);
+        CollaborationView current = get(id, actor, false);
+        requireState(current.stage(), Set.of("PENDING_REVIEW"), "collaboration is not pending review");
+        String target = request.approved() ? "OPEN" : "REJECTED";
+        String action = request.approved() ? "APPROVE" : "REJECT";
+        return transition(current, expectedVersion, target, false, action, request.comment(), actor);
+    }
+
+    @Transactional
+    public CollaborationView advance(
+            UUID id,
+            long expectedVersion,
+            CollaborationTransitionRequest request,
+            ActorScope actor) {
+        CollaborationView current = get(id, actor, false);
+        requireManager(actor, current);
+        String target = request.targetStage().trim().toUpperCase(Locale.ROOT);
+        Set<String> allowed = TRANSITIONS.getOrDefault(current.stage(), Set.of());
+        if (!allowed.contains(target)) {
+            throw new PreconditionFailedException(
+                    "invalid collaboration transition from " + current.stage() + " to " + target);
+        }
+        return transition(current, expectedVersion, target, false, "TRANSITION", request.detail(), actor);
+    }
+
+    @Transactional
+    public CollaborationView disable(UUID id, long expectedVersion, ActorScope actor) {
+        CollaborationView current = get(id, actor, false);
+        requireManager(actor, current);
+        if (current.disabled() || "DISABLED".equals(current.stage())) {
+            throw new PreconditionFailedException("collaboration is already disabled");
+        }
+        return transition(current, expectedVersion, "DISABLED", true, "DISABLE", null, actor);
+    }
+
+    @Transactional
+    public CollaborationView delete(UUID id, long expectedVersion, ActorScope actor) {
+        CollaborationView current = get(id, actor, false);
+        requireManager(actor, current);
+        requireVersion(current.version(), expectedVersion);
+        CollaborationView deleted = store.softDelete(id, expectedVersion, actor)
+                .orElseThrow(CollaborationService::stale);
+        store.recordChange(actor, "SOFT_DELETE", deleted, null);
+        return deleted;
+    }
+
+    @Transactional
+    public CollaborationView restore(UUID id, long expectedVersion, ActorScope actor) {
+        CollaborationView current = get(id, actor, true);
+        requireManager(actor, current);
+        requireVersion(current.version(), expectedVersion);
+        CollaborationView restored;
+        if (current.deleted()) {
+            restored = store.restore(id, expectedVersion, actor)
+                    .orElseThrow(CollaborationService::stale);
+        } else if (current.disabled() || "DISABLED".equals(current.stage())) {
+            restored = store.transition(id, expectedVersion, "DRAFT", false, actor)
+                    .orElseThrow(CollaborationService::stale);
+        } else {
+            throw new PreconditionFailedException("collaboration is neither deleted nor disabled");
+        }
+        store.recordChange(actor, "RESTORE", restored, null);
+        return restored;
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaborationActivityView> activities(
+            UUID id, int limit, ActorScope actor) {
+        get(id, actor, true);
+        return store.activities(id, safeLimit(limit));
+    }
+
+    @Transactional
+    public CollaborationActivityView addActivity(
+            UUID id, CollaborationActivityRequest request, ActorScope actor) {
+        CollaborationView current = get(id, actor, false);
+        requireManager(actor, current);
+        return store.appendActivity(
+                id,
+                request.type().trim().toUpperCase(Locale.ROOT),
+                request.detail().trim(),
+                actor);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CollaborationHistoryView> history(
+            UUID id, int limit, ActorScope actor) {
+        get(id, actor, true);
+        return store.history(id, safeLimit(limit));
+    }
+
+    private CollaborationView transition(
+            CollaborationView current,
+            long expectedVersion,
+            String stage,
+            boolean disabled,
+            String action,
+            String detail,
+            ActorScope actor) {
+        requireVersion(current.version(), expectedVersion);
+        CollaborationView updated = store.transition(
+                current.id(), expectedVersion, stage, disabled, actor)
+                .orElseThrow(CollaborationService::stale);
+        store.recordChange(actor, action, updated, detail);
+        return updated;
+    }
+
+    private static boolean canManageDeleted(ActorScope actor) {
+        return actor.isSystemAdmin() || actor.isAssociationStaff() || actor.isEnterpriseAdmin();
+    }
+
+    private static UUID requireAssociation(ActorScope actor) {
+        if (actor.associationId() == null) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_CONTEXT_REQUIRED", "an association identity is required");
+        }
+        return actor.associationId();
+    }
+
+    private static void requireManager(ActorScope actor, CollaborationView item) {
+        if (actor.isSystemAdmin()) {
+            return;
+        }
+        if (actor.isAssociationStaff() && item.associationId().equals(actor.associationId())) {
+            return;
+        }
+        if (actor.isEnterpriseAdmin()
+                && actor.enterpriseId() != null
+                && actor.enterpriseId().equals(item.enterpriseId())) {
+            return;
+        }
+        throw scopeViolation();
+    }
+
+    private static void requireReviewer(ActorScope actor) {
+        if (!actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
+            throw new ForbiddenException(
+                    "REVIEWER_REQUIRED", "association reviewer identity is required");
+        }
+    }
+
+    private static void requireState(String actual, Set<String> expected, String message) {
+        if (!expected.contains(actual)) {
+            throw new PreconditionFailedException(message);
+        }
+    }
+
+    private static void requireVersion(long actual, long expected) {
+        if (actual != expected) {
+            throw stale();
+        }
+    }
+
+    private static int safeLimit(int limit) {
+        return Math.min(Math.max(limit, 1), 200);
+    }
+
+    private static ForbiddenException scopeViolation() {
+        return new ForbiddenException(
+                "COLLABORATION_SCOPE_VIOLATION",
+                "enterprise can only manage its own collaboration items");
+    }
+
+    private static PreconditionFailedException stale() {
+        return new PreconditionFailedException(
+                "resource version is stale; reload and retry with the latest ETag");
     }
 }
