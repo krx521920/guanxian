@@ -62,42 +62,28 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                     .addValue("solution", candidate.solution())
                     .addValue("score", candidate.score())
                     .addValue("reasons", json(candidate.reasons()));
-            List<UUID> existing = jdbc.query("""
-                    SELECT id
-                      FROM ecosystem_match
-                     WHERE demand_id=:demandId
-                       AND candidate_enterprise_id=:candidateId
-                       AND deleted_at IS NULL
-                     ORDER BY created_at
-                     LIMIT 1
-                    """, params, (rs, row) -> rs.getObject("id", UUID.class));
-            if (existing.isEmpty()) {
-                jdbc.update("""
-                        INSERT INTO ecosystem_match (
-                            demand_id, candidate_enterprise_id, score, explanation, review_status,
-                            demand_company_snapshot, demand_title_snapshot, scene_snapshot,
-                            supplier_company_snapshot, solution, reasons, state)
-                        VALUES (
-                            :demandId, :candidateId, :score, '{}'::jsonb, 'PENDING',
-                            :demandCompany, :demandTitle, :scene, :supplierCompany,
-                            :solution, CAST(:reasons AS jsonb), 'PENDING_CONFIRMATION')
-                        """, params);
-            } else {
-                params.addValue("id", existing.getFirst());
-                jdbc.update("""
-                        UPDATE ecosystem_match
-                           SET score=:score,
-                               demand_company_snapshot=:demandCompany,
-                               demand_title_snapshot=:demandTitle,
-                               scene_snapshot=:scene,
-                               supplier_company_snapshot=:supplierCompany,
-                               solution=:solution,
-                               reasons=CAST(:reasons AS jsonb),
-                               version=version+1,
-                               updated_at=now()
-                         WHERE id=:id AND deleted_at IS NULL
-                        """, params);
-            }
+            jdbc.update("""
+                    INSERT INTO ecosystem_match (
+                        demand_id, candidate_enterprise_id, score, explanation, review_status,
+                        demand_company_snapshot, demand_title_snapshot, scene_snapshot,
+                        supplier_company_snapshot, solution, reasons, state)
+                    VALUES (
+                        :demandId, :candidateId, :score, '{}'::jsonb, 'PENDING',
+                        :demandCompany, :demandTitle, :scene, :supplierCompany,
+                        :solution, CAST(:reasons AS jsonb), 'PENDING_CONFIRMATION')
+                    ON CONFLICT (demand_id, candidate_enterprise_id)
+                      WHERE deleted_at IS NULL
+                    DO UPDATE SET
+                        score=excluded.score,
+                        demand_company_snapshot=excluded.demand_company_snapshot,
+                        demand_title_snapshot=excluded.demand_title_snapshot,
+                        scene_snapshot=excluded.scene_snapshot,
+                        supplier_company_snapshot=excluded.supplier_company_snapshot,
+                        solution=excluded.solution,
+                        reasons=excluded.reasons,
+                        version=ecosystem_match.version+1,
+                        updated_at=now()
+                    """, params);
         }
         return list(demand.id(), actor);
     }
