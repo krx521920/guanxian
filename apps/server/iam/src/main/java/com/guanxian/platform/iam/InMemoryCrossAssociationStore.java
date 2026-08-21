@@ -24,6 +24,9 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
     private final Map<UUID, CrossAssociationDtos.ConsentView> consents = new LinkedHashMap<>();
     private final Map<UUID, CrossAssociationDtos.RecommendationView> recommendations = new LinkedHashMap<>();
     private final Map<UUID, UUID> enterpriseAssociations = new LinkedHashMap<>();
+    private final Map<String, Map<UUID, UUID>> resourceOwners = new LinkedHashMap<>();
+    private final Map<UUID, CrossAssociationStore.DemandOwnership> demandOwnerships = new LinkedHashMap<>();
+    private final Map<UUID, CrossAssociationStore.MatchOwnership> matchOwnerships = new LinkedHashMap<>();
     private final List<AuditEntry> audits = new ArrayList<>();
 
     InMemoryCrossAssociationStore(
@@ -73,8 +76,7 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
 
     @Override
     public synchronized Optional<CrossAssociationDtos.RelationshipView> relationship(UUID source, UUID target) {
-        return Optional.ofNullable(relationships.get(key(source, target)))
-                .or(() -> Optional.ofNullable(relationships.get(key(target, source))));
+        return Optional.ofNullable(relationships.get(key(source, target)));
     }
 
     @Override
@@ -83,12 +85,12 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
         var old = relationship(source, target).orElse(null);
         if (old == null) {
             var created = new CrossAssociationDtos.RelationshipView(source, target, "ACTIVE", allowMemberData,
-                    expiresAt, null, null, null, null, 0, now, now);
+                    expiresAt, null, null, null, null, null, null, 0, now, now);
             relationships.put(key(source, target), created);
             return created;
         }
         var changed = new CrossAssociationDtos.RelationshipView(old.sourceAssociationId(), old.targetAssociationId(),
-                "ACTIVE", allowMemberData, expiresAt, null, null, null, null,
+                "ACTIVE", allowMemberData, expiresAt, null, null, null, null, null, null,
                 old.version() + 1, old.createdAt(), now);
         relationships.put(key(old.sourceAssociationId(), old.targetAssociationId()), changed);
         return changed;
@@ -101,8 +103,8 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
         var old = relationship(source, target).orElseThrow(() -> new ConflictException("relationship no longer exists"));
         requireVersion(old.version(), expectedVersion);
         var changed = new CrossAssociationDtos.RelationshipView(old.sourceAssociationId(), old.targetAssociationId(),
-                status, old.allowMemberData(), expiresAt, suspendedAt, revokedAt,
-                "REVOKED".equals(status) ? actor.subject() : old.revokedBySubject(),
+                status, old.allowMemberData(), expiresAt, suspendedAt, suspendedByAssociationId, suspendedBySubject,
+                revokedAt, "REVOKED".equals(status) ? actor.subject() : old.revokedBySubject(),
                 "REVOKED".equals(status) ? reason : old.revokeReason(), old.version() + 1, old.createdAt(), now);
         relationships.put(key(old.sourceAssociationId(), old.targetAssociationId()), changed);
         return changed;
@@ -233,6 +235,29 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
     }
 
     @Override
+    public synchronized boolean resourceOwnedByEnterprise(String resourceType, UUID resourceId, UUID enterpriseId) {
+        return switch (resourceType) {
+            case "PRODUCT", "SERVICE" ->
+                    enterpriseId.equals(resourceOwners.getOrDefault(resourceType, Map.of()).get(resourceId));
+            case "DEMAND" -> demandOwnership(resourceId)
+                    .filter(value -> enterpriseId.equals(value.enterpriseId())).isPresent();
+            case "MATCH" -> matchOwnership(resourceId)
+                    .filter(value -> value.belongsToEnterprise(enterpriseId)).isPresent();
+            default -> false;
+        };
+    }
+
+    @Override
+    public synchronized Optional<CrossAssociationStore.DemandOwnership> demandOwnership(UUID demandId) {
+        return Optional.ofNullable(demandOwnerships.get(demandId));
+    }
+
+    @Override
+    public synchronized Optional<CrossAssociationStore.MatchOwnership> matchOwnership(UUID matchId) {
+        return Optional.ofNullable(matchOwnerships.get(matchId));
+    }
+
+    @Override
     public synchronized void audit(ActorScope actor, UUID associationId, UUID enterpriseId,
                                    String action, String resourceType, Object resourceId, Object details) {
         audits.add(new AuditEntry(actor.subject(), associationId, enterpriseId, action, resourceType,
@@ -247,8 +272,28 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
         enterpriseAssociations.put(enterpriseId, associationId);
     }
 
+    synchronized void bindResource(String resourceType, UUID resourceId, UUID enterpriseId) {
+        resourceOwners.computeIfAbsent(resourceType, ignored -> new LinkedHashMap<>()).put(resourceId, enterpriseId);
+    }
+
+    synchronized void bindDemand(UUID demandId, UUID enterpriseId, UUID associationId) {
+        demandOwnerships.put(demandId, new CrossAssociationStore.DemandOwnership(demandId, enterpriseId, associationId));
+    }
+
+    synchronized void bindMatch(
+            UUID matchId,
+            UUID demandId,
+            UUID demandEnterpriseId,
+            UUID demandAssociationId,
+            UUID candidateEnterpriseId,
+            UUID candidateAssociationId) {
+        matchOwnerships.put(matchId, new CrossAssociationStore.MatchOwnership(
+                matchId, demandId, demandEnterpriseId, demandAssociationId,
+                candidateEnterpriseId, candidateAssociationId));
+    }
+
     private static String key(UUID source, UUID target) {
-        return source + ":" + target;
+        return source.compareTo(target) <= 0 ? source + ":" + target : target + ":" + source;
     }
 
     private static void requireVersion(long actual, long expected) {
