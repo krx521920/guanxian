@@ -55,6 +55,8 @@ final class CrossAssociationDtos {
             boolean allowMemberData,
             Instant expiresAt,
             Instant suspendedAt,
+            UUID suspendedByAssociationId,
+            String suspendedBySubject,
             Instant revokedAt,
             String revokedBySubject,
             String revokeReason,
@@ -92,7 +94,7 @@ final class CrossAssociationDtos {
             UUID enterpriseId,
             @NotNull UUID targetAssociationId,
             @NotBlank @Size(max = 64) String resourceType,
-            UUID resourceId,
+            @NotNull UUID resourceId,
             Instant expiresAt) {
     }
 
