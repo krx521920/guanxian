@@ -75,25 +75,47 @@ class PolicyRagServiceTest {
     }
 
     @Test
+    void memoryRepositoryRejectsUnknownDocumentVersionUpdate() {
+        RagProperties properties = new RagProperties();
+        KnowledgeIngestionService service = new KnowledgeIngestionService(
+                new MemoryKnowledgeRepository(), properties);
+
+        assertThrows(IllegalArgumentException.class, () -> service.ingest(new KnowledgeTextDocument(
+                UUID.randomUUID(), UUID.randomUUID(), "不存在的文档", "POLICY", "MANUAL", null,
+                "ASSOCIATION", "PUBLISHED", "tester", "不能通过指定随机编号创建文档。"
+        )));
+    }
+
+    @Test
     void privateDocumentIsVisibleOnlyToCreatorOrPrivilegedStaff() {
         RagProperties properties = new RagProperties();
         MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
         UUID associationId = UUID.randomUUID();
-        new KnowledgeIngestionService(repository, properties).ingest(new KnowledgeTextDocument(
+        KnowledgeIngestionService ingestion = new KnowledgeIngestionService(repository, properties);
+        var initial = ingestion.ingest(new KnowledgeTextDocument(
                 null, associationId, "私有研判材料", "POLICY", "MANUAL", null,
                 "PRIVATE", "PUBLISHED", "document-owner",
                 "北区试验管线使用专属代号青铜松树并执行每日复核。"
+        ));
+        ingestion.ingest(new KnowledgeTextDocument(
+                initial.documentId(), associationId, "私有研判材料修订版", "POLICY", "MANUAL", null,
+                "PRIVATE", "PUBLISHED", "editing-subject",
+                "北区试验管线使用专属代号青铜松树并执行每日压力复核。"
         ));
         PolicyRagService service = new PolicyRagService(repository, disabledProvider(), properties);
 
         var owner = service.ask(new RagQuestion(
                 associationId, "document-owner", "青铜松树如何复核", 2, null));
+        var editorWithoutStaffRole = service.ask(new RagQuestion(
+                associationId, "editing-subject", "青铜松树如何复核", 2, null));
         var ordinaryMember = service.ask(new RagQuestion(
                 associationId, "different-member", "青铜松树如何复核", 2, null));
         var associationStaff = service.ask(new RagQuestion(
                 associationId, "association-operator", "青铜松树如何复核", 2, null, true));
 
         assertEquals("RETRIEVAL_SUMMARY", owner.mode());
+        assertEquals(2, owner.citations().getFirst().version());
+        assertEquals("NO_EVIDENCE", editorWithoutStaffRole.mode());
         assertEquals("NO_EVIDENCE", ordinaryMember.mode());
         assertTrue(ordinaryMember.citations().isEmpty());
         assertEquals("RETRIEVAL_SUMMARY", associationStaff.mode());
