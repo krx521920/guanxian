@@ -28,6 +28,7 @@ jobs:
       GUANXIAN_STORAGE_ENDPOINT: https://storage.ci.internal
       GUANXIAN_STORAGE_ACCESS_KEY: ci-storage-app
       GUANXIAN_STORAGE_SECRET_KEY: ci-only-storage-secret-32chars
+      GUANXIAN_STORAGE_REDIS_URL: rediss://redis.ci.internal:6380
       GUANXIAN_STORAGE_MAX_SIZE_BYTES: "20971520"
       GUANXIAN_STORAGE_RATE_LIMIT_ENABLED: "true"
       GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE: "30"
