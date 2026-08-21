@@ -41,7 +41,8 @@ Identifier = Annotated[
         min_length=1,
         max_length=100,
         pattern=r".*\S.*",
-    ),    BeforeValidator(_strip_identifier),
+    ),
+    BeforeValidator(_strip_identifier),
 ]
 LabelText = Annotated[
     str,
@@ -49,7 +50,8 @@ LabelText = Annotated[
         min_length=1,
         max_length=200,
         pattern=r".*\S.*",
-    ),    BeforeValidator(_strip_label),
+    ),
+    BeforeValidator(_strip_label),
 ]
 TitleText = Annotated[
     str,
@@ -57,7 +59,8 @@ TitleText = Annotated[
         min_length=1,
         max_length=300,
         pattern=r".*\S.*",
-    ),    BeforeValidator(_strip_title),
+    ),
+    BeforeValidator(_strip_title),
 ]
 SafeHttpUrl = Annotated[
     str,
@@ -65,7 +68,8 @@ SafeHttpUrl = Annotated[
         min_length=8,
         max_length=2_000,
         pattern=r"^https?://[A-Za-z0-9._~%\-]+(?::[0-9]{1,5})?(?:[/?#][^\s\\@]*)?$",
-    ),    BeforeValidator(_strip_url),
+    ),
+    BeforeValidator(_strip_url),
 ]
 
 
