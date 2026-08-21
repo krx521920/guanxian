@@ -13,6 +13,7 @@ public class RagProperties {
     private int maxInputTokens = 6000;
     private int maxOutputTokens = 800;
     private BigDecimal maxEstimatedCost = new BigDecimal("0.50");
+    private boolean externalModelDataEgressEnabled = false;
 
     public int getChunkSizeChars() { return chunkSizeChars; }
     public void setChunkSizeChars(int value) { chunkSizeChars = value; }
@@ -28,6 +29,8 @@ public class RagProperties {
     public void setMaxOutputTokens(int value) { maxOutputTokens = value; }
     public BigDecimal getMaxEstimatedCost() { return maxEstimatedCost; }
     public void setMaxEstimatedCost(BigDecimal value) { maxEstimatedCost = value; }
+    public boolean isExternalModelDataEgressEnabled() { return externalModelDataEgressEnabled; }
+    public void setExternalModelDataEgressEnabled(boolean value) { externalModelDataEgressEnabled = value; }
 
     public void validate() {
         if (chunkSizeChars < 200 || chunkSizeChars > 8000) throw new IllegalStateException("rag chunk size must be between 200 and 8000");
