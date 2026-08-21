@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.ai.rag.DocumentTextChunker.TextChunk;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
@@ -47,13 +48,19 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
         } else {
             MapSqlParameterSource lockParams = new MapSqlParameterSource("documentId", documentId)
                     .addValue("associationId", command.associationId());
-            Integer current = jdbc.queryForObject("""
-                    SELECT current_version FROM knowledge_document
-                    WHERE id = :documentId
-                      AND deleted_at IS NULL
-                      AND association_id IS NOT DISTINCT FROM CAST(:associationId AS UUID)
-                    FOR UPDATE
-                    """, lockParams, Integer.class);
+            Integer current;
+            try {
+                current = jdbc.queryForObject("""
+                        SELECT current_version FROM knowledge_document
+                        WHERE id = :documentId
+                          AND deleted_at IS NULL
+                          AND association_id IS NOT DISTINCT FROM CAST(:associationId AS UUID)
+                        FOR UPDATE
+                        """, lockParams, Integer.class);
+            } catch (EmptyResultDataAccessException exception) {
+                throw new IllegalArgumentException(
+                        "knowledge document does not exist in this association", exception);
+            }
             if (current == null) throw new IllegalArgumentException("knowledge document does not exist in this association");
             version = current + 1;
             MapSqlParameterSource update = commonParams(command).addValue("documentId", documentId).addValue("version", version);
@@ -92,7 +99,7 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
     }
 
     @Override
-    public List<RetrievedChunk> retrieve(UUID associationId, String query, int limit) {
+    public List<RetrievedChunk> retrieve(RetrievalScope scope, String query, int limit) {
         List<String> terms = MemoryKnowledgeRepository.queryTerms(query).stream()
                 .filter(term -> term.length() >= 2)
                 .limit(12)
@@ -100,7 +107,9 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
         if (terms.isEmpty()) return List.of();
 
         MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("associationId", associationId)
+                .addValue("associationId", scope.associationId())
+                .addValue("actorSubject", scope.actorSubject())
+                .addValue("privileged", scope.privileged())
                 .addValue("limit", Math.min(Math.max(1, limit), 12));
         List<String> matches = new ArrayList<>();
         List<String> scores = new ArrayList<>();
@@ -121,7 +130,13 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
                   AND dv.status = 'READY'
                   AND dv.version = d.current_version
                   AND (d.visibility = 'PUBLIC'
-                       OR (CAST(:associationId AS UUID) IS NOT NULL AND d.association_id = CAST(:associationId AS UUID)))
+                       OR (d.visibility = 'ASSOCIATION'
+                           AND CAST(:associationId AS UUID) IS NOT NULL
+                           AND d.association_id = CAST(:associationId AS UUID))
+                       OR (d.visibility = 'PRIVATE'
+                           AND CAST(:associationId AS UUID) IS NOT NULL
+                           AND d.association_id = CAST(:associationId AS UUID)
+                           AND (CAST(:privileged AS BOOLEAN) OR d.created_by_subject = :actorSubject)))
                   AND (%s)
                 ORDER BY relevance DESC, d.updated_at DESC, kc.chunk_index
                 LIMIT :limit
