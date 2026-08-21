@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
 @RestController
 @RequestMapping("/api/v1/attachments")
 public class AttachmentController {
-    private static final Pattern STRONG_VERSION_ETAG = Pattern.compile("\\"(0|[1-9][0-9]*)\\"");
+    private static final Pattern STRONG_VERSION_ETAG = Pattern.compile("\\\"(0|[1-9][0-9]*)\\\"");
 
     private final AttachmentService service;
     private final ActorScopeResolver actorScopeResolver;
