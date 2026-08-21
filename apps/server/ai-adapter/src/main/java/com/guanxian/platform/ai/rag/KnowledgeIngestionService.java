@@ -16,10 +16,12 @@ public class KnowledgeIngestionService {
 
     private final KnowledgeRepository repository;
     private final DocumentTextChunker chunker;
+    private final RagSecurityGuard securityGuard;
 
     public KnowledgeIngestionService(KnowledgeRepository repository, RagProperties properties) {
         this.repository = repository;
         this.chunker = new DocumentTextChunker(properties);
+        this.securityGuard = new RagSecurityGuard(properties);
     }
 
     public IngestionResult ingest(KnowledgeTextDocument document) {
@@ -28,6 +30,7 @@ public class KnowledgeIngestionService {
         String status = normalized(document.status(), "PUBLISHED");
         if (!VISIBILITIES.contains(visibility)) throw new IllegalArgumentException("unsupported knowledge visibility");
         if (!STATUSES.contains(status)) throw new IllegalArgumentException("unsupported knowledge status");
+        securityGuard.validateKnowledgeDocument(document.title(), document.sourceUrl(), document.content());
         validateSourceUrl(document.sourceUrl());
         var chunks = chunker.split(document.content());
         if (chunks.isEmpty()) throw new IllegalArgumentException("knowledge document content is required");
