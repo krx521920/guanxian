@@ -36,7 +36,7 @@ class KnowledgeApiIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.code").value("OK"));
 
         mockMvc.perform(post("/api/v1/knowledge/questions")
                         .with(httpBasic("enterprise-member", "member123"))
