@@ -148,7 +148,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                   JOIN ecosystem_match m ON m.id=n.match_id
                   JOIN cooperation_demand d ON d.id=m.demand_id
                   JOIN enterprise de ON de.id=d.enterprise_id
-                """ + scope(actor).replace("i.", "n.")
+                """ + matchScope(actor)
                         + " AND n.match_id=:matchId ORDER BY n.created_at DESC, n.id",
                 scopeParams(actor).addValue("matchId", matchId), this::mapNegotiation);
     }
@@ -227,7 +227,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                   JOIN ecosystem_match m ON m.id=o.match_id
                   JOIN cooperation_demand d ON d.id=m.demand_id
                   JOIN enterprise de ON de.id=d.enterprise_id
-                """ + scope(actor).replace("i.", "o.")
+                """ + matchScope(actor)
                         + " AND o.match_id=:matchId AND o.deleted_at IS NULL"
                         + " ORDER BY o.archived_at DESC, o.id",
                 scopeParams(actor).addValue("matchId", matchId), this::mapOutcome);
@@ -244,6 +244,19 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
             return " WHERE (d.enterprise_id=:enterpriseId"
                     + " OR m.candidate_enterprise_id=:enterpriseId"
                     + " OR i.recipient_enterprise_id=:enterpriseId)";
+        }
+        return " WHERE FALSE";
+    }
+
+    private String matchScope(ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            return " WHERE TRUE";
+        }
+        if (actor.isAssociationStaff()) {
+            return " WHERE de.association_id=:associationId";
+        }
+        if (actor.enterpriseId() != null) {
+            return " WHERE (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
         }
         return " WHERE FALSE";
     }
