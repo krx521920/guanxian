@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentMap;
 
 @Repository
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "memory")
-final class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
+class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
     private final ConcurrentMap<UUID, AttachmentView> entries = new ConcurrentHashMap<>();
 
     @Override
