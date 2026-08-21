@@ -19,6 +19,7 @@ Production MinIO configuration:
 | `guanxian.storage.access-key` | MinIO access key |
 | `guanxian.storage.secret-key` | MinIO secret key |
 | `guanxian.storage.max-size-bytes` | Maximum upload size; default 20 MiB, hard ceiling 100 MiB |
+| `guanxian.storage.redis-url` | Redis endpoint used only when limiting is enabled; `rediss://` is mandatory in production |
 | `guanxian.storage.rate-limit-per-minute` | Per-subject write limit; default 30 |
 
 V7 extends `object_file` with lifecycle status, optimistic version, update time and deleting
