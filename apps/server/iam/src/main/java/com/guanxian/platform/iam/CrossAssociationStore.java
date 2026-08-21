@@ -28,8 +28,8 @@ interface CrossAssociationStore {
 
     CrossAssociationDtos.RelationshipView updateRelationship(
             UUID sourceAssociationId, UUID targetAssociationId, long expectedVersion,
-            String status, Instant expiresAt, Instant suspendedAt, Instant revokedAt,
-            String revokeReason, ActorScope actor, Instant now);
+            String status, Instant expiresAt, Instant suspendedAt, UUID suspendedByAssociationId,
+            String suspendedBySubject, Instant revokedAt, String revokeReason, ActorScope actor, Instant now);
 
     List<CrossAssociationDtos.SharePolicyView> sharePolicies();
 
@@ -64,6 +64,28 @@ interface CrossAssociationStore {
 
     boolean associationExists(UUID associationId);
 
+    boolean resourceOwnedByEnterprise(String resourceType, UUID resourceId, UUID enterpriseId);
+
+    Optional<DemandOwnership> demandOwnership(UUID demandId);
+
+    Optional<MatchOwnership> matchOwnership(UUID matchId);
+
     void audit(ActorScope actor, UUID associationId, UUID enterpriseId,
                String action, String resourceType, Object resourceId, Object details);
+
+    record DemandOwnership(UUID demandId, UUID enterpriseId, UUID associationId) {
+    }
+
+    record MatchOwnership(
+            UUID matchId,
+            UUID demandId,
+            UUID demandEnterpriseId,
+            UUID demandAssociationId,
+            UUID candidateEnterpriseId,
+            UUID candidateAssociationId) {
+        boolean belongsToEnterprise(UUID enterpriseId) {
+            return enterpriseId != null
+                    && (enterpriseId.equals(demandEnterpriseId) || enterpriseId.equals(candidateEnterpriseId));
+        }
+    }
 }
