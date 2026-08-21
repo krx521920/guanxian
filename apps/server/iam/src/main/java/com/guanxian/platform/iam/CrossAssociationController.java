@@ -34,7 +34,7 @@ class CrossAssociationController {
     }
 
     @GetMapping("/access-requests")
-    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
     ApiResponse<List<CrossAssociationDtos.AccessRequestView>> accessRequests(Authentication authentication) {
         return ApiResponse.ok(service.accessRequests(actor(authentication)));
     }
@@ -57,7 +57,7 @@ class CrossAssociationController {
     }
 
     @GetMapping("/relationships")
-    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
     ApiResponse<List<CrossAssociationDtos.RelationshipView>> relationships(Authentication authentication) {
         return ApiResponse.ok(service.relationships(actor(authentication)));
     }
@@ -76,7 +76,7 @@ class CrossAssociationController {
     }
 
     @GetMapping("/share-policies")
-    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
     ApiResponse<List<CrossAssociationDtos.SharePolicyView>> sharePolicies(Authentication authentication) {
         return ApiResponse.ok(service.sharePolicies(actor(authentication)));
     }
