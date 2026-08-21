@@ -2,45 +2,49 @@ package com.guanxian.platform.storage;
 
 import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.security.ActorScope;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.redis.RedisConnectionFailureException;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
+import redis.clients.jedis.JedisPooled;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "guanxian.storage.rate-limit.enabled", havingValue = "true")
 final class RedisAttachmentRateLimiter implements AttachmentRateLimiter {
-    private static final DefaultRedisScript<Long> FIXED_WINDOW = new DefaultRedisScript<>("""
+    private static final String FIXED_WINDOW = """
             local current = redis.call('INCR', KEYS[1])
             if current == 1 then
               redis.call('EXPIRE', KEYS[1], ARGV[1])
             end
             return current
-            """, Long.class);
+            """;
 
-    private final StringRedisTemplate redis;
+    private final JedisPooled redis;
     private final NamedParameterJdbcTemplate jdbc;
     private final int limit;
 
     RedisAttachmentRateLimiter(
-            StringRedisTemplate redis,
             NamedParameterJdbcTemplate jdbc,
-            StorageProperties properties) {
+            StorageProperties properties,
+            Environment environment) {
         if (properties.getRateLimitPerMinute() < 1 || properties.getRateLimitPerMinute() > 10_000) {
-            throw new IllegalStateException("attachment rate limit must be between 1 and 10000 per minute");
+            throw new IllegalStateException(
+                    "attachment rate limit must be between 1 and 10000 per minute");
         }
-        this.redis = redis;
+        URI redisUri = validatedRedisUri(properties.getRedisUrl(), environment.getActiveProfiles());
+        this.redis = new JedisPooled(redisUri);
         this.jdbc = jdbc;
         this.limit = properties.getRateLimitPerMinute();
     }
@@ -50,13 +54,14 @@ final class RedisAttachmentRateLimiter implements AttachmentRateLimiter {
         String subjectHash = sha256(actor.subject());
         String route = "attachment:" + action;
         try {
-            Long count = redis.execute(FIXED_WINDOW,
-                    List.of("guanxian:rate:" + route + ":" + subjectHash), "60");
-            if (count == null) {
+            Object raw = redis.eval(FIXED_WINDOW,
+                    List.of("guanxian:rate:" + route + ":" + subjectHash),
+                    List.of("60"));
+            if (!(raw instanceof Number number)) {
                 audit(subjectHash, route, "ERROR");
                 throw new StorageUnavailableException("rate limiter returned no decision");
             }
-            if (count > limit) {
+            if (number.longValue() > limit) {
                 audit(subjectHash, route, "REJECTED");
                 throw new ApiException("RATE_LIMIT_EXCEEDED",
                         "too many attachment operations; retry after the current minute",
@@ -70,6 +75,11 @@ final class RedisAttachmentRateLimiter implements AttachmentRateLimiter {
             throw new StorageUnavailableException(
                     "attachment rate limiter is unavailable; write operation rejected", exception);
         }
+    }
+
+    @PreDestroy
+    void close() {
+        redis.close();
     }
 
     private void audit(String subjectHash, String route, String decision) {
@@ -89,6 +99,25 @@ final class RedisAttachmentRateLimiter implements AttachmentRateLimiter {
             audit(subjectHash, route, decision);
         } catch (RuntimeException ignored) {
             // Preserve the Redis failure as the externally visible fail-closed reason.
+        }
+    }
+
+    private static URI validatedRedisUri(String raw, String[] profiles) {
+        try {
+            URI uri = URI.create(raw == null ? "" : raw.trim());
+            boolean tls = "rediss".equalsIgnoreCase(uri.getScheme());
+            boolean plain = "redis".equalsIgnoreCase(uri.getScheme());
+            if ((!tls && !plain) || uri.getHost() == null || uri.getFragment() != null) {
+                throw new IllegalStateException("Redis URL must be a redis:// or rediss:// endpoint");
+            }
+            boolean production = Arrays.stream(profiles).anyMatch(profile ->
+                    "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile));
+            if (production && !tls) {
+                throw new IllegalStateException("Redis URL must use rediss:// in production");
+            }
+            return uri;
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("Redis URL is invalid", exception);
         }
     }
 
