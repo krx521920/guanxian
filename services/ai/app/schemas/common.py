@@ -37,39 +37,35 @@ def _strip_url(value: object) -> object:
 
 Identifier = Annotated[
     str,
-    BeforeValidator(_strip_identifier),
     StringConstraints(
         min_length=1,
         max_length=100,
         pattern=r".*\S.*",
-    ),
+    ),    BeforeValidator(_strip_identifier),
 ]
 LabelText = Annotated[
     str,
-    BeforeValidator(_strip_label),
     StringConstraints(
         min_length=1,
         max_length=200,
         pattern=r".*\S.*",
-    ),
+    ),    BeforeValidator(_strip_label),
 ]
 TitleText = Annotated[
     str,
-    BeforeValidator(_strip_title),
     StringConstraints(
         min_length=1,
         max_length=300,
         pattern=r".*\S.*",
-    ),
+    ),    BeforeValidator(_strip_title),
 ]
 SafeHttpUrl = Annotated[
     str,
-    BeforeValidator(_strip_url),
     StringConstraints(
         min_length=8,
         max_length=2_000,
         pattern=r"^https?://[A-Za-z0-9._~%\-]+(?::[0-9]{1,5})?(?:[/?#][^\s\\@]*)?$",
-    ),
+    ),    BeforeValidator(_strip_url),
 ]
 
 
