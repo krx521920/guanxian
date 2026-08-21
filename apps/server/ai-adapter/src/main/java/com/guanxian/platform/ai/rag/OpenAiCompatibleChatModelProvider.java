@@ -2,6 +2,7 @@ package com.guanxian.platform.ai.rag;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ public class OpenAiCompatibleChatModelProvider implements ChatModelProvider, Ini
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public OpenAiCompatibleChatModelProvider(AiProviderProperties properties, ObjectMapper objectMapper) {
         this(properties, objectMapper, HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
     }
