@@ -32,10 +32,44 @@ public class RagSecurityGuard {
         if (containsAny(question, SECRET_PATTERNS)) throw new UnsafePromptException("question appears to contain sensitive credentials or identity data");
     }
 
+    public void validateKnowledgeDocument(String title, String sourceUrl, String content) {
+        validateRequiredField(title, "knowledge document title");
+        validateOptionalField(sourceUrl, "knowledge source URL");
+        validateRequiredField(content, "knowledge document content");
+    }
+
+    public boolean safeRetrievedDocument(String title, String sourceUrl, String content) {
+        return safeRequiredField(title)
+                && safeOptionalField(sourceUrl)
+                && safeRequiredField(content);
+    }
+
     public boolean safeRetrievedContent(String content) {
-        return content != null && !content.isBlank()
-                && !containsAny(content, INJECTION_PATTERNS)
-                && !containsAny(content, SECRET_PATTERNS);
+        return safeRequiredField(content);
+    }
+
+    private void validateRequiredField(String value, String field) {
+        if (value == null || value.isBlank()) throw new UnsafePromptException(field + " is required");
+        validateOptionalField(value, field);
+    }
+
+    private void validateOptionalField(String value, String field) {
+        if (value == null || value.isBlank()) return;
+        if (containsAny(value, INJECTION_PATTERNS)) {
+            throw new UnsafePromptException(field + " contains a prompt-injection pattern");
+        }
+        if (containsAny(value, SECRET_PATTERNS)) {
+            throw new UnsafePromptException(field + " appears to contain sensitive credentials or identity data");
+        }
+    }
+
+    private boolean safeRequiredField(String value) {
+        return value != null && !value.isBlank() && safeOptionalField(value);
+    }
+
+    private boolean safeOptionalField(String value) {
+        return value == null || value.isBlank()
+                || (!containsAny(value, INJECTION_PATTERNS) && !containsAny(value, SECRET_PATTERNS));
     }
 
     private boolean containsAny(String value, List<Pattern> patterns) {
