@@ -6,7 +6,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class VersionEtags {
-    private static final Pattern STRONG_ETAG = Pattern.compile("^\\\"([0-9]+)\\\"$");
+    private static final Pattern STRONG_ETAG = Pattern.compile("^\"([0-9]+)\"$");
 
     private VersionEtags() {
     }
@@ -17,7 +17,7 @@ final class VersionEtags {
         }
         Matcher matcher = STRONG_ETAG.matcher(ifMatch.trim());
         if (!matcher.matches()) {
-            throw new PreconditionRequiredException("If-Match must be a single strong version ETag such as \\"3\\"");
+            throw new PreconditionRequiredException("If-Match must be a single strong version ETag such as \"3\"");
         }
         try {
             return Long.parseLong(matcher.group(1));
@@ -27,6 +27,6 @@ final class VersionEtags {
     }
 
     static String format(long version) {
-        return "\\"" + version + "\\"";
+        return "\"" + version + "\"";
     }
 }
