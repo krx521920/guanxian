@@ -105,6 +105,10 @@ public class PolicyRagService {
             }
         }
 
+        if (outputTokens > properties.getMaxOutputTokens()) {
+            throw new RagLimitException("answer exceeds the configured output token limit");
+        }
+
         List<CitationDraft> citationDrafts = citations.stream()
                 .map(citation -> new CitationDraft(citation.chunkId(), citation.quote(), citation.score()))
                 .toList();
@@ -142,8 +146,9 @@ public class PolicyRagService {
     private String localSummary(List<Citation> citations) {
         StringBuilder answer = new StringBuilder("外部大模型未启用。以下摘要仅依据已检索资料：\n");
         for (Citation citation : citations) {
-            answer.append('[').append(citation.order()).append("] ")
-                    .append(clip(citation.quote(), 180)).append('\n');
+            String line = "[" + citation.order() + "] " + clip(citation.quote(), 180) + "\n";
+            if (DocumentTextChunker.estimateTokens(answer + line) > properties.getMaxOutputTokens()) break;
+            answer.append(line);
         }
         return answer.toString().strip();
     }
