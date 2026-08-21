@@ -15,15 +15,15 @@ if (-not (Test-Path $serverJar)) {
 }
 
 $requiredSmokeServerOverrides = @(
-  '--guanxian.business.repository=postgres'
-  '--guanxian.member.repository=postgres'
+  '--guanxian.business.repository=memory'
+  '--guanxian.member.repository=memory'
   '--guanxian.member.seed-demo-data=true'
   '--guanxian.security.mode=demo'
   '--spring.flyway.enabled=true'
 )
 $smokeServerOverrides = @(
-  '--guanxian.business.repository=postgres'
-  '--guanxian.member.repository=postgres'
+  '--guanxian.business.repository=memory'
+  '--guanxian.member.repository=memory'
   '--guanxian.member.seed-demo-data=true'
   '--guanxian.security.mode=demo'
   '--spring.flyway.enabled=true'
