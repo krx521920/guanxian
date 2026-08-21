@@ -32,6 +32,7 @@ def valid_environment() -> dict[str, str]:
         "GUANXIAN_STORAGE_ENDPOINT": "https://storage.guanxian.test",
         "GUANXIAN_STORAGE_ACCESS_KEY": "guanxian-storage-app",
         "GUANXIAN_STORAGE_SECRET_KEY": "storage-production-secret-32",
+        "GUANXIAN_STORAGE_REDIS_URL": "rediss://redis.internal:6380",
         "GUANXIAN_STORAGE_MAX_SIZE_BYTES": "20971520",
         "GUANXIAN_STORAGE_RATE_LIMIT_ENABLED": "true",
         "GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE": "30",
@@ -95,6 +96,7 @@ class ProductionEnvironmentValidationTest(unittest.TestCase):
         values["GUANXIAN_STORAGE_BACKEND"] = "memory"
         values["GUANXIAN_STORAGE_ENDPOINT"] = "http://localhost:9000"
         values["GUANXIAN_STORAGE_SECRET_KEY"] = "short"
+        values["GUANXIAN_STORAGE_REDIS_URL"] = "redis://localhost:6379"
         values["GUANXIAN_STORAGE_MAX_SIZE_BYTES"] = str(101 * 1024 * 1024)
         values["GUANXIAN_STORAGE_RATE_LIMIT_ENABLED"] = "false"
         values["GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE"] = "0"
@@ -104,6 +106,14 @@ class ProductionEnvironmentValidationTest(unittest.TestCase):
         self.assertIn("GUANXIAN_STORAGE_ENDPOINT: must be an absolute HTTPS URL", errors)
         self.assertIn("GUANXIAN_STORAGE_ENDPOINT: loopback or placeholder host is forbidden", errors)
         self.assertIn("GUANXIAN_STORAGE_SECRET_KEY: must contain at least 16 characters", errors)
+        self.assertIn(
+            "GUANXIAN_STORAGE_REDIS_URL: must be an absolute rediss:// URL in production",
+            errors,
+        )
+        self.assertIn(
+            "GUANXIAN_STORAGE_REDIS_URL: loopback or placeholder host is forbidden",
+            errors,
+        )
         self.assertIn(
             "GUANXIAN_STORAGE_MAX_SIZE_BYTES: must be between 1 and 104857600",
             errors,
