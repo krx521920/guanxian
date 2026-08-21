@@ -103,7 +103,7 @@ public class AttachmentService {
 
     public AttachmentView get(UUID id, ActorScope actor, boolean includeDeleted) {
         return metadata.findVisible(id, actor, includeDeleted)
-                .orElseThrow(() -> new NotFoundException("attachment not found"));
+                .orElseThrow(() -> new NotFoundException("attachment", id));
     }
 
     public AttachmentDownload download(UUID id, ActorScope actor) {
