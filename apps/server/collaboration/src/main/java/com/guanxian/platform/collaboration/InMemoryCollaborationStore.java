@@ -178,7 +178,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
     public List<CollaborationActivityView> activities(UUID collaborationId, int limit) {
         return activities.getOrDefault(collaborationId, List.of()).stream()
                 .sorted(Comparator.comparing(CollaborationActivityView::occurredAt).reversed()
-                        .thenComparing(CollaborationActivityView::id).reversed())
+                        .thenComparing(Comparator.comparingLong(CollaborationActivityView::id).reversed()))
                 .limit(limit)
                 .toList();
     }
@@ -187,7 +187,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
     public List<CollaborationHistoryView> history(UUID collaborationId, int limit) {
         return histories.getOrDefault(collaborationId, List.of()).stream()
                 .sorted(Comparator.comparing(CollaborationHistoryView::occurredAt).reversed()
-                        .thenComparing(CollaborationHistoryView::id).reversed())
+                        .thenComparing(Comparator.comparingLong(CollaborationHistoryView::id).reversed()))
                 .limit(limit)
                 .toList();
     }
