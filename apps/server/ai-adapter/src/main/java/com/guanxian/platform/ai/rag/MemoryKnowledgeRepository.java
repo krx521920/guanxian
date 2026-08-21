@@ -26,6 +26,9 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     public synchronized IngestionResult ingest(IngestCommand command) {
         UUID documentId = command.documentId() == null ? UUID.randomUUID() : command.documentId();
         MemoryDocument previous = documents.get(documentId);
+        if (previous != null && !java.util.Objects.equals(previous.associationId(), command.associationId())) {
+            throw new IllegalArgumentException("knowledge document does not exist in this association");
+        }
         int version = previous == null ? 1 : previous.version() + 1;
         UUID versionId = UUID.randomUUID();
         MemoryDocument document = new MemoryDocument(documentId, command.associationId(), command.title(),
