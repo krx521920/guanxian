@@ -5,6 +5,7 @@ import io.minio.GetObjectArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -46,10 +47,20 @@ final class MinioObjectStorage implements ObjectStorage {
 
     @Override
     public byte[] get(String objectKey) {
-        try (var stream = client.getObject(GetObjectArgs.builder().bucket(bucket).object(objectKey).build())) {
+        try (var stream = client.getObject(
+                GetObjectArgs.builder().bucket(bucket).object(objectKey).build())) {
             return stream.readAllBytes();
         } catch (Exception exception) {
             throw new StorageUnavailableException("object download failed", exception);
+        }
+    }
+
+    @Override
+    public void delete(String objectKey) {
+        try {
+            client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(objectKey).build());
+        } catch (Exception exception) {
+            throw new StorageUnavailableException("object cleanup failed", exception);
         }
     }
 
@@ -67,7 +78,8 @@ final class MinioObjectStorage implements ObjectStorage {
         if (!"minio".equalsIgnoreCase(properties.getBackend())) {
             throw new IllegalStateException("MinIO adapter requires guanxian.storage.backend=minio");
         }
-        if (properties.getBucket() == null || !properties.getBucket().matches("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]")) {
+        if (properties.getBucket() == null
+                || !properties.getBucket().matches("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]")) {
             throw new IllegalStateException("MinIO bucket name is invalid");
         }
         try {
@@ -76,7 +88,8 @@ final class MinioObjectStorage implements ObjectStorage {
             boolean http = "http".equalsIgnoreCase(endpoint.getScheme());
             if ((!https && !http) || endpoint.getHost() == null || endpoint.getUserInfo() != null
                     || endpoint.getQuery() != null || endpoint.getFragment() != null) {
-                throw new IllegalStateException("MinIO endpoint must be an HTTP(S) origin without credentials");
+                throw new IllegalStateException(
+                        "MinIO endpoint must be an HTTP(S) origin without credentials");
             }
             if (Arrays.stream(activeProfiles).anyMatch(profile ->
                     "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)) && !https) {
