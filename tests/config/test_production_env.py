@@ -39,6 +39,7 @@ def valid_environment() -> dict[str, str]:
         "SPRING_DATA_REDIS_HOST": "redis.internal",
         "SPRING_DATA_REDIS_PORT": "6379",
         "GUANXIAN_AI_PROVIDER_ENABLED": "false",
+        "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED": "false",
         "GUANXIAN_RAG_MAX_ESTIMATED_COST": "0.50",
         "WEB_OIDC_AUTHORITY": "https://login.guanxian.test/realms/guanxian",
         "WEB_OIDC_CLIENT_ID": "guanxian-web",
@@ -60,6 +61,7 @@ class ProductionEnvironmentValidationTest(unittest.TestCase):
                 "GUANXIAN_AI_PROVIDER_ENDPOINT": "https://ai.guanxian.test/v1",
                 "GUANXIAN_AI_PROVIDER_API_KEY": "provider-production-key-32",
                 "GUANXIAN_AI_PROVIDER_MODEL": "approved-policy-model",
+                "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED": "true",
             }
         )
         self.assertEqual([], validate(values))
@@ -124,6 +126,16 @@ class ProductionEnvironmentValidationTest(unittest.TestCase):
             errors,
         )
         self.assertIn("SPRING_DATA_REDIS_PORT: must be between 1 and 65535", errors)
+
+    def test_rejects_external_data_egress_when_provider_is_disabled(self) -> None:
+        values = valid_environment()
+        values["GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED"] = "true"
+        errors = validate(values)
+        self.assertIn(
+            "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED: requires "
+            "GUANXIAN_AI_PROVIDER_ENABLED=true",
+            errors,
+        )
 
     def test_rejects_enabled_ai_without_secure_provider_and_cost_controls(self) -> None:
         values = valid_environment()
