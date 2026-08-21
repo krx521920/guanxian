@@ -5,6 +5,7 @@ import com.guanxian.platform.ai.rag.ChatModelProvider.ChatResult;
 import com.guanxian.platform.ai.rag.ChatModelProvider.Message;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.CitationDraft;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.ModelExecutionDraft;
+import com.guanxian.platform.ai.rag.KnowledgeRepository.RetrievalScope;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.RetrievedChunk;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.TraceDraft;
 import org.springframework.stereotype.Service;
@@ -45,8 +46,11 @@ public class PolicyRagService {
         int limit = question.maxCitations() == null
                 ? properties.getRetrievalLimit()
                 : Math.min(Math.max(1, question.maxCitations()), properties.getRetrievalLimit());
-        List<RetrievedChunk> chunks = repository.retrieve(question.associationId(), question.question(), limit).stream()
-                .filter(chunk -> securityGuard.safeRetrievedContent(chunk.content()))
+        RetrievalScope retrievalScope = new RetrievalScope(
+                question.associationId(), question.actorSubject(), question.privilegedKnowledgeAccess());
+        List<RetrievedChunk> chunks = repository.retrieve(retrievalScope, question.question(), limit).stream()
+                .filter(chunk -> securityGuard.safeRetrievedDocument(
+                        chunk.documentTitle(), chunk.sourceUrl(), chunk.content()))
                 .toList();
         List<Citation> citations = citations(chunks);
         String context = context(chunks);
@@ -62,12 +66,13 @@ public class PolicyRagService {
         BigDecimal estimatedCost = BigDecimal.ZERO;
         long latencyMs = 0;
         String providerRequestId = null;
+        boolean externalModelAllowed = modelProvider.enabled() && properties.isExternalModelDataEgressEnabled();
 
         if (chunks.isEmpty()) {
             answer = "未在当前可见知识库中检索到可引用资料，无法形成有出处的回答。";
             mode = "NO_EVIDENCE";
             outputTokens = DocumentTextChunker.estimateTokens(answer);
-        } else if (!modelProvider.enabled()) {
+        } else if (!externalModelAllowed) {
             answer = localSummary(citations);
             mode = "RETRIEVAL_SUMMARY";
             outputTokens = DocumentTextChunker.estimateTokens(answer);
@@ -114,7 +119,7 @@ public class PolicyRagService {
                 .toList();
         UUID traceId = repository.saveRetrieval(new TraceDraft(
                 question.associationId(), question.actorSubject(), question.question(),
-                DocumentTextChunker.sha256(question.question()), modelProvider.enabled() ? modelProvider.providerName() : "local",
+                DocumentTextChunker.sha256(question.question()), externalModelAllowed ? modelProvider.providerName() : "local",
                 model, mode, inputTokens, outputTokens, estimatedCost, latencyMs,
                 firstNonBlank(question.requestId(), providerRequestId)
         ), citationDrafts);
@@ -168,7 +173,16 @@ public class PolicyRagService {
         return first != null && !first.isBlank() ? first : second;
     }
 
-    public record RagQuestion(UUID associationId, String actorSubject, String question, Integer maxCitations, String requestId) {
+    public record RagQuestion(UUID associationId, String actorSubject, String question, Integer maxCitations,
+                              String requestId, boolean privilegedKnowledgeAccess) {
+        public RagQuestion(
+                UUID associationId,
+                String actorSubject,
+                String question,
+                Integer maxCitations,
+                String requestId) {
+            this(associationId, actorSubject, question, maxCitations, requestId, false);
+        }
     }
 
     public record Citation(int order, String documentName, int version, UUID chunkId, int chunkIndex,
