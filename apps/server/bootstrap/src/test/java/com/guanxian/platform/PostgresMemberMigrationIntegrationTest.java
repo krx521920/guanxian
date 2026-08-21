@@ -26,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "spring.flyway.enabled=true",
+        "spring.flyway.baseline-on-migrate=true",
+        "spring.flyway.baseline-version=1",
         "guanxian.member.repository=postgres",
         "guanxian.member.seed-demo-data=false",
         "guanxian.security.mode=demo"
@@ -61,7 +63,7 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(6, migrationCount);
+        org.junit.jupiter.api.Assertions.assertEquals(8, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals("member_import_batch", jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.member_import_batch')::text", String.class));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
