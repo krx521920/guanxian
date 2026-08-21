@@ -7,6 +7,12 @@ spring:
       max-request-size: 6MB
   jackson:
     default-property-inclusion: non_null
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:2s}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/guanxian}
     username: ${SPRING_DATASOURCE_USERNAME:guanxian}
@@ -41,6 +47,16 @@ guanxian:
     repository: ${GUANXIAN_MEMBER_REPOSITORY:postgres}
     association-name: ${GUANXIAN_ASSOCIATION_NAME:北京地下管线协会}
     seed-demo-data: ${GUANXIAN_SEED_DEMO_DATA:false}
+  storage:
+    backend: ${GUANXIAN_STORAGE_BACKEND:memory}
+    bucket: ${GUANXIAN_STORAGE_BUCKET:guanxian-private}
+    endpoint: ${GUANXIAN_STORAGE_ENDPOINT:}
+    access-key: ${GUANXIAN_STORAGE_ACCESS_KEY:}
+    secret-key: ${GUANXIAN_STORAGE_SECRET_KEY:}
+    max-size-bytes: ${GUANXIAN_STORAGE_MAX_SIZE_BYTES:20971520}
+    rate-limit-per-minute: ${GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE:30}
+    rate-limit:
+      enabled: ${GUANXIAN_STORAGE_RATE_LIMIT_ENABLED:false}
   security:
     mode: ${GUANXIAN_SECURITY_MODE:jwt}
     jwt:
