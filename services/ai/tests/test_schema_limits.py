@@ -147,3 +147,36 @@ def test_policy_accepts_safe_https_source_and_trims_identifiers(client):
     assert citation["document_id"] == "P-1"
     assert citation["title"] == "安全规定"
     assert citation["source_url"] == "https://example.com/policy?id=1"
+
+
+def test_trimmed_common_strings_still_enforce_wire_length_limits(client):
+    oversized_identifier = client.post(
+        "/api/v1/qa/policy",
+        json={
+            "question": "政策问题",
+            "documents": [
+                {
+                    "document_id": " " + ("P" * 100),
+                    "title": "政策",
+                    "content": "政策内容",
+                }
+            ],
+        },
+    )
+    oversized_url = client.post(
+        "/api/v1/qa/policy",
+        json={
+            "question": "政策问题",
+            "documents": [
+                {
+                    "document_id": "P-1",
+                    "title": "政策",
+                    "content": "政策内容",
+                    "source_url": " " + "https://example.com/" + ("a" * 1_981),
+                }
+            ],
+        },
+    )
+
+    assert oversized_identifier.status_code == 422
+    assert oversized_url.status_code == 422
