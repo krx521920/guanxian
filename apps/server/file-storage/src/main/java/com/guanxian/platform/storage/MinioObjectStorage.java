@@ -99,7 +99,7 @@ final class MinioObjectStorage implements ObjectStorage {
             throw new IllegalStateException("MinIO endpoint is invalid", exception);
         }
         if (properties.getAccessKey() == null || properties.getAccessKey().isBlank()
-                || properties.getSecretKey() == null || properties.getSecretKey().length() < 8) {
+                || properties.getSecretKey() == null || properties.getSecretKey().length() < 16) {
             throw new IllegalStateException("MinIO credentials must be configured");
         }
     }
