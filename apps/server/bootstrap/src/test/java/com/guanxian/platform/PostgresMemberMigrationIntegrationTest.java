@@ -63,7 +63,7 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(9, migrationCount);
+        org.junit.jupiter.api.Assertions.assertEquals(10, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals("member_import_batch", jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.member_import_batch')::text", String.class));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
@@ -94,6 +94,14 @@ class PostgresMemberMigrationIntegrationTest {
                 WHERE table_schema = 'public'
                   AND table_name = 'object_file'
                   AND constraint_type = 'UNIQUE'
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = 'notification_subscription' AND column_name = 'version'
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname = 'notification_subscription_user_type_uq'
                 """, Integer.class));
 
         mockMvc.perform(get("/api/v1/members/{id}", LEGACY_MEMBER_ID)
