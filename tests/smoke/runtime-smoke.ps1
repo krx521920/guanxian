@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$isWindowsHost = $env:OS -eq 'Windows_NT'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $runDir = Join-Path $root 'test-results/smoke'
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
@@ -18,9 +19,9 @@ $serverStart = @{
   ArgumentList = @('-jar', $serverJar, "--server.port=$ServerPort")
   RedirectStandardOutput = (Join-Path $runDir 'server.out.log')
   RedirectStandardError = (Join-Path $runDir 'server.err.log')
-  WindowStyle = 'Hidden'
   PassThru = $true
 }
+if ($isWindowsHost) { $serverStart.WindowStyle = 'Hidden' }
 $serverProc = Start-Process @serverStart
 
 $aiStart = @{
@@ -29,9 +30,9 @@ $aiStart = @{
   WorkingDirectory = (Join-Path $root 'services/ai')
   RedirectStandardOutput = (Join-Path $runDir 'ai.out.log')
   RedirectStandardError = (Join-Path $runDir 'ai.err.log')
-  WindowStyle = 'Hidden'
   PassThru = $true
 }
+if ($isWindowsHost) { $aiStart.WindowStyle = 'Hidden' }
 $aiProc = Start-Process @aiStart
 
 try {
