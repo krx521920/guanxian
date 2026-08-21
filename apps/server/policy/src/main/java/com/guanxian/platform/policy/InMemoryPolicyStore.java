@@ -149,21 +149,22 @@ class InMemoryPolicyStore implements PolicyStore {
     private void seed(String id, String title, String authority, String level, String category,
                       LocalDate publishedOn, LocalDate effectiveOn, String summary, List<String> tags) {
         UUID uuid = UUID.fromString(id);
-        policies.put(uuid, new PolicyView(id, title, authority, level, category, publishedOn, effectiveOn,
-                "PUBLISHED", summary, tags, null, "PUBLIC", 0, false, false, Instant.now()));
+        policies.put(uuid, new PolicyView(id, title, authority, null, level, category, publishedOn, effectiveOn,
+                null, "PUBLISHED", summary, tags, null, "PUBLIC", 0, false, false, Instant.now()));
     }
 
     private static PolicyView fromRequest(UUID id, UUID associationId, PolicyUpsertRequest request,
                                           String status, long version, boolean disabled, boolean deleted) {
         return new PolicyView(id.toString(), request.title().trim(), clean(request.authority()),
-                clean(request.level()), clean(request.category()), request.publishDate(), request.effectiveDate(),
+                clean(request.documentNumber()), clean(request.level()), clean(request.category()),
+                request.publishDate(), request.effectiveDate(), clean(request.sourceUrl()),
                 status, clean(request.summary()), list(request.tags()), associationId,
                 visibility(request.visibility()), version, disabled, deleted, Instant.now());
     }
 
     private static PolicyView copy(PolicyView old, String status, long version, boolean disabled, boolean deleted) {
-        return new PolicyView(old.id(), old.title(), old.authority(), old.level(), old.category(),
-                old.publishDate(), old.effectiveDate(), status, old.summary(), old.tags(), old.associationId(),
+        return new PolicyView(old.id(), old.title(), old.authority(), old.documentNumber(), old.level(), old.category(),
+                old.publishDate(), old.effectiveDate(), old.sourceUrl(), status, old.summary(), old.tags(), old.associationId(),
                 old.visibility(), version, disabled, deleted, Instant.now());
     }
 
