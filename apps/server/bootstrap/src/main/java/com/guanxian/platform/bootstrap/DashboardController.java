@@ -85,7 +85,9 @@ public class DashboardController {
     @PreAuthorize("hasAuthority('DASHBOARD_ENTERPRISE_READ')")
     ApiResponse<EnterpriseDashboard> enterprise(Authentication authentication) {
         ActorScope actor = actorScopeResolver.resolve(authentication);
-        List<MemberProfile> members = memberDirectory.findAll(null, actor);
+        List<MemberProfile> members = actor.enterpriseId() == null
+                ? memberDirectory.findAll(null, actor)
+                : memberDirectory.findById(actor.enterpriseId(), actor).stream().toList();
         List<PolicyView> policies = policyService.findAll(null, actor).stream()
                 .filter(policy -> policy.publishDate() != null)
                 .toList();
