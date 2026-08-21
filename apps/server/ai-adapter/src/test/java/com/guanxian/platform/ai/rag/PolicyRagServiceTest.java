@@ -75,9 +75,65 @@ class PolicyRagServiceTest {
     }
 
     @Test
+    void privateDocumentIsVisibleOnlyToCreatorOrPrivilegedStaff() {
+        RagProperties properties = new RagProperties();
+        MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
+        UUID associationId = UUID.randomUUID();
+        new KnowledgeIngestionService(repository, properties).ingest(new KnowledgeTextDocument(
+                null, associationId, "私有研判材料", "POLICY", "MANUAL", null,
+                "PRIVATE", "PUBLISHED", "document-owner",
+                "北区试验管线使用专属代号青铜松树并执行每日复核。"
+        ));
+        PolicyRagService service = new PolicyRagService(repository, disabledProvider(), properties);
+
+        var owner = service.ask(new RagQuestion(
+                associationId, "document-owner", "青铜松树如何复核", 2, null));
+        var ordinaryMember = service.ask(new RagQuestion(
+                associationId, "different-member", "青铜松树如何复核", 2, null));
+        var associationStaff = service.ask(new RagQuestion(
+                associationId, "association-operator", "青铜松树如何复核", 2, null, true));
+
+        assertEquals("RETRIEVAL_SUMMARY", owner.mode());
+        assertEquals("NO_EVIDENCE", ordinaryMember.mode());
+        assertTrue(ordinaryMember.citations().isEmpty());
+        assertEquals("RETRIEVAL_SUMMARY", associationStaff.mode());
+    }
+
+    @Test
+    void enabledProviderCannotReceiveRetrievedDataWithoutExplicitEgressApproval() {
+        RagProperties properties = new RagProperties();
+        assertFalse(properties.isExternalModelDataEgressEnabled());
+        MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
+        UUID associationId = UUID.randomUUID();
+        new KnowledgeIngestionService(repository, properties).ingest(new KnowledgeTextDocument(
+                null, associationId, "内部政策", "POLICY", "MANUAL", null,
+                "ASSOCIATION", "PUBLISHED", "tester",
+                "银杏编号管线需要在雨季开始前完成专项巡检。"
+        ));
+        AtomicBoolean called = new AtomicBoolean();
+        ChatModelProvider enabledProvider = new ChatModelProvider() {
+            public String providerName() { return "must-not-receive-data"; }
+            public boolean enabled() { return true; }
+            public ChatResult complete(ChatRequest request) {
+                called.set(true);
+                throw new AssertionError("external provider must not receive context");
+            }
+        };
+
+        PolicyRagService service = new PolicyRagService(repository, enabledProvider, properties);
+        var answer = service.ask(new RagQuestion(
+                associationId, "member", "银杏编号管线何时巡检", 2, null));
+
+        assertEquals("RETRIEVAL_SUMMARY", answer.mode());
+        assertFalse(called.get());
+        assertEquals(0, repository.modelExecutionCount());
+    }
+
+    @Test
     void estimatedCostLimitStopsExternalCall() {
         RagProperties properties = new RagProperties();
         properties.setMaxEstimatedCost(new BigDecimal("0.01"));
+        properties.setExternalModelDataEgressEnabled(true);
         MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
         new KnowledgeIngestionService(repository, properties).ingest(new KnowledgeTextDocument(
                 null, null, "公开政策", "POLICY", "URL", "https://example.gov.cn/policy/2",
