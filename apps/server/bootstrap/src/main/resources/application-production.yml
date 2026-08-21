@@ -1,0 +1,5 @@
+guanxian:
+  storage:
+    backend: ${GUANXIAN_STORAGE_BACKEND:minio}
+    rate-limit:
+      enabled: ${GUANXIAN_STORAGE_RATE_LIMIT_ENABLED:true}
