@@ -213,6 +213,7 @@ class PostgresPolicyStore implements PolicyStore {
         List<UUID> partners = actor.partnerAssociationIds().isEmpty()
                 ? List.of(new UUID(0, 0)) : List.copyOf(actor.partnerAssociationIds());
         return new MapSqlParameterSource().addValue("associationId", actor.associationId())
+                .addValue("associationStaff", actor.isAssociationStaff())
                 .addValue("partnerIds", partners)
                 .addValue("query", query == null ? null : "%" + query.trim() + "%");
     }
