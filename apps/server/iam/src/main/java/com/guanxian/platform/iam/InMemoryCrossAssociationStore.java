@@ -99,7 +99,8 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
     @Override
     public synchronized CrossAssociationDtos.RelationshipView updateRelationship(
             UUID source, UUID target, long expectedVersion, String status, Instant expiresAt,
-            Instant suspendedAt, Instant revokedAt, String reason, ActorScope actor, Instant now) {
+            Instant suspendedAt, UUID suspendedByAssociationId, String suspendedBySubject,
+            Instant revokedAt, String reason, ActorScope actor, Instant now) {
         var old = relationship(source, target).orElseThrow(() -> new ConflictException("relationship no longer exists"));
         requireVersion(old.version(), expectedVersion);
         var changed = new CrossAssociationDtos.RelationshipView(old.sourceAssociationId(), old.targetAssociationId(),
