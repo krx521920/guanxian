@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentMap;
 
 @Repository
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "memory")
-final class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
+class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     private final ConcurrentMap<UUID, StoredOffering> offerings = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, StoredDemand> demands = new ConcurrentHashMap<>();
 
