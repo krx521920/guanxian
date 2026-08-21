@@ -9,6 +9,7 @@ public class StorageProperties {
     private String endpoint = "";
     private String accessKey = "";
     private String secretKey = "";
+    private String redisUrl = "redis://localhost:6379";
     private long maxSizeBytes = 20L * 1024 * 1024;
     private int rateLimitPerMinute = 30;
 
@@ -50,6 +51,14 @@ public class StorageProperties {
 
     public void setSecretKey(String secretKey) {
         this.secretKey = secretKey;
+    }
+
+    public String getRedisUrl() {
+        return redisUrl;
+    }
+
+    public void setRedisUrl(String redisUrl) {
+        this.redisUrl = redisUrl;
     }
 
     public long getMaxSizeBytes() {
