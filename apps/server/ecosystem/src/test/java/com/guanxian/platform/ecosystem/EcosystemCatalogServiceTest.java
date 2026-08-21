@@ -1,6 +1,6 @@
 package com.guanxian.platform.ecosystem;
 
-import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ class EcosystemCatalogServiceTest {
 
         assertEquals("DRAFT", created.status());
         assertEquals(0, created.version());
-        assertThrows(ForbiddenException.class, () -> service.updateOffering(
+        assertThrows(NotFoundException.class, () -> service.updateOffering(
                 created.id(), 0, new OfferingUpsertRequest(
                         "越权修改", "PRODUCT", null, List.of(), List.of(), "PRIVATE"),
                 enterpriseAdmin(ENTERPRISE_B)));
