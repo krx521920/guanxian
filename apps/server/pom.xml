@@ -18,6 +18,7 @@
         <module>ai-adapter</module>
         <module>ecosystem</module>
         <module>collaboration</module>
+        <module>notification</module>
         <module>file-storage</module>
         <module>bootstrap</module>
     </modules>
