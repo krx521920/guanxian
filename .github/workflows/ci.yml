@@ -110,6 +110,24 @@ jobs:
   integration-smoke:
     needs: [server, ai]
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: guanxian
+          POSTGRES_USER: guanxian
+          POSTGRES_PASSWORD: ci-only-smoke-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U guanxian -d guanxian"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:5432/guanxian
+      SPRING_DATASOURCE_USERNAME: guanxian
+      SPRING_DATASOURCE_PASSWORD: ci-only-smoke-postgres-password
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
