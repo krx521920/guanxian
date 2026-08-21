@@ -14,12 +14,34 @@ if (-not (Test-Path $serverJar)) {
   throw "未找到后端可执行包：$serverJar。请先运行 Maven verify。"
 }
 
+$requiredSmokeServerOverrides = @(
+  '--guanxian.business.repository=memory'
+  '--guanxian.member.repository=memory'
+  '--guanxian.member.seed-demo-data=true'
+  '--guanxian.security.mode=demo'
+  '--spring.flyway.enabled=false'
+)
+$smokeServerOverrides = @(
+  '--guanxian.business.repository=memory'
+  '--guanxian.member.repository=memory'
+  '--guanxian.member.seed-demo-data=true'
+  '--guanxian.security.mode=demo'
+  '--spring.flyway.enabled=false'
+)
+
 $serverStart = @{
   FilePath = 'java'
-  ArgumentList = @('-jar', $serverJar, "--server.port=$ServerPort")
+  ArgumentList = @('-jar', $serverJar, "--server.port=$ServerPort") + $smokeServerOverrides
   RedirectStandardOutput = (Join-Path $runDir 'server.out.log')
   RedirectStandardError = (Join-Path $runDir 'server.err.log')
   PassThru = $true
+}
+$missingSmokeOverrides = @(
+  $requiredSmokeServerOverrides | Where-Object { $serverStart.ArgumentList -notcontains $_ }
+)
+if ($missingSmokeOverrides.Count -gt 0 -or
+    $smokeServerOverrides.Count -ne $requiredSmokeServerOverrides.Count) {
+  throw "Smoke后端运行模式契约不完整：$($missingSmokeOverrides -join ', ')"
 }
 if ($isWindowsHost) { $serverStart.WindowStyle = 'Hidden' }
 
