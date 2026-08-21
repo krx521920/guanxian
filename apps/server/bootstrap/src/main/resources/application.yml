@@ -53,6 +53,7 @@ guanxian:
     endpoint: ${GUANXIAN_STORAGE_ENDPOINT:}
     access-key: ${GUANXIAN_STORAGE_ACCESS_KEY:}
     secret-key: ${GUANXIAN_STORAGE_SECRET_KEY:}
+    redis-url: ${GUANXIAN_STORAGE_REDIS_URL:redis://localhost:6379}
     max-size-bytes: ${GUANXIAN_STORAGE_MAX_SIZE_BYTES:20971520}
     rate-limit-per-minute: ${GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE:30}
     rate-limit:
