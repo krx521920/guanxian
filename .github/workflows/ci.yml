@@ -9,6 +9,36 @@ permissions:
   contents: read
 
 jobs:
+  production-config:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-only-postgres-password-32chars
+      MINIO_ROOT_USER: ci-minio-admin
+      MINIO_ROOT_PASSWORD: ci-only-minio-password-32chars
+      SPRING_PROFILES_ACTIVE: production
+      GUANXIAN_SECURITY_MODE: jwt
+      GUANXIAN_MEMBER_REPOSITORY: postgres
+      GUANXIAN_SEED_DEMO_DATA: "false"
+      GUANXIAN_JWT_ISSUER_URI: https://login.ci.internal/realms/guanxian
+      GUANXIAN_JWT_JWK_SET_URI: https://login.ci.internal/realms/guanxian/protocol/openid-connect/certs
+      GUANXIAN_JWT_PRINCIPAL_CLAIM: preferred_username
+      WEB_OIDC_AUTHORITY: https://login.ci.internal/realms/guanxian
+      WEB_OIDC_CLIENT_ID: guanxian-web
+      WEB_OIDC_REDIRECT_URI: https://platform.ci.internal/auth/callback
+      WEB_OIDC_POST_LOGOUT_REDIRECT_URI: https://platform.ci.internal/login
+      WEB_OIDC_SCOPE: openid profile email
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate production environment contract
+        run: python tools/deployment/validate_production_env.py
+      - name: Test production environment validator
+        run: python -m unittest discover -s tests/config -p "test_*.py"
+      - name: Render production Compose configuration
+        run: docker compose config --quiet
+
   server:
     runs-on: ubuntu-latest
     defaults:
