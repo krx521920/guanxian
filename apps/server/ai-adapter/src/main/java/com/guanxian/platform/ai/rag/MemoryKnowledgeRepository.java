@@ -26,13 +26,17 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     public synchronized IngestionResult ingest(IngestCommand command) {
         UUID documentId = command.documentId() == null ? UUID.randomUUID() : command.documentId();
         MemoryDocument previous = documents.get(documentId);
+        if (command.documentId() != null && previous == null) {
+            throw new IllegalArgumentException("knowledge document does not exist in this association");
+        }
         if (previous != null && !java.util.Objects.equals(previous.associationId(), command.associationId())) {
             throw new IllegalArgumentException("knowledge document does not exist in this association");
         }
         int version = previous == null ? 1 : previous.version() + 1;
+        String createdBySubject = previous == null ? command.actorSubject() : previous.createdBySubject();
         UUID versionId = UUID.randomUUID();
         MemoryDocument document = new MemoryDocument(documentId, command.associationId(), command.title(),
-                command.sourceUrl(), command.visibility(), command.status(), command.actorSubject(),
+                command.sourceUrl(), command.visibility(), command.status(), createdBySubject,
                 version, versionId, command.contentHash());
         documents.put(documentId, document);
         for (TextChunk source : command.chunks()) {
