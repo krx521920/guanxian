@@ -12,6 +12,7 @@
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>ai-adapter</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>ecosystem</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>collaboration</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.guanxian.platform</groupId><artifactId>file-storage</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-actuator</artifactId></dependency>
         <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-core</artifactId></dependency>
         <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-database-postgresql</artifactId></dependency>
