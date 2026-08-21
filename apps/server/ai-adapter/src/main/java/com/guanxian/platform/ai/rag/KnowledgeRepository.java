@@ -8,9 +8,17 @@ import java.util.UUID;
 
 public interface KnowledgeRepository {
     IngestionResult ingest(IngestCommand command);
-    List<RetrievedChunk> retrieve(UUID associationId, String query, int limit);
+    List<RetrievedChunk> retrieve(RetrievalScope scope, String query, int limit);
     UUID saveRetrieval(TraceDraft trace, List<CitationDraft> citations);
     UUID saveModelExecution(ModelExecutionDraft execution);
+
+    record RetrievalScope(UUID associationId, String actorSubject, boolean privileged) {
+        public RetrievalScope {
+            if (actorSubject == null || actorSubject.isBlank()) {
+                throw new IllegalArgumentException("actor subject is required for knowledge retrieval");
+            }
+        }
+    }
 
     record IngestCommand(UUID documentId, UUID associationId, String title, String documentType,
                          String sourceType, String sourceUrl, String visibility, String status,
