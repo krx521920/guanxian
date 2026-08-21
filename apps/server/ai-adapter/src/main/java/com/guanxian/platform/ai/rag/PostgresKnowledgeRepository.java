@@ -109,8 +109,8 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
         for (int index = 0; index < terms.size(); index++) {
             String name = "term" + index;
             params.addValue(name, "%" + escapeLike(terms.get(index)) + "%");
-            matches.add("LOWER(kc.content) LIKE :" + name + " ESCAPE '\\\\'");
-            scores.add("CASE WHEN LOWER(kc.content) LIKE :" + name + " ESCAPE '\\\\' THEN " + Math.max(1, 12 - index) + " ELSE 0 END");
+            matches.add("LOWER(kc.content) LIKE :" + name + " ESCAPE '\\'");
+            scores.add("CASE WHEN LOWER(kc.content) LIKE :" + name + " ESCAPE '\\' THEN " + Math.max(1, 12 - index) + " ELSE 0 END");
         }
         String sql = """
                 SELECT kc.id AS chunk_id, d.id AS document_id, d.title, dv.version, kc.chunk_index,
