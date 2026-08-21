@@ -36,7 +36,8 @@ markers = [
 ]
 
 [tool.mutmut]
-source_paths = ["app/services/"]
+source_paths = ["app/"]
+only_mutate = ["app/services/*"]
 pytest_add_cli_args = ["-q", "-m", "not stress"]
 pytest_add_cli_args_test_selection = ["tests/"]
 mutate_only_covered_lines = true
