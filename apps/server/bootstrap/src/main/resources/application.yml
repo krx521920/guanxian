@@ -47,3 +47,22 @@ guanxian:
       issuer-uri: ${GUANXIAN_JWT_ISSUER_URI:}
       jwk-set-uri: ${GUANXIAN_JWT_JWK_SET_URI:}
       principal-claim: ${GUANXIAN_JWT_PRINCIPAL_CLAIM:preferred_username}
+
+  ai:
+    provider:
+      enabled: ${GUANXIAN_AI_PROVIDER_ENABLED:false}
+      endpoint: ${GUANXIAN_AI_PROVIDER_ENDPOINT:}
+      api-key: ${GUANXIAN_AI_PROVIDER_API_KEY:}
+      model: ${GUANXIAN_AI_PROVIDER_MODEL:}
+      request-timeout: ${GUANXIAN_AI_PROVIDER_TIMEOUT:30s}
+      max-output-tokens: ${GUANXIAN_AI_PROVIDER_MAX_OUTPUT_TOKENS:800}
+      input-cost-per-million: ${GUANXIAN_AI_INPUT_COST_PER_MILLION:0}
+      output-cost-per-million: ${GUANXIAN_AI_OUTPUT_COST_PER_MILLION:0}
+    rag:
+      chunk-size-chars: ${GUANXIAN_RAG_CHUNK_SIZE_CHARS:1200}
+      chunk-overlap-chars: ${GUANXIAN_RAG_CHUNK_OVERLAP_CHARS:150}
+      retrieval-limit: ${GUANXIAN_RAG_RETRIEVAL_LIMIT:5}
+      max-question-chars: ${GUANXIAN_RAG_MAX_QUESTION_CHARS:2000}
+      max-input-tokens: ${GUANXIAN_RAG_MAX_INPUT_TOKENS:6000}
+      max-output-tokens: ${GUANXIAN_RAG_MAX_OUTPUT_TOKENS:800}
+      max-estimated-cost: ${GUANXIAN_RAG_MAX_ESTIMATED_COST:0.50}
