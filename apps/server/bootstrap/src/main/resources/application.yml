@@ -83,3 +83,4 @@ guanxian:
       max-input-tokens: ${GUANXIAN_RAG_MAX_INPUT_TOKENS:6000}
       max-output-tokens: ${GUANXIAN_RAG_MAX_OUTPUT_TOKENS:800}
       max-estimated-cost: ${GUANXIAN_RAG_MAX_ESTIMATED_COST:0.50}
+      external-model-data-egress-enabled: ${GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED:false}
