@@ -125,7 +125,8 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
     @Override
     public CrossAssociationDtos.RelationshipView updateRelationship(
             UUID source, UUID target, long expectedVersion, String status, Instant expiresAt,
-            Instant suspendedAt, Instant revokedAt, String reason, ActorScope actor, Instant now) {
+            Instant suspendedAt, UUID suspendedByAssociationId, String suspendedBySubject,
+            Instant revokedAt, String reason, ActorScope actor, Instant now) {
         var old = relationship(source, target).orElseThrow();
         int changed = jdbc.update("""
                 UPDATE association_relationship
