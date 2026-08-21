@@ -3,7 +3,6 @@ package com.guanxian.platform.ai.rag;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.ai.rag.DocumentTextChunker.TextChunk;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -19,7 +18,6 @@ import java.util.Set;
 import java.util.UUID;
 
 @Repository
-@ConditionalOnBean(NamedParameterJdbcTemplate.class)
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "postgres", matchIfMissing = true)
 public class PostgresKnowledgeRepository implements KnowledgeRepository {
     private final NamedParameterJdbcTemplate jdbc;
