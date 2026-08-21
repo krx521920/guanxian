@@ -58,6 +58,23 @@ class PolicyRagServiceTest {
     }
 
     @Test
+    void memoryRepositoryRejectsCrossAssociationVersionUpdate() {
+        RagProperties properties = new RagProperties();
+        MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
+        KnowledgeIngestionService service = new KnowledgeIngestionService(repository, properties);
+        UUID ownerAssociation = UUID.randomUUID();
+        var initial = service.ingest(new KnowledgeTextDocument(
+                null, ownerAssociation, "内部制度", "POLICY", "MANUAL", null,
+                "ASSOCIATION", "PUBLISHED", "tester", "地下管线设施应按照规定开展定期巡检。"
+        ));
+
+        assertThrows(IllegalArgumentException.class, () -> service.ingest(new KnowledgeTextDocument(
+                initial.documentId(), UUID.randomUUID(), "越权更新", "POLICY", "MANUAL", null,
+                "ASSOCIATION", "PUBLISHED", "attacker", "尝试覆盖其他协会的知识文档。"
+        )));
+    }
+
+    @Test
     void estimatedCostLimitStopsExternalCall() {
         RagProperties properties = new RagProperties();
         properties.setMaxEstimatedCost(new BigDecimal("0.01"));
