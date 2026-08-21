@@ -30,6 +30,9 @@ public class KnowledgeIngestionService {
         String status = normalized(document.status(), "PUBLISHED");
         if (!VISIBILITIES.contains(visibility)) throw new IllegalArgumentException("unsupported knowledge visibility");
         if (!STATUSES.contains(status)) throw new IllegalArgumentException("unsupported knowledge status");
+        if (!"PUBLIC".equals(visibility) && document.associationId() == null) {
+            throw new IllegalArgumentException("non-public knowledge documents require an association");
+        }
         securityGuard.validateKnowledgeDocument(document.title(), document.sourceUrl(), document.content());
         validateSourceUrl(document.sourceUrl());
         var chunks = chunker.split(document.content());
