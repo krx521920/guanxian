@@ -32,7 +32,8 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
         int version = previous == null ? 1 : previous.version() + 1;
         UUID versionId = UUID.randomUUID();
         MemoryDocument document = new MemoryDocument(documentId, command.associationId(), command.title(),
-                command.sourceUrl(), command.visibility(), command.status(), version, versionId, command.contentHash());
+                command.sourceUrl(), command.visibility(), command.status(), command.actorSubject(),
+                version, versionId, command.contentHash());
         documents.put(documentId, document);
         for (TextChunk source : command.chunks()) {
             UUID chunkId = UUID.randomUUID();
@@ -42,16 +43,14 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     }
 
     @Override
-    public synchronized List<RetrievedChunk> retrieve(UUID associationId, String query, int limit) {
+    public synchronized List<RetrievedChunk> retrieve(RetrievalScope scope, String query, int limit) {
         if (query == null || query.isBlank() || limit < 1) return List.of();
         Set<String> terms = queryTerms(query);
         List<RetrievedChunk> matches = new ArrayList<>();
         for (MemoryChunk chunk : chunks.values()) {
             MemoryDocument document = documents.get(chunk.documentId());
             if (document == null || chunk.version() != document.version() || !"PUBLISHED".equals(document.status())) continue;
-            boolean visible = "PUBLIC".equals(document.visibility())
-                    || (associationId != null && associationId.equals(document.associationId()));
-            if (!visible) continue;
+            if (!visibleTo(scope, document)) continue;
             double score = relevance(chunk.content(), query, terms);
             if (score > 0) {
                 matches.add(new RetrievedChunk(chunk.id(), document.id(), document.title(), chunk.version(),
@@ -83,6 +82,14 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     int retrievalTraceCount() { return retrievalTraces.size(); }
     int modelExecutionCount() { return modelExecutions.size(); }
 
+    private boolean visibleTo(RetrievalScope scope, MemoryDocument document) {
+        if ("PUBLIC".equals(document.visibility())) return true;
+        if (scope.associationId() == null || !scope.associationId().equals(document.associationId())) return false;
+        if ("ASSOCIATION".equals(document.visibility())) return true;
+        return "PRIVATE".equals(document.visibility())
+                && (scope.privileged() || scope.actorSubject().equals(document.createdBySubject()));
+    }
+
     static Set<String> queryTerms(String query) {
         String normalized = query.toLowerCase(Locale.ROOT).replaceAll("[\\p{Punct}，。！？；：、（）【】《》]+", " ").trim();
         LinkedHashSet<String> terms = new LinkedHashSet<>();
@@ -113,7 +120,8 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     }
 
     private record MemoryDocument(UUID id, UUID associationId, String title, String sourceUrl,
-                                  String visibility, String status, int version, UUID versionId, String contentHash) {
+                                  String visibility, String status, String createdBySubject,
+                                  int version, UUID versionId, String contentHash) {
     }
 
     private record MemoryChunk(UUID id, UUID documentId, UUID versionId, int version, int index, String content) {
