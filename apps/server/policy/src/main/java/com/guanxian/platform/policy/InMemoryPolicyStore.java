@@ -141,7 +141,8 @@ class InMemoryPolicyStore implements PolicyStore {
     @Override
     public List<PolicyHistoryView> history(UUID id, ActorScope actor, int limit) {
         return histories.getOrDefault(id, List.of()).stream()
-                .sorted(Comparator.comparing(PolicyHistoryView::occurredAt).reversed())
+                .sorted(Comparator.comparingLong(PolicyHistoryView::version).reversed()
+                        .thenComparing(PolicyHistoryView::occurredAt, Comparator.reverseOrder()))
                 .limit(limit)
                 .toList();
     }
