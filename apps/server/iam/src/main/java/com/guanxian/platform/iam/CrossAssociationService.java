@@ -64,13 +64,15 @@ class CrossAssociationService {
         }
         Instant now = Instant.now();
         String status = request.decision() == CrossAssociationDtos.AccessDecision.APPROVE ? "APPROVED" : "REJECTED";
+        if ("APPROVED".equals(status)
+                && request.relationshipExpiresAt() != null
+                && !request.relationshipExpiresAt().isAfter(now)) {
+            throw invalid("relationshipExpiresAt must be in the future");
+        }
         var reviewed = store.reviewAccessRequest(id, status, clean(request.comment()), actor, now);
         store.audit(actor, existing.targetAssociationId(), null, "ASSOCIATION_ACCESS_REQUEST_" + status,
                 "ASSOCIATION_ACCESS_REQUEST", id, reviewed);
         if ("APPROVED".equals(status)) {
-            if (request.relationshipExpiresAt() != null && !request.relationshipExpiresAt().isAfter(now)) {
-                throw invalid("relationshipExpiresAt must be in the future");
-            }
             var relationship = store.establishRelationship(
                     existing.applicantAssociationId(), existing.targetAssociationId(),
                     !Boolean.FALSE.equals(request.allowMemberData()), request.relationshipExpiresAt(), actor, now);
