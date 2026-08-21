@@ -42,8 +42,10 @@ class CrossAssociationService {
             throw new ConflictException("associations already have an active relationship");
         }
         boolean pending = store.accessRequests().stream().anyMatch(item -> "PENDING".equals(item.status())
-                && item.applicantAssociationId().equals(source)
-                && item.targetAssociationId().equals(request.targetAssociationId()));
+                && ((item.applicantAssociationId().equals(source)
+                        && item.targetAssociationId().equals(request.targetAssociationId()))
+                    || (item.applicantAssociationId().equals(request.targetAssociationId())
+                        && item.targetAssociationId().equals(source))));
         if (pending) {
             throw new ConflictException("a pending access request already exists");
         }
