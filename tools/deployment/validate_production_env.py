@@ -35,6 +35,7 @@ REQUIRED = (
     "SPRING_DATA_REDIS_HOST",
     "SPRING_DATA_REDIS_PORT",
     "GUANXIAN_AI_PROVIDER_ENABLED",
+    "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED",
     "GUANXIAN_RAG_MAX_ESTIMATED_COST",
     "WEB_OIDC_AUTHORITY",
     "WEB_OIDC_CLIENT_ID",
@@ -188,6 +189,19 @@ def validate(values: dict[str, str]) -> list[str]:
     ai_enabled = cleaned.get("GUANXIAN_AI_PROVIDER_ENABLED", "").casefold()
     if ai_enabled not in {"true", "false"}:
         errors.append("GUANXIAN_AI_PROVIDER_ENABLED: must be true or false")
+    egress_enabled = cleaned.get(
+        "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED", ""
+    ).casefold()
+    if egress_enabled not in {"true", "false"}:
+        errors.append(
+            "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED: must be true or false"
+        )
+    if egress_enabled == "true" and ai_enabled != "true":
+        errors.append(
+            "GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED: requires "
+            "GUANXIAN_AI_PROVIDER_ENABLED=true"
+        )
+
     if ai_enabled == "true":
         for key in (
             "GUANXIAN_AI_PROVIDER_ENDPOINT",
