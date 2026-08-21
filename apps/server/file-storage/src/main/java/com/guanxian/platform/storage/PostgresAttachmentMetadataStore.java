@@ -20,7 +20,7 @@ import java.util.UUID;
 
 @Repository
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "postgres", matchIfMissing = true)
-final class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
+class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
     private static final String COLUMNS = """
             id, association_id, enterprise_id, bucket_name, object_key, original_filename,
             media_type, size_bytes, sha256, scan_status, visibility, lifecycle_status,
