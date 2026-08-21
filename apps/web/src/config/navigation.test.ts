@@ -7,11 +7,11 @@ const associationRoles: UserRole[] = ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSO
 const enterpriseRoles: UserRole[] = ['ENTERPRISE_ADMIN', 'ENTERPRISE_MEMBER']
 
 describe('role navigation', () => {
-  it('keeps association-only modules away from enterprise members', () => {
+  it('lets enterprise members view the scoped member directory without the association workspace', () => {
     const paths = navigationForRole('ENTERPRISE_MEMBER').map((item) => item.to)
     expect(paths).toContain('/enterprise')
     expect(paths).not.toContain('/association')
-    expect(paths).not.toContain('/members')
+    expect(paths).toContain('/members')
   })
 
   it('allows association operators to manage members and collaboration', () => {
@@ -30,11 +30,11 @@ describe('role navigation', () => {
     expect(paths).not.toContain('/enterprise')
   })
 
-  it.each(enterpriseRoles)('denies association-only navigation to %s', (role) => {
+  it.each(enterpriseRoles)('shows the scoped member directory but not association administration to %s', (role) => {
     const paths = navigationForRole(role).map((item) => item.to)
     expect(paths).toEqual(expect.arrayContaining(['/enterprise', '/policies', '/matching', '/collaborations']))
     expect(paths).not.toContain('/association')
-    expect(paths).not.toContain('/members')
+    expect(paths).toContain('/members')
   })
 
   it.each([...associationRoles, ...enterpriseRoles])('shows shared ecosystem navigation to %s', (role) => {

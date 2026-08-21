@@ -39,7 +39,7 @@ class ArchitectureBoundaryTest {
         classes()
                 .that().resideInAnyPackage("..member.api..")
                 .should().onlyDependOnClassesThat().resideInAnyPackage(
-                        "java..", "com.guanxian.platform.member.api..")
+                        "java..", "com.guanxian.platform.member.api..", "com.guanxian.platform.shared.security..")
                 .because("other modules consume member.api without depending on web or internal implementation")
                 .check(PRODUCTION_CLASSES);
     }

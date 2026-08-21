@@ -1,6 +1,10 @@
 spring:
   application:
     name: guanxian-server
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jackson:
     default-property-inclusion: non_null
   datasource:

@@ -8,7 +8,10 @@ import com.guanxian.platform.member.api.MemberDirectory;
 import com.guanxian.platform.policy.PolicyService;
 import com.guanxian.platform.policy.PolicyView;
 import com.guanxian.platform.shared.api.ApiResponse;
+import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.ActorScopeResolver;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,22 +25,26 @@ public class DashboardController {
     private final PolicyService policyService;
     private final EcosystemMatchService matchService;
     private final CollaborationService collaborationService;
+    private final ActorScopeResolver actorScopeResolver;
 
     public DashboardController(
             MemberDirectory memberDirectory,
             PolicyService policyService,
             EcosystemMatchService matchService,
-            CollaborationService collaborationService) {
+            CollaborationService collaborationService,
+            ActorScopeResolver actorScopeResolver) {
         this.memberDirectory = memberDirectory;
         this.policyService = policyService;
         this.matchService = matchService;
         this.collaborationService = collaborationService;
+        this.actorScopeResolver = actorScopeResolver;
     }
 
     @GetMapping("/association")
     @PreAuthorize("hasAuthority('DASHBOARD_ASSOCIATION_READ')")
-    ApiResponse<AssociationDashboard> association() {
-        int memberCount = memberDirectory.findAll(null).size();
+    ApiResponse<AssociationDashboard> association(Authentication authentication) {
+        ActorScope actor = actorScopeResolver.resolve(authentication);
+        int memberCount = memberDirectory.findAll(null, actor).size();
         List<CollaborationView> collaborations = collaborationService.findAll();
         return ApiResponse.ok(new AssociationDashboard(
                 List.of(

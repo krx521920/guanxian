@@ -86,7 +86,7 @@ class ApiIntegrationTest {
 
         String updatedBody = body.replace("测试管线技术有限公司", "测试管线科技有限公司");
         mockMvc.perform(put("/api/v1/members/{id}", id)
-                .with(httpBasic("enterprise-admin", "enterprise123"))
+                .with(httpBasic("association-admin", "admin123"))
                 .header(HttpHeaders.IF_MATCH, "\"0\"")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updatedBody))

@@ -1,6 +1,8 @@
 package com.guanxian.platform.member.web;
 
 import com.guanxian.platform.member.api.MemberProfile;
+import com.guanxian.platform.member.internal.MemberService;
+import com.guanxian.platform.shared.security.ActorScope;
 
 import java.time.Instant;
 import java.util.List;
@@ -17,9 +19,12 @@ public record MemberListItem(
         String contact,
         int completeness,
         String status,
+        String visibility,
+        boolean canEdit,
+        boolean canReview,
         Instant updatedAt) {
 
-    static MemberListItem from(MemberProfile member) {
+    static MemberListItem from(MemberProfile member, ActorScope actor, MemberService service) {
         int populated = 3;
         populated += member.address() == null ? 0 : 1;
         populated += member.contactName() == null ? 0 : 1;
@@ -34,8 +39,10 @@ public record MemberListItem(
                 switch (member.status()) {
                     case "PENDING_REVIEW" -> "待审核";
                     case "INCOMPLETE" -> "待完善";
+                    case "DISABLED" -> "已停用";
                     default -> "已认证";
-                }, member.updatedAt());
+                },
+                member.visibility(), service.canEdit(actor, member), service.canReview(actor, member), member.updatedAt());
     }
 
     private static String abbreviate(String name) {

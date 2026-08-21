@@ -8,12 +8,12 @@ import type {
 } from '../types/domain'
 
 export const members: MemberEnterprise[] = [
-  { id: 'E001', name: '北京市政建设集团有限责任公司', shortName: '北京建工市政', role: '建设施工单位', scenes: ['施工建设', '更新改造'], products: ['地下管线施工', '非开挖修复'], city: '北京', contact: '陈工', completeness: 96, status: '已认证', updatedAt: '2026-08-13' },
-  { id: 'E002', name: '京城管网科技有限公司', shortName: '京城管网', role: '技术服务单位', scenes: ['探测测绘', '运行监测'], products: ['管网数字孪生', '泄漏监测平台'], city: '北京', contact: '王志远', completeness: 91, status: '已认证', updatedAt: '2026-08-12' },
-  { id: 'E003', name: '华北智慧阀门制造有限公司', shortName: '华北阀门', role: '产品制造单位', scenes: ['运行维护', '应急处置'], products: ['智能球阀', '远程控制器'], city: '廊坊', contact: '周经理', completeness: 78, status: '待完善', updatedAt: '2026-08-11' },
-  { id: 'E004', name: '中勘地下空间技术研究院', shortName: '中勘研究院', role: '勘察设计单位', scenes: ['规划设计', '探测测绘'], products: ['地质勘察', '管线综合设计'], city: '北京', contact: '刘工', completeness: 85, status: '待审核', updatedAt: '2026-08-10' },
-  { id: 'E005', name: '北方燃气安全科技股份有限公司', shortName: '北方燃气安全', role: '安全设备单位', scenes: ['运行监测', '应急处置'], products: ['燃气报警器', '巡检机器人'], city: '天津', contact: '韩经理', completeness: 93, status: '已认证', updatedAt: '2026-08-09' },
-  { id: 'E006', name: '首都城市更新发展有限公司', shortName: '首都更新', role: '建设运营单位', scenes: ['更新改造', '运营管理'], products: ['更新项目管理', '城市体检服务'], city: '北京', contact: '宋主任', completeness: 69, status: '待完善', updatedAt: '2026-08-08' },
+  { id: 'E001', name: '北京市政建设集团有限责任公司', shortName: '北京建工市政', role: '建设施工单位', scenes: ['施工建设', '更新改造'], products: ['地下管线施工', '非开挖修复'], city: '北京', contact: '陈工', completeness: 96, status: '已认证', visibility: 'MEMBERS', canEdit: true, canReview: true, updatedAt: '2026-08-13' },
+  { id: 'E002', name: '京城管网科技有限公司', shortName: '京城管网', role: '技术服务单位', scenes: ['探测测绘', '运行监测'], products: ['管网数字孪生', '泄漏监测平台'], city: '北京', contact: '王志远', completeness: 91, status: '已认证', visibility: 'MEMBERS', canEdit: true, canReview: true, updatedAt: '2026-08-12' },
+  { id: 'E003', name: '华北智慧阀门制造有限公司', shortName: '华北阀门', role: '产品制造单位', scenes: ['运行维护', '应急处置'], products: ['智能球阀', '远程控制器'], city: '廊坊', contact: '周经理', completeness: 78, status: '待完善', visibility: 'MEMBERS', canEdit: true, canReview: true, updatedAt: '2026-08-11' },
+  { id: 'E004', name: '中勘地下空间技术研究院', shortName: '中勘研究院', role: '勘察设计单位', scenes: ['规划设计', '探测测绘'], products: ['地质勘察', '管线综合设计'], city: '北京', contact: '刘工', completeness: 85, status: '待审核', visibility: 'MEMBERS', canEdit: true, canReview: true, updatedAt: '2026-08-10' },
+  { id: 'E005', name: '北方燃气安全科技股份有限公司', shortName: '北方燃气安全', role: '安全设备单位', scenes: ['运行监测', '应急处置'], products: ['燃气报警器', '巡检机器人'], city: '天津', contact: '韩经理', completeness: 93, status: '已认证', visibility: 'MEMBERS', canEdit: true, canReview: true, updatedAt: '2026-08-09' },
+  { id: 'E006', name: '首都城市更新发展有限公司', shortName: '首都更新', role: '建设运营单位', scenes: ['更新改造', '运营管理'], products: ['更新项目管理', '城市体检服务'], city: '北京', contact: '宋主任', completeness: 69, status: '待完善', visibility: 'MEMBERS', canEdit: true, canReview: true, updatedAt: '2026-08-08' },
 ]
 
 export const policies: Policy[] = [

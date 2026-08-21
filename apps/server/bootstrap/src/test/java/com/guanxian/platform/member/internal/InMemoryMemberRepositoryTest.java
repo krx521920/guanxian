@@ -71,7 +71,8 @@ class InMemoryMemberRepositoryTest {
     private static MemberProfile member(UUID id, String name, long version) {
         Instant now = Instant.parse("2026-08-15T00:00:00Z");
         return new MemberProfile(
-                id, name, "91110000TEST000001", "测试单位", null, null, null, null,
-                List.of(), List.of(), List.of(), "ACTIVE", version, now, now);
+                id, UUID.fromString("00000000-0000-0000-0000-000000000100"),
+                name, "91110000TEST000001", "测试单位", null, null, null, null,
+                List.of(), List.of(), List.of(), "MEMBERS", "ACTIVE", version, now, now);
     }
 }

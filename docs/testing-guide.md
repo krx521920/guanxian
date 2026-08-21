@@ -33,6 +33,22 @@ Push-Location services/ai; python -m ruff check app tests; python -m pytest; Pop
 ```
 
 跨模块运行时冒烟可执行 `./tests/smoke/runtime-smoke.ps1`。脚本会启动实际 Java 与 AI 进程，验证健康检查、合法账号、匿名 `401`、政策列表、确定性匹配、安全响应头，以及成功/鉴权失败/AI 匹配三条 `X-Request-Id` 往返契约；还会创建临时会员，验证 ETag 从 `"0"` 递增到 `"1"`、旧标签写入返回 `412`，最后按新标签删除。本轮结果为 `request_trace=ok`、`optimistic_concurrency=ok`，报告写入 `test-results/smoke/result.json`。
+### 真实 PostgreSQL 与 IdP 验收
+
+PostgreSQL 迁移自动测试位于 `PostgresMemberMigrationIntegrationTest`。本机 Docker Engine 已恢复，但 Testcontainers 通过 Docker Desktop 命名管道请求 `/info` 时仍收到 400，因此 Maven 会跳过该类的 2 项测试。不能把“跳过”视为通过。本轮另行使用隔离的 `postgres:16-alpine` 容器和实际 Spring Boot JAR 完成等价验收：空库 Flyway V1–V3 均成功，创建返回 ETag `"0"`，更新返回 `"1"`，删除返回 200，删除后 3 条创建/更新/删除审计仍完整保留；再按 `legacy-member-schema.sql` 装入旧库，验证 baseline 0 + V1/V2/V3 共 4 条历史、存量会员和版本 3 保留、API ETag `"3"`、新增企业使用旧库实际协会 UUID、删除后 2 条审计保留。CI 的标准 Docker socket 环境仍应执行 Testcontainers 类。
+
+真实 Keycloak 登录协议可用以下工具复验：
+
+```powershell
+./tools/testing/Test-KeycloakPkce.ps1 `
+  -Authority 'https://identity.example.com/realms/guanxian' `
+  -ClientId 'guanxian-web' `
+  -Username $env:OIDC_TEST_USERNAME `
+  -Password $env:OIDC_TEST_PASSWORD `
+  -RedirectUri 'https://platform.example.com/auth/callback'
+```
+
+工具验证 discovery issuer、S256、登录页、302 回调、state、授权码、token 兑换、access token、ID token 与 UserInfo。密码只通过参数传入，不写报告。`-AllowInsecureLoopback` 仅用于临时 Keycloak 在 `127.0.0.1` 上的 HTTP 测试；工具会拒绝将该开关用于非回环主机，生产和共享测试环境必须使用 HTTPS。本轮 Keycloak 26.7.1 实测全部通过；另以两个真实 RS256 令牌验证了后端系统管理员引导、`user_account` 绑定、协会管理员 `…0106` 数据域和绑定审计。
 
 ## 4. 变异测试
 
@@ -44,7 +60,7 @@ mvn -pl bootstrap -am verify -Pmutation
 Pop-Location
 ```
 
-报告：`apps/server/bootstrap/target/pit-reports/index.html`。当前基线：65 项常规测试通过；变异代码行覆盖 370/387（96%）；179 个变异体中 162 个被杀死、13 个存活、4 个无覆盖，变异分数 91%，测试强度 93%。存活变异体应结合业务风险补断言，不应只为提高分数编写无意义测试。
+报告：`apps/server/bootstrap/target/pit-reports/index.html`。本轮常规 `mvn verify` 发现 89 项，其中 87 项通过、2 项 PostgreSQL/Testcontainers 测试因 Docker Desktop 命名管道兼容问题跳过；对应真实 PostgreSQL 行为已按上一节独立验收。最近一次 PIT 基线（新增本轮回归测试前）为：576 个变异体中 379 个被杀死、108 个存活、89 个无覆盖，变异分数 65.80%，测试强度 77.82%。会员权限策略存活变异为 0；剩余缺口主要来自 PostgreSQL 适配器、XLSX 防御分支及低风险展示代码。存活变异应按业务风险补断言，不为分数编写无意义测试。
 
 ### Web/StrykerJS
 
@@ -54,7 +70,7 @@ npm run mutation
 Pop-Location
 ```
 
-报告：`apps/web/reports/mutation/mutation.html` 和 `mutation.json`。当前基线：96 项常规测试通过；365/365 个变异体被杀死，分数 100%。配置阈值为 high 80、low 60、break 50。
+报告：`apps/web/reports/mutation/mutation.html` 和 `mutation.json`。当前基线（2026-08-21）：122 项常规测试全部通过；618 个变异体中 592 个被杀死、23 个存活、3 个无覆盖，总分 95.79%。新增的 API 路径、HTTP 方法、ETag 与导入合同层为 90.63%，HTTP 客户端为 99.55%。配置阈值为 high 80、low 60、break 50。
 
 Windows 受限沙箱内，Stryker 在报告完成后可能因 `taskkill` 权限返回非零退出码；报告内容仍有效。在普通终端和 GitHub Ubuntu Runner 中应以进程退出码为准。
 
@@ -111,7 +127,7 @@ Docker 可用时执行：
 ./tests/security/run-zap.ps1 -Mode api -Target http://127.0.0.1:18001/openapi.json
 ```
 
-规则位于 `tests/security/zap-rules.conf`，报告生成到 `test-results/zap/`。Web Nginx 与 AI API 已配置 X-Content-Type-Options、X-Frame-Options 和 Referrer-Policy 等安全头。本机 Docker daemon 当前不可访问，因此本轮未执行容器化 ZAP；GitHub `advanced-testing.yml` 会在隔离 Runner 上执行 API 主动扫描并上传报告。
+规则位于 `tests/security/zap-rules.conf`，报告生成到 `test-results/zap/`。Web Nginx 与 AI API 已配置 X-Content-Type-Options、X-Frame-Options 和 Referrer-Policy 等安全头。Docker Engine 当前可用，但本次验收范围是 PostgreSQL 与 IdP，未重复执行容器化 ZAP；GitHub `advanced-testing.yml` 会在隔离 Runner 上执行 API 主动扫描并上传报告。
 
 ## 8. 供应链扫描
 
@@ -128,7 +144,7 @@ GitHub `security-scan.yml` 还使用 Trivy 扫描 HIGH/CRITICAL 依赖漏洞、�
 ./tests/resilience/run-toxiproxy.ps1
 ```
 
-脚本通过 Compose 启动 AI 与固定版本的 Toxiproxy 2.12.0，在代理链路注入 1,500ms 延迟、验证延迟确实生效，然后移除 toxic。报告和终端结果用于确认上游超时、降级及监控配置。本机 Docker daemon 当前不可访问，因此此项已配置但未在本轮执行。
+脚本通过 Compose 启动 AI 与固定版本的 Toxiproxy 2.12.0，在代理链路注入 1,500ms 延迟、验证延迟确实生效，然后移除 toxic。报告和终端结果用于确认上游超时、降级及监控配置。Docker Engine 当前可用；本次 PostgreSQL/IdP 验收未重复执行该故障注入任务。
 
 ## 10. CI 运行策略
 

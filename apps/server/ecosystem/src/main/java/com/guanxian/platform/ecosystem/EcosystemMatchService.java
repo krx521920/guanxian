@@ -3,6 +3,7 @@ package com.guanxian.platform.ecosystem;
 import com.guanxian.platform.ai.AiTextService;
 import com.guanxian.platform.member.api.MemberDirectory;
 import com.guanxian.platform.member.api.MemberProfile;
+import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -32,11 +33,11 @@ public class EcosystemMatchService {
                         List.of("城市更新场景匹配", "具备数字孪生能力", "服务覆盖北京地区"), "已推荐", "昨天 16:18"));
     }
 
-    public List<EcosystemMatch> match(MatchRequest request) {
+    public List<EcosystemMatch> match(MatchRequest request, ActorScope actor) {
         int limit = request.limit() == null ? 5 : request.limit();
         String context = String.join(" ", request.demandTitle(), request.scene(), nullToEmpty(request.requirements()));
         List<String> tags = aiTextService.extractTags(context);
-        return memberDirectory.findAll(null).stream()
+        return memberDirectory.findAll(null, actor).stream()
                 .filter(member -> !member.name().equalsIgnoreCase(request.demandCompany()))
                 .map(member -> score(member, request, tags))
                 .sorted(Comparator.comparingInt(EcosystemMatch::score).reversed()

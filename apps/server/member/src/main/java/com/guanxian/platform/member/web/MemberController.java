@@ -5,11 +5,14 @@ import com.guanxian.platform.member.internal.MemberService;
 import com.guanxian.platform.shared.api.ApiResponse;
 import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.PreconditionRequiredException;
+import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.ActorScopeResolver;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,27 +36,33 @@ public class MemberController {
     private static final Pattern STRONG_VERSION_ETAG = Pattern.compile("\\\"(0|[1-9][0-9]*)\\\"");
 
     private final MemberService memberService;
+    private final ActorScopeResolver actorScopeResolver;
 
-    public MemberController(MemberService memberService) {
+    public MemberController(MemberService memberService, ActorScopeResolver actorScopeResolver) {
         this.memberService = memberService;
+        this.actorScopeResolver = actorScopeResolver;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('MEMBER_READ')")
-    ApiResponse<List<MemberListItem>> list(@RequestParam(required = false) String q) {
-        return ApiResponse.ok(memberService.findAll(q).stream().map(MemberListItem::from).toList());
+    ApiResponse<List<MemberListItem>> list(
+            @RequestParam(required = false) String q, Authentication authentication) {
+        ActorScope actor = actorScopeResolver.resolve(authentication);
+        return ApiResponse.ok(memberService.findAll(q, actor).stream()
+                .map(member -> MemberListItem.from(member, actor, memberService)).toList());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('MEMBER_READ')")
-    ResponseEntity<ApiResponse<MemberProfile>> get(@PathVariable UUID id) {
-        return response(HttpStatus.OK, memberService.get(id));
+    ResponseEntity<ApiResponse<MemberProfile>> get(@PathVariable UUID id, Authentication authentication) {
+        return response(HttpStatus.OK, memberService.get(id, actorScopeResolver.resolve(authentication)));
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
-    ResponseEntity<ApiResponse<MemberProfile>> create(@Valid @RequestBody MemberUpsertRequest request) {
-        return response(HttpStatus.CREATED, memberService.create(request));
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
+    ResponseEntity<ApiResponse<MemberProfile>> create(
+            @Valid @RequestBody MemberUpsertRequest request, Authentication authentication) {
+        return response(HttpStatus.CREATED, memberService.create(request, actorScopeResolver.resolve(authentication)));
     }
 
     @PutMapping("/{id}")
@@ -61,26 +70,41 @@ public class MemberController {
     ResponseEntity<ApiResponse<MemberProfile>> update(
             @PathVariable UUID id,
             @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
-            @Valid @RequestBody MemberUpsertRequest request) {
-        return response(HttpStatus.OK, memberService.update(id, requiredVersion(ifMatch), request));
+            @Valid @RequestBody MemberUpsertRequest request,
+            Authentication authentication) {
+        return response(HttpStatus.OK, memberService.update(
+                id, requiredVersion(ifMatch), request, actorScopeResolver.resolve(authentication)));
+    }
+
+    @PutMapping("/{id}/review")
+    @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
+    ResponseEntity<ApiResponse<MemberProfile>> review(
+            @PathVariable UUID id,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
+            @Valid @RequestBody MemberReviewRequest request,
+            Authentication authentication) {
+        return response(HttpStatus.OK, memberService.review(
+                id, requiredVersion(ifMatch), request, actorScopeResolver.resolve(authentication)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN')")
     ApiResponse<Map<String, Object>> delete(
             @PathVariable UUID id,
-            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch) {
-        MemberProfile deleted = memberService.delete(id, requiredVersion(ifMatch));
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
+            Authentication authentication) {
+        MemberProfile deleted = memberService.delete(
+                id, requiredVersion(ifMatch), actorScopeResolver.resolve(authentication));
         return ApiResponse.ok(Map.of("deleted", true, "id", deleted.id()));
     }
 
-    private static ResponseEntity<ApiResponse<MemberProfile>> response(HttpStatus status, MemberProfile member) {
+    static ResponseEntity<ApiResponse<MemberProfile>> response(HttpStatus status, MemberProfile member) {
         return ResponseEntity.status(status)
                 .eTag('"' + Long.toString(member.version()) + '"')
                 .body(ApiResponse.ok(member));
     }
 
-    private static long requiredVersion(List<String> ifMatch) {
+    static long requiredVersion(List<String> ifMatch) {
         if (ifMatch == null || ifMatch.isEmpty()) {
             throw new PreconditionRequiredException("If-Match header is required");
         }

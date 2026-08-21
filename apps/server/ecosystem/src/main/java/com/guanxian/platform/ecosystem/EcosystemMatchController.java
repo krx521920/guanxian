@@ -1,8 +1,10 @@
 package com.guanxian.platform.ecosystem;
 
 import com.guanxian.platform.shared.api.ApiResponse;
+import com.guanxian.platform.shared.security.ActorScopeResolver;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,9 +17,11 @@ import java.util.List;
 @RequestMapping({"/api/v1/matches", "/api/v1/ecosystem/matches"})
 public class EcosystemMatchController {
     private final EcosystemMatchService matchService;
+    private final ActorScopeResolver actorScopeResolver;
 
-    public EcosystemMatchController(EcosystemMatchService matchService) {
+    public EcosystemMatchController(EcosystemMatchService matchService, ActorScopeResolver actorScopeResolver) {
         this.matchService = matchService;
+        this.actorScopeResolver = actorScopeResolver;
     }
 
     @GetMapping
@@ -28,7 +32,8 @@ public class EcosystemMatchController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('MATCH_REQUEST')")
-    ApiResponse<List<EcosystemMatch>> requestMatch(@Valid @RequestBody MatchRequest request) {
-        return ApiResponse.ok(matchService.match(request));
+    ApiResponse<List<EcosystemMatch>> requestMatch(
+            @Valid @RequestBody MatchRequest request, Authentication authentication) {
+        return ApiResponse.ok(matchService.match(request, actorScopeResolver.resolve(authentication)));
     }
 }

@@ -46,7 +46,7 @@ class MemberOptimisticConcurrencyIntegrationTest {
 
         String updated = body("已更新版本企业-" + suffix, "VER" + suffix);
         mockMvc.perform(put("/api/v1/enterprises/{id}", id)
-                        .with(httpBasic("enterprise-admin", "enterprise123"))
+                        .with(httpBasic("association-admin", "admin123"))
                         .header(HttpHeaders.IF_MATCH, "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updated))

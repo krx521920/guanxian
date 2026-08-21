@@ -52,15 +52,20 @@ public class SecurityConfig {
             "MATCH_REQUEST",
             "COLLABORATION_READ",
             "DASHBOARD_ASSOCIATION_READ",
-            "DASHBOARD_ENTERPRISE_READ");
+            "DASHBOARD_ENTERPRISE_READ",
+            "MEMBER_IMPORT",
+            "MEMBER_REVIEW",
+            "AUDIT_READ",
+            "ACCESS_BINDING_WRITE");
     private static final Map<String, Set<String>> ROLE_PERMISSIONS = Map.of(
             "SYSTEM_ADMIN", KNOWN_PERMISSIONS,
             "ASSOCIATION_ADMIN", Set.of(
                     "MEMBER_READ", "ENTERPRISE_WRITE", "POLICY_READ", "MATCH_REQUEST",
-                    "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ"),
+                    "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ",
+                    "MEMBER_IMPORT", "MEMBER_REVIEW", "AUDIT_READ"),
             "ASSOCIATION_OPERATOR", Set.of(
                     "MEMBER_READ", "ENTERPRISE_WRITE", "POLICY_READ", "MATCH_REQUEST",
-                    "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ"),
+                    "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ", "MEMBER_IMPORT"),
             "ENTERPRISE_ADMIN", Set.of(
                     "MEMBER_READ", "ENTERPRISE_WRITE", "POLICY_READ", "MATCH_REQUEST",
                     "COLLABORATION_READ", "DASHBOARD_ENTERPRISE_READ"),

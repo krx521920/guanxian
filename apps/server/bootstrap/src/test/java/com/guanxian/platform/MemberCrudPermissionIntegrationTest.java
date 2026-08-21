@@ -47,7 +47,7 @@ class MemberCrudPermissionIntegrationTest {
                 .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.version").value(0))
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
                 .andExpect(jsonPath("$.data.capabilities", hasItem("管线探测")))
                 .andExpect(jsonPath("$.data.capabilities.length()").value(1))
                 .andExpect(jsonPath("$.data.products.length()").value(1))
@@ -75,12 +75,12 @@ class MemberCrudPermissionIntegrationTest {
                 .andExpect(jsonPath("$.data[0].city").value("北京市朝阳区"))
                 .andExpect(jsonPath("$.data[0].contact").value("测试联系人"))
                 .andExpect(jsonPath("$.data[0].completeness").value(89))
-                .andExpect(jsonPath("$.data[0].status").value("已认证"))
+                .andExpect(jsonPath("$.data[0].status").value("待审核"))
                 .andExpect(jsonPath("$.data[0].updatedAt").exists());
 
         String updated = memberJson("更新后的企业-" + suffix, creditCode);
         mockMvc.perform(put("/api/v1/enterprises/{id}", id)
-                        .with(httpBasic("enterprise-admin", "enterprise123"))
+                        .with(httpBasic("association-admin", "admin123"))
                         .header(HttpHeaders.IF_MATCH, "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updated))

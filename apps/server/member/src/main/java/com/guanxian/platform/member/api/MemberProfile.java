@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record MemberProfile(
         UUID id,
+        UUID associationId,
         String name,
         String unifiedSocialCreditCode,
         String category,
@@ -16,14 +17,19 @@ public record MemberProfile(
         List<String> capabilities,
         List<String> products,
         List<String> cooperationNeeds,
+        String visibility,
         String status,
         long version,
         Instant createdAt,
         Instant updatedAt) {
 
     public MemberProfile {
+        if (associationId == null) {
+            throw new IllegalArgumentException("associationId is required");
+        }
         if (version < 0) {
             throw new IllegalArgumentException("version must be non-negative");
         }
+        visibility = visibility == null ? "MEMBERS" : visibility;
     }
 }

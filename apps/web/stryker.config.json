@@ -5,7 +5,8 @@
     "src/config/navigation.ts",
     "src/config/roles.ts",
     "src/services/auth.ts",
-    "src/services/http.ts"
+    "src/services/http.ts",
+    "src/services/platform-api.ts"
   ],
   "testRunner": "vitest",
   "vitest": {

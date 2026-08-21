@@ -15,6 +15,8 @@ export interface SessionUser {
   organization: string
   title: string
   permissions: string[]
+  associationId?: string | null
+  enterpriseId?: string | null
 }
 
 export type StatusTone = 'success' | 'warning' | 'info' | 'neutral' | 'danger'
@@ -44,14 +46,19 @@ export interface MemberEnterprise {
   city: string
   contact: string
   completeness: number
-  status: '已认证' | '待完善' | '待审核'
+  status: '已认证' | '待完善' | '待审核' | '已停用'
+  visibility: MemberVisibility
+  canEdit: boolean
+  canReview: boolean
   updatedAt: string
 }
 
 export type MemberStatus = 'ACTIVE' | 'PENDING_REVIEW' | 'INCOMPLETE' | 'DISABLED'
+export type MemberVisibility = 'PRIVATE' | 'ASSOCIATION' | 'PARTNERS' | 'MEMBERS' | 'PUBLIC'
 
 export interface MemberProfile {
   id: string
+  associationId: string
   name: string
   unifiedSocialCreditCode: string | null
   category: string
@@ -62,6 +69,7 @@ export interface MemberProfile {
   capabilities: string[]
   products: string[]
   cooperationNeeds: string[]
+  visibility: MemberVisibility
   status: MemberStatus
   version: number
   createdAt: string
@@ -79,9 +87,42 @@ export interface MemberUpsertPayload {
   capabilities: string[]
   products: string[]
   cooperationNeeds: string[]
+  visibility: MemberVisibility
   status: MemberStatus
+  associationId?: string
 }
 
+export type MemberImportRowData = Omit<MemberUpsertPayload, 'visibility' | 'status' | 'associationId'> & {
+  visibility?: MemberVisibility | null
+  status?: MemberStatus | null
+  associationId?: string | null
+}
+
+export interface MemberImportRow {
+  rowNumber: number
+  data: MemberImportRowData
+  errors: string[]
+  status: 'VALID' | 'INVALID' | 'IMPORTED'
+  enterpriseId: string | null
+}
+
+export interface MemberImportPreview {
+  batchId: string
+  filename: string
+  status: 'PREVIEWED' | 'COMMITTED' | 'CANCELLED'
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  createdAt: string
+  rows: MemberImportRow[]
+}
+
+export interface MemberImportCommitResult {
+  batchId: string
+  importedRows: number
+  invalidRows: number
+  enterpriseIds: string[]
+}
 export interface VersionedMember {
   member: MemberProfile
   etag: string

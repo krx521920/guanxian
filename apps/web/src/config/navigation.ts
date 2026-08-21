@@ -14,7 +14,7 @@ export interface NavItem {
 export const navigation: NavItem[] = [
   { label: '协会工作台', to: '/association', icon: 'dashboard', roles: associationRoles },
   { label: '企业工作台', to: '/enterprise', icon: 'dashboard', roles: enterpriseRoles },
-  { label: '会员企业', to: '/members', icon: 'enterprise', roles: associationRoles },
+  { label: '会员企业', to: '/members', icon: 'enterprise', roles: allRoles },
   { label: '政策标准', to: '/policies', icon: 'policy', roles: allRoles },
   { label: '生态匹配', to: '/matching', icon: 'match', roles: allRoles, badge: '6' },
   { label: '协作事项', to: '/collaborations', icon: 'task', roles: allRoles, badge: '3' },

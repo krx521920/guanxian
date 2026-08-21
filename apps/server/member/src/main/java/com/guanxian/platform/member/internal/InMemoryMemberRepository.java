@@ -1,6 +1,7 @@
 package com.guanxian.platform.member.internal;
 
 import com.guanxian.platform.member.api.MemberProfile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -14,6 +15,17 @@ import java.util.concurrent.ConcurrentMap;
 @ConditionalOnProperty(name = "guanxian.member.repository", havingValue = "memory")
 class InMemoryMemberRepository implements MemberRepository {
     private final ConcurrentMap<UUID, MemberProfile> members = new ConcurrentHashMap<>();
+    private final UUID defaultAssociationId;
+
+    InMemoryMemberRepository() {
+        this(UUID.fromString("00000000-0000-0000-0000-000000000106"));
+    }
+
+    InMemoryMemberRepository(
+            @Value("${guanxian.security.demo.association-id:00000000-0000-0000-0000-000000000106}")
+            UUID defaultAssociationId) {
+        this.defaultAssociationId = defaultAssociationId;
+    }
 
     @Override
     public List<MemberProfile> findAll() {
@@ -23,6 +35,11 @@ class InMemoryMemberRepository implements MemberRepository {
     @Override
     public Optional<MemberProfile> findById(UUID id) {
         return Optional.ofNullable(members.get(id));
+    }
+
+    @Override
+    public UUID defaultAssociationId() {
+        return defaultAssociationId;
     }
 
     @Override

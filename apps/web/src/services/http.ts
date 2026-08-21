@@ -46,7 +46,7 @@ function headerEntries(headersInit?: HeadersInit): Array<[string, string]> {
   return Object.entries(headersInit)
 }
 
-function prepareHeaders(headersInit?: HeadersInit): { headers: Headers; requestId: string } {
+function prepareHeaders(headersInit?: HeadersInit, body?: BodyInit | null): { headers: Headers; requestId: string } {
   const entries = headerEntries(headersInit)
   const requestIdValues = entries
     .filter(([name]) => name.toLowerCase() === requestIdHeader.toLowerCase())
@@ -60,7 +60,9 @@ function prepareHeaders(headersInit?: HeadersInit): { headers: Headers; requestI
   })
   const accessToken = getAccessToken()
   if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`)
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  if (!headers.has('Content-Type') && !(body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   headers.set(requestIdHeader, requestId)
 
   return { headers, requestId }
@@ -102,8 +104,9 @@ export async function request<T>(
   options: RequestInit = {},
   mock?: () => Promise<T> | T,
   observeResponse?: (response: Response) => void,
+  responseKind: 'json' | 'blob' = 'json',
 ): Promise<T> {
-  const { headers, requestId } = prepareHeaders(options.headers)
+  const { headers, requestId } = prepareHeaders(options.headers, options.body)
   const controller = new AbortController()
   const externalSignal = options.signal
   let abortSource: 'external' | 'timeout' | undefined
@@ -148,6 +151,8 @@ export async function request<T>(
       throw error
     }
 
+    if (response.ok && responseKind === 'blob') return await response.blob() as T
+
     let payload: ApiEnvelopeCandidate<T> | T | undefined
     try {
       payload = (await response.json()) as ApiEnvelopeCandidate<T> | T
@@ -188,4 +193,8 @@ export async function request<T>(
     window.clearTimeout(timeout)
     externalSignal?.removeEventListener('abort', abortFromExternal)
   }
+}
+
+export function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+  return request<Blob>(path, options, undefined, undefined, 'blob')
 }

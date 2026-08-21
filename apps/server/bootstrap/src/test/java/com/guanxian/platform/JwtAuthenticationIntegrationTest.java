@@ -39,13 +39,13 @@ class JwtAuthenticationIntegrationTest {
                                 .claim("name", "OIDC 用户")
                                 .claim("organization", "北京地下管线协会"))
                         .authorities(
-                                new SimpleGrantedAuthority("ROLE_ASSOCIATION_ADMIN"),
+                                new SimpleGrantedAuthority("ROLE_SYSTEM_ADMIN"),
                                 new SimpleGrantedAuthority("MEMBER_READ"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.subject").value("oidc-subject"))
                 .andExpect(jsonPath("$.data.username").value("oidc-user"))
                 .andExpect(jsonPath("$.data.displayName").value("OIDC 用户"))
-                .andExpect(jsonPath("$.data.roles[0]").value("ASSOCIATION_ADMIN"))
+                .andExpect(jsonPath("$.data.roles[0]").value("SYSTEM_ADMIN"))
                 .andExpect(jsonPath("$.data.permissions[0]").value("MEMBER_READ"));
     }
 }

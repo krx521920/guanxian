@@ -28,6 +28,7 @@
         <spring-boot.version>3.3.5</spring-boot.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
+        <apache-poi.version>5.5.1</apache-poi.version>
     </properties>
 
     <dependencyManagement>
