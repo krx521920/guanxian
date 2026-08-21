@@ -23,7 +23,7 @@ import java.util.UUID;
         name = "guanxian.business.repository",
         havingValue = "postgres",
         matchIfMissing = true)
-final class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
+class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {
     };
     private static final String OFFERING_SELECT = """
