@@ -1,4 +1,3 @@
-import encoding from 'k6/encoding';
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
@@ -29,7 +28,11 @@ export const options = {
   },
 };
 
-const auth = `Basic ${encoding.b64encode('association-admin:admin123')}`;
+const jwtToken = (__ENV.JWT_TOKEN || '').trim();
+if (!jwtToken) {
+  throw new Error('JWT_TOKEN is required; the load test never uses demo Basic credentials');
+}
+const auth = `Bearer ${jwtToken}`;
 
 export default function () {
   const tracePrefix = `k6-${__VU}-${__ITER}`;
