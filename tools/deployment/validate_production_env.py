@@ -28,6 +28,7 @@ REQUIRED = (
     "GUANXIAN_STORAGE_ENDPOINT",
     "GUANXIAN_STORAGE_ACCESS_KEY",
     "GUANXIAN_STORAGE_SECRET_KEY",
+    "GUANXIAN_STORAGE_REDIS_URL",
     "GUANXIAN_STORAGE_MAX_SIZE_BYTES",
     "GUANXIAN_STORAGE_RATE_LIMIT_ENABLED",
     "GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE",
@@ -90,6 +91,17 @@ def _validate_https_url(key: str, value: str, errors: list[str]) -> None:
         errors.append(f"{key}: loopback or placeholder host is forbidden")
 
 
+def _validate_redis_url(key: str, value: str, errors: list[str]) -> None:
+    parsed = urlsplit(value)
+    host = (parsed.hostname or "").casefold()
+    if parsed.scheme.casefold() != "rediss" or not host:
+        errors.append(f"{key}: must be an absolute rediss:// URL in production")
+    if parsed.fragment:
+        errors.append(f"{key}: fragments are forbidden")
+    if host in PLACEHOLDER_HOSTS or host.endswith(".example") or host.endswith(".invalid"):
+        errors.append(f"{key}: loopback or placeholder host is forbidden")
+
+
 def _positive_int(
     cleaned: dict[str, str], key: str, errors: list[str], *, maximum: int | None = None
 ) -> int | None:
@@ -131,6 +143,10 @@ def validate(values: dict[str, str]) -> list[str]:
         value = cleaned.get(key, "")
         if value:
             _validate_https_url(key, value, errors)
+
+    redis_url = cleaned.get("GUANXIAN_STORAGE_REDIS_URL", "")
+    if redis_url:
+        _validate_redis_url("GUANXIAN_STORAGE_REDIS_URL", redis_url, errors)
 
     issuer = cleaned.get("GUANXIAN_JWT_ISSUER_URI", "")
     authority = cleaned.get("WEB_OIDC_AUTHORITY", "")
