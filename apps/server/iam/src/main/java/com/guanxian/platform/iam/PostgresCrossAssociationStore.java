@@ -48,13 +48,17 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
     public CrossAssociationDtos.AccessRequestView insertAccessRequest(
             UUID source, UUID target, String reason, ActorScope actor, Instant now) {
         UUID id = UUID.randomUUID();
-        jdbc.update("""
-                INSERT INTO association_access_request
-                  (id, applicant_association_id, target_association_id, reason, status,
-                   requested_by_subject, requested_at)
-                VALUES (:id, :source, :target, :reason, 'PENDING', :subject, :now)
-                """, params("id", id).addValue("source", source).addValue("target", target)
-                .addValue("reason", reason).addValue("subject", actor.subject()).addValue("now", now));
+        try {
+            jdbc.update("""
+                    INSERT INTO association_access_request
+                      (id, applicant_association_id, target_association_id, reason, status,
+                       requested_by_subject, requested_at)
+                    VALUES (:id, :source, :target, :reason, 'PENDING', :subject, :now)
+                    """, params("id", id).addValue("source", source).addValue("target", target)
+                    .addValue("reason", reason).addValue("subject", actor.subject()).addValue("now", now));
+        } catch (DataIntegrityViolationException exception) {
+            throw new ConflictException("a pending access request already exists between these associations");
+        }
         return accessRequest(id).orElseThrow();
     }
 
@@ -91,18 +95,23 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
             UUID source, UUID target, boolean allowMemberData, Instant expiresAt, ActorScope actor, Instant now) {
         var old = relationship(source, target).orElse(null);
         if (old == null) {
-            jdbc.update("""
-                    INSERT INTO association_relationship
-                      (source_association_id, target_association_id, status, allow_member_data,
-                       expires_at, version, created_at, updated_at)
-                    VALUES (:source, :target, 'ACTIVE', :allow, :expiresAt, 0, :now, :now)
-                    """, params("source", source).addValue("target", target).addValue("allow", allowMemberData)
-                    .addValue("expiresAt", expiresAt).addValue("now", now));
+            try {
+                jdbc.update("""
+                        INSERT INTO association_relationship
+                          (source_association_id, target_association_id, status, allow_member_data,
+                           expires_at, version, created_at, updated_at)
+                        VALUES (:source, :target, 'ACTIVE', :allow, :expiresAt, 0, :now, :now)
+                        """, params("source", source).addValue("target", target).addValue("allow", allowMemberData)
+                        .addValue("expiresAt", expiresAt).addValue("now", now));
+            } catch (DataIntegrityViolationException exception) {
+                throw new ConflictException("association relationship was established concurrently");
+            }
         } else {
             jdbc.update("""
                     UPDATE association_relationship
                     SET status='ACTIVE', allow_member_data=:allow, expires_at=:expiresAt,
-                        suspended_at=NULL, revoked_at=NULL, revoked_by_subject=NULL, revoke_reason=NULL,
+                        suspended_at=NULL, suspended_by_association_id=NULL, suspended_by_subject=NULL,
+                        revoked_at=NULL, revoked_by_subject=NULL, revoke_reason=NULL,
                         version=version+1, updated_at=:now
                     WHERE source_association_id=:source AND target_association_id=:target
                     """, params("source", old.sourceAssociationId()).addValue("target", old.targetAssociationId())
@@ -121,14 +130,17 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
         int changed = jdbc.update("""
                 UPDATE association_relationship
                 SET status=:status, expires_at=:expiresAt, suspended_at=:suspendedAt,
-                    revoked_at=:revokedAt,
+                    suspended_by_association_id=:suspendedByAssociationId,
+                    suspended_by_subject=:suspendedBySubject, revoked_at=:revokedAt,
                     revoked_by_subject=CASE WHEN :status='REVOKED' THEN :subject ELSE revoked_by_subject END,
                     revoke_reason=CASE WHEN :status='REVOKED' THEN :reason ELSE revoke_reason END,
                     version=version+1, updated_at=:now
                 WHERE source_association_id=:source AND target_association_id=:target AND version=:version
                 """, params("source", old.sourceAssociationId()).addValue("target", old.targetAssociationId())
                 .addValue("version", expectedVersion).addValue("status", status).addValue("expiresAt", expiresAt)
-                .addValue("suspendedAt", suspendedAt).addValue("revokedAt", revokedAt)
+                .addValue("suspendedAt", suspendedAt)
+                .addValue("suspendedByAssociationId", suspendedByAssociationId)
+                .addValue("suspendedBySubject", suspendedBySubject).addValue("revokedAt", revokedAt)
                 .addValue("subject", actor.subject()).addValue("reason", reason).addValue("now", now));
         requireUpdated(changed);
         return relationship(old.sourceAssociationId(), old.targetAssociationId()).orElseThrow();
@@ -280,6 +292,67 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
     }
 
     @Override
+    public boolean resourceOwnedByEnterprise(String resourceType, UUID resourceId, UUID enterpriseId) {
+        MapSqlParameterSource values = params("resourceId", resourceId).addValue("enterpriseId", enterpriseId);
+        String sql = switch (resourceType) {
+            case "PRODUCT", "SERVICE" -> """
+                    SELECT COUNT(*) FROM product_service
+                    WHERE id=:resourceId AND enterprise_id=:enterpriseId
+                      AND kind=:resourceType AND deleted_at IS NULL
+                    """;
+            case "DEMAND" -> """
+                    SELECT COUNT(*) FROM cooperation_demand
+                    WHERE id=:resourceId AND enterprise_id=:enterpriseId AND deleted_at IS NULL
+                    """;
+            case "MATCH" -> """
+                    SELECT COUNT(*)
+                    FROM ecosystem_match m
+                    JOIN cooperation_demand d ON d.id=m.demand_id
+                    WHERE m.id=:resourceId AND m.deleted_at IS NULL AND d.deleted_at IS NULL
+                      AND (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)
+                    """;
+            default -> null;
+        };
+        if (sql == null) return false;
+        values.addValue("resourceType", resourceType);
+        Integer count = jdbc.queryForObject(sql, values, Integer.class);
+        return count != null && count == 1;
+    }
+
+    @Override
+    public Optional<CrossAssociationStore.DemandOwnership> demandOwnership(UUID demandId) {
+        return one("""
+                SELECT d.id AS demand_id, d.enterprise_id, e.association_id
+                FROM cooperation_demand d
+                JOIN enterprise e ON e.id=d.enterprise_id
+                WHERE d.id=:id AND d.deleted_at IS NULL
+                """, params("id", demandId), rs -> new CrossAssociationStore.DemandOwnership(
+                rs.getObject("demand_id", UUID.class), rs.getObject("enterprise_id", UUID.class),
+                rs.getObject("association_id", UUID.class)));
+    }
+
+    @Override
+    public Optional<CrossAssociationStore.MatchOwnership> matchOwnership(UUID matchId) {
+        return one("""
+                SELECT m.id AS match_id, m.demand_id,
+                       d.enterprise_id AS demand_enterprise_id,
+                       de.association_id AS demand_association_id,
+                       m.candidate_enterprise_id,
+                       ce.association_id AS candidate_association_id
+                FROM ecosystem_match m
+                JOIN cooperation_demand d ON d.id=m.demand_id
+                JOIN enterprise de ON de.id=d.enterprise_id
+                JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                WHERE m.id=:id AND m.deleted_at IS NULL AND d.deleted_at IS NULL
+                """, params("id", matchId), rs -> new CrossAssociationStore.MatchOwnership(
+                rs.getObject("match_id", UUID.class), rs.getObject("demand_id", UUID.class),
+                rs.getObject("demand_enterprise_id", UUID.class),
+                rs.getObject("demand_association_id", UUID.class),
+                rs.getObject("candidate_enterprise_id", UUID.class),
+                rs.getObject("candidate_association_id", UUID.class)));
+    }
+
+    @Override
     public void audit(ActorScope actor, UUID associationId, UUID enterpriseId,
                       String action, String resourceType, Object resourceId, Object details) {
         jdbc.update("""
@@ -315,6 +388,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
         return new CrossAssociationDtos.RelationshipView(rs.getObject("source_association_id", UUID.class),
                 rs.getObject("target_association_id", UUID.class), rs.getString("status"),
                 rs.getBoolean("allow_member_data"), instant(rs, "expires_at"), instant(rs, "suspended_at"),
+                rs.getObject("suspended_by_association_id", UUID.class), rs.getString("suspended_by_subject"),
                 instant(rs, "revoked_at"), rs.getString("revoked_by_subject"), rs.getString("revoke_reason"),
                 rs.getLong("version"), instant(rs, "created_at"), instant(rs, "updated_at"));
     }
