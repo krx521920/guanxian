@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS model_execution (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-DO $
+DO $migration$
 BEGIN
   IF NOT EXISTS (
     SELECT 1
@@ -154,7 +154,7 @@ BEGIN
       FOREIGN KEY (model_execution_id) REFERENCES model_execution(id);
   END IF;
 END
-$;
+$migration$;
 
 CREATE TABLE IF NOT EXISTS notification_subscription (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
