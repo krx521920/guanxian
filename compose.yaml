@@ -126,7 +126,7 @@ services:
         VITE_OIDC_POST_LOGOUT_REDIRECT_URI: ${WEB_OIDC_POST_LOGOUT_REDIRECT_URI:?WEB_OIDC_POST_LOGOUT_REDIRECT_URI is required}
         VITE_OIDC_SCOPE: ${WEB_OIDC_SCOPE:-openid profile email}
     ports:
-      - "${WEB_HTTP_PORT:-8081}:80"
+      - "${WEB_HTTP_PORT:-8081}:8080"
     depends_on:
       - server
     restart: unless-stopped
