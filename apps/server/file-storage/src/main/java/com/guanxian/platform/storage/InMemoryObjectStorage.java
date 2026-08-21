@@ -28,4 +28,9 @@ final class InMemoryObjectStorage implements ObjectStorage {
         }
         return Arrays.copyOf(content, content.length);
     }
+
+    @Override
+    public void delete(String objectKey) {
+        objects.remove(objectKey);
+    }
 }
