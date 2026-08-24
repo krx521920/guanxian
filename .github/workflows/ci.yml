@@ -51,6 +51,8 @@ jobs:
         run: python tools/deployment/validate_production_env.py
       - name: Test production environment validator
         run: python -m unittest discover -s tests/config -p "test_*.py"
+      - name: Test database operations safety
+        run: python -m unittest discover -s tests/operations -p "test_*.py"
       - name: Render production Compose configuration
         run: docker compose config --quiet
 
