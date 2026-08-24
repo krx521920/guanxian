@@ -180,3 +180,20 @@ def test_trimmed_common_strings_still_enforce_wire_length_limits(client):
 
     assert oversized_identifier.status_code == 422
     assert oversized_url.status_code == 422
+
+
+def test_openapi_preserves_common_string_constraints(client):
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    schemas = response.json()["components"]["schemas"]
+    document = schemas["PolicyDocument"]["properties"]
+    identifier = document["document_id"]
+    source_url = document["source_url"]["anyOf"][0]
+
+    assert identifier["minLength"] == 1
+    assert identifier["maxLength"] == 100
+    assert identifier["pattern"] == r".*\S.*"
+    assert source_url["minLength"] == 8
+    assert source_url["maxLength"] == 2_000
+    assert source_url["pattern"].startswith("^https?://")
