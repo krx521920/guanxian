@@ -184,7 +184,11 @@ def _run(command: tuple[str, ...], *, stdin=None, capture_stdout: bool = False) 
     return completed
 
 
-def execute_restore(plan: RestorePlan) -> None:
+def execute_restore(
+    plan: RestorePlan, *, confirm_target: str | None, environment: Mapping[str, str]
+) -> None:
+    validate_restore_target(plan.target_database, plan.source_database)
+    validate_execution_guards(plan, confirm_target=confirm_target, environment=environment)
     _run(plan.drop_command)
     try:
         _run(plan.create_command)
@@ -233,8 +237,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.execute:
             print(json.dumps(describe_plan(plan), ensure_ascii=False, indent=2))
             return 0
-        validate_execution_guards(plan, confirm_target=args.confirm_target, environment=os.environ)
-        execute_restore(plan)
+        execute_restore(plan, confirm_target=args.confirm_target, environment=os.environ)
         print(
             json.dumps(
                 {

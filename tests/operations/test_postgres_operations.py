@@ -209,6 +209,16 @@ class RestoreDrillTests(OperationFixture):
                 plan, confirm_target=plan.target_database, environment={}
             )
 
+    def test_destructive_restore_function_enforces_guards_before_subprocess(self) -> None:
+        plan = self.build_plan()
+        with self.assertRaises(OperationSafetyError), mock.patch.object(
+            postgres_restore_drill.subprocess, "run"
+        ) as run:
+            postgres_restore_drill.execute_restore(
+                plan, confirm_target=plan.target_database, environment={}
+            )
+        run.assert_not_called()
+
     def test_restore_commands_use_fixed_service_and_validated_target(self) -> None:
         plan = self.build_plan()
         for command in (
@@ -224,11 +234,6 @@ class RestoreDrillTests(OperationFixture):
 
     def test_restore_executes_only_after_both_guards_and_verifies_flyway(self) -> None:
         plan = self.build_plan()
-        postgres_restore_drill.validate_execution_guards(
-            plan,
-            confirm_target=plan.target_database,
-            environment={EXECUTION_GUARD_NAME: EXECUTION_GUARD_VALUE},
-        )
         observed: list[tuple[str, ...]] = []
 
         def fake_run(command, **kwargs):
@@ -238,9 +243,34 @@ class RestoreDrillTests(OperationFixture):
             return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr=b"")
 
         with mock.patch.object(postgres_restore_drill.subprocess, "run", side_effect=fake_run):
-            postgres_restore_drill.execute_restore(plan)
+            postgres_restore_drill.execute_restore(
+                plan,
+                confirm_target=plan.target_database,
+                environment={EXECUTION_GUARD_NAME: EXECUTION_GUARD_VALUE},
+            )
         self.assertEqual(
             [plan.drop_command, plan.create_command, plan.restore_command, plan.verify_command],
+            observed,
+        )
+
+    def test_failed_restore_cleans_up_only_the_validated_test_database(self) -> None:
+        plan = self.build_plan()
+        observed: list[tuple[str, ...]] = []
+
+        def fake_run(command, **kwargs):
+            observed.append(command)
+            return_code = 1 if command == plan.restore_command else 0
+            return subprocess.CompletedProcess(command, return_code, stdout=b"", stderr=b"restore failed")
+
+        with mock.patch.object(postgres_restore_drill.subprocess, "run", side_effect=fake_run):
+            with self.assertRaises(RuntimeError):
+                postgres_restore_drill.execute_restore(
+                    plan,
+                    confirm_target=plan.target_database,
+                    environment={EXECUTION_GUARD_NAME: EXECUTION_GUARD_VALUE},
+                )
+        self.assertEqual(
+            [plan.drop_command, plan.create_command, plan.restore_command, plan.drop_command],
             observed,
         )
 
