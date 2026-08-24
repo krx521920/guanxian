@@ -58,7 +58,8 @@ public class SecurityConfig {
             "AUDIT_READ",
             "ACCESS_BINDING_WRITE",
             "NOTIFICATION_READ",
-            "NOTIFICATION_PUBLISH");
+            "NOTIFICATION_PUBLISH",
+            "OBSERVABILITY_READ");
     private static final Map<String, Set<String>> ROLE_PERMISSIONS = Map.of(
             "SYSTEM_ADMIN", KNOWN_PERMISSIONS,
             "ASSOCIATION_ADMIN", Set.of(
@@ -92,6 +93,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/health", "/actuator/health").permitAll()
+                        .requestMatchers("/actuator/prometheus").hasAuthority("OBSERVABILITY_READ")
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> writeError(

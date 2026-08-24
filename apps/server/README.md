@@ -49,6 +49,7 @@ curl http://localhost:8080/api/v1/health
 | 方法 | 地址 | 权限 |
 | --- | --- | --- |
 | GET | `/api/v1/health` | 公开 |
+| GET | `/actuator/prometheus` | `OBSERVABILITY_READ`（仅采集服务账号/系统管理员） |
 | GET | `/api/v1/users/me` | 已登录 |
 | GET/POST | `/api/v1/members` | `MEMBER_READ` / 协会工作人员 |
 | GET/PUT/DELETE | `/api/v1/members/{id}` | 数据域内读取 / 受限写入 / 协会管理员 |
@@ -91,6 +92,8 @@ curl -u enterprise-admin:enterprise123 \
 错误时 `code` 为稳定字符串，例如 `VALIDATION_FAILED`、`MALFORMED_REQUEST`、`INVALID_PARAMETER`、`UNSUPPORTED_MEDIA_TYPE`、`METHOD_NOT_ALLOWED`、`RESOURCE_NOT_FOUND`、`AUTHENTICATION_REQUIRED`、`ACCESS_DENIED`。MVC 参数转换、请求体解析、媒体类型、请求方法和未知路由也使用相同外层结构。前端已兼容字符串或数字类型的错误码。
 
 所有响应（包括 `401`、`403` 和 MVC 异常）都携带 `X-Request-Id`。入站值只有完全符合 `[A-Za-z0-9._:-]{1,128}` 时才会透传，否则生成 UUID。处理期间该值写入 SLF4J MDC 的 `requestId`，请求结束后恢复原有上下文或清理，避免线程复用串号。该标识只用于日志关联，不能替代认证、幂等键或业务流水号。
+
+生产 Profile 会将控制台日志输出为 Logstash JSON，每行带应用名和 MDC 中的 `requestId`；请由部署环境的日志代理转送到集中日志系统。Micrometer Prometheus 指标已启用 HTTP 请求直方图，`/actuator/prometheus` 必须使用拥有 `OBSERVABILITY_READ` 的短期 OIDC 服务令牌读取，不能把它暴露给公网或匿名抓取器。
 
 会员企业状态只接受 `ACTIVE`、`PENDING_REVIEW`、`INCOMPLETE`、`DISABLED`（忽略大小写及首尾空白）。协会管理员或系统管理员手工新增时空值按 `ACTIVE` 处理；协会运营人员新增、企业自助修改和 Excel 导入统一进入 `PENDING_REVIEW`，由协会管理员审核。统一社会信用代码入库前会去除首尾空白并转为大写，唯一性判断使用规范化后的值。
 

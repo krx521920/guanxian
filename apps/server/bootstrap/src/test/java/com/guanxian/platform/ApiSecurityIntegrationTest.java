@@ -22,7 +22,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "management.endpoints.web.exposure.include=health,info,prometheus",
+        "management.endpoint.prometheus.access=unrestricted",
+        "management.prometheus.metrics.export.enabled=true"
+})
 @AutoConfigureMockMvc
 class ApiSecurityIntegrationTest {
     private static final String UNKNOWN_MEMBER_ID = "00000000-0000-0000-0000-000000000001";
@@ -48,6 +52,24 @@ class ApiSecurityIntegrationTest {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    void prometheusMetricsRequireAServiceOrSystemObservabilityPermission() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
+
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(httpBasic("system-admin", "system123")))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("http_server_requests")));
     }
 
     @ParameterizedTest(name = "valid credentials for {0}")

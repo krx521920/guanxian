@@ -35,10 +35,24 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never
+    # Endpoint availability and web exposure are explicit; authorization remains
+    # in SecurityConfig and is never relaxed by this setting.
+    prometheus:
+      access: unrestricted
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 guanxian:
   business:

@@ -133,6 +133,32 @@ MinIO 对象与 PostgreSQL 附件元数据必须恢复到一致时间点。Redis
 
 ## 8. 监控与告警最低集
 
+### 已随代码交付的基础配置
+
+后端的 `/actuator/prometheus` 输出 Micrometer 指标，但它不是匿名接口：只有带
+`OBSERVABILITY_READ` 权限的 OIDC 服务账号（或系统管理员）才能读取；`/actuator/health`
+仍保持公开，供负载均衡器使用。生产日志采用 Spring Boot 的 Logstash JSON 控制台格式，
+其中包含应用名和请求过滤器放入 MDC 的 `requestId`，可直接由集中日志代理采集。
+
+仓库提供固定版本的 Prometheus/Alertmanager 可选编排，默认 `compose.yaml` 不会启动它：
+
+```bash
+docker compose -f compose.yaml -f compose.observability.yml --profile app --profile observability up -d
+```
+
+启动前由密钥系统生成一个仅含 `OBSERVABILITY_READ` 的短期、专用 OIDC 服务令牌文件，并将
+**文件路径**（不是令牌值）以 `PROMETHEUS_SCRAPE_TOKEN_FILE` 注入 Compose。该文件会作为
+Docker secret 挂载到 `/run/secrets/prometheus_scrape_token`，Prometheus 使用
+`authorization.credentials_file` 读取它。令牌不得写入 `.env`、Git、镜像层、命令行、环境变量
+或告警规则。非 Compose 生产环境应以等效的 secret volume/外部工作负载身份挂载该文件，并由
+令牌轮换流程原子替换后重载 Prometheus；正式网络还应由网关以 TLS 保护指标链路。仓库中的
+Alertmanager 接收器仅记录/聚合告警，上线前必须由运维在受控配置中接入值班 Webhook、邮件或
+on-call 系统并完成一次演练。
+
+预置告警只引用后端已导出的 Micrometer 指标：不可抓取、5xx 比率、HTTP P95、JVM 堆、
+Hikari 连接池和节点磁盘空间。PostgreSQL、Redis、MinIO 还需要按实际部署接入各自的
+exporter；没有 exporter 时不得把“无数据”误解为“健康”。
+
 生产环境至少配置下列指标和告警：
 
 - 备份：最近成功时间、归档字节数、清单哈希校验、异地复制状态、季度恢复演练状态。

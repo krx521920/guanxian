@@ -3,3 +3,11 @@ guanxian:
     backend: ${GUANXIAN_STORAGE_BACKEND:minio}
     rate-limit:
       enabled: ${GUANXIAN_STORAGE_RATE_LIMIT_ENABLED:true}
+
+# Spring Boot emits one JSON object per line in production. The request filter keeps
+# `requestId` in MDC, which Spring's structured logger includes for correlation.
+logging:
+  include-application-name: true
+  structured:
+    format:
+      console: logstash
