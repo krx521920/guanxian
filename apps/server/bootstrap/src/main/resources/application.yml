@@ -7,10 +7,16 @@ spring:
       max-request-size: 6MB
   jackson:
     default-property-inclusion: non_null
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      connect-timeout: ${SPRING_DATA_REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${SPRING_DATA_REDIS_TIMEOUT:2s}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/guanxian}
     username: ${SPRING_DATASOURCE_USERNAME:guanxian}
-    password: ${SPRING_DATASOURCE_PASSWORD:change_me}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
       maximum-pool-size: ${DB_POOL_MAX_SIZE:10}
       minimum-idle: ${DB_POOL_MIN_IDLE:2}
@@ -29,19 +35,68 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never
+    # Endpoint availability and web exposure are explicit; authorization remains
+    # in SecurityConfig and is never relaxed by this setting.
+    prometheus:
+      access: unrestricted
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
 
 guanxian:
+  business:
+    repository: ${GUANXIAN_BUSINESS_REPOSITORY:postgres}
+  notification:
+    repository: ${GUANXIAN_NOTIFICATION_REPOSITORY:postgres}
   member:
     repository: ${GUANXIAN_MEMBER_REPOSITORY:postgres}
     association-name: ${GUANXIAN_ASSOCIATION_NAME:北京地下管线协会}
     seed-demo-data: ${GUANXIAN_SEED_DEMO_DATA:false}
+  storage:
+    backend: ${GUANXIAN_STORAGE_BACKEND:memory}
+    bucket: ${GUANXIAN_STORAGE_BUCKET:guanxian-private}
+    endpoint: ${GUANXIAN_STORAGE_ENDPOINT:}
+    access-key: ${GUANXIAN_STORAGE_ACCESS_KEY:}
+    secret-key: ${GUANXIAN_STORAGE_SECRET_KEY:}
+    redis-url: ${GUANXIAN_STORAGE_REDIS_URL:redis://localhost:6379}
+    max-size-bytes: ${GUANXIAN_STORAGE_MAX_SIZE_BYTES:20971520}
+    rate-limit-per-minute: ${GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE:30}
+    rate-limit:
+      enabled: ${GUANXIAN_STORAGE_RATE_LIMIT_ENABLED:false}
   security:
     mode: ${GUANXIAN_SECURITY_MODE:jwt}
     jwt:
       issuer-uri: ${GUANXIAN_JWT_ISSUER_URI:}
       jwk-set-uri: ${GUANXIAN_JWT_JWK_SET_URI:}
       principal-claim: ${GUANXIAN_JWT_PRINCIPAL_CLAIM:preferred_username}
+
+  ai:
+    provider:
+      enabled: ${GUANXIAN_AI_PROVIDER_ENABLED:false}
+      endpoint: ${GUANXIAN_AI_PROVIDER_ENDPOINT:}
+      api-key: ${GUANXIAN_AI_PROVIDER_API_KEY:}
+      model: ${GUANXIAN_AI_PROVIDER_MODEL:}
+      request-timeout: ${GUANXIAN_AI_PROVIDER_TIMEOUT:30s}
+      max-output-tokens: ${GUANXIAN_AI_PROVIDER_MAX_OUTPUT_TOKENS:800}
+      input-cost-per-million: ${GUANXIAN_AI_INPUT_COST_PER_MILLION:0}
+      output-cost-per-million: ${GUANXIAN_AI_OUTPUT_COST_PER_MILLION:0}
+    rag:
+      chunk-size-chars: ${GUANXIAN_RAG_CHUNK_SIZE_CHARS:1200}
+      chunk-overlap-chars: ${GUANXIAN_RAG_CHUNK_OVERLAP_CHARS:150}
+      retrieval-limit: ${GUANXIAN_RAG_RETRIEVAL_LIMIT:5}
+      max-question-chars: ${GUANXIAN_RAG_MAX_QUESTION_CHARS:2000}
+      max-input-tokens: ${GUANXIAN_RAG_MAX_INPUT_TOKENS:6000}
+      max-output-tokens: ${GUANXIAN_RAG_MAX_OUTPUT_TOKENS:800}
+      max-estimated-cost: ${GUANXIAN_RAG_MAX_ESTIMATED_COST:0.50}
+      external-model-data-egress-enabled: ${GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED:false}

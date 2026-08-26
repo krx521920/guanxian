@@ -18,6 +18,8 @@
         <module>ai-adapter</module>
         <module>ecosystem</module>
         <module>collaboration</module>
+        <module>notification</module>
+        <module>file-storage</module>
         <module>bootstrap</module>
     </modules>
 
@@ -25,7 +27,10 @@
         <java.version>21</java.version>
         <maven.compiler.release>${java.version}</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>3.3.5</spring-boot.version>
+        <spring-boot.version>3.5.12</spring-boot.version>
+        <postgresql.version>42.7.12</postgresql.version>
+        <minio.version>8.6.0</minio.version>
+        <jackson.version>2.21.4</jackson.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
         <apache-poi.version>5.5.1</apache-poi.version>
@@ -34,11 +39,23 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

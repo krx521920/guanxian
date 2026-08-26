@@ -147,3 +147,53 @@ def test_policy_accepts_safe_https_source_and_trims_identifiers(client):
     assert citation["document_id"] == "P-1"
     assert citation["title"] == "安全规定"
     assert citation["source_url"] == "https://example.com/policy?id=1"
+
+
+def test_trimmed_common_strings_still_enforce_wire_length_limits(client):
+    oversized_identifier = client.post(
+        "/api/v1/qa/policy",
+        json={
+            "question": "政策问题",
+            "documents": [
+                {
+                    "document_id": " " + ("P" * 100),
+                    "title": "政策",
+                    "content": "政策内容",
+                }
+            ],
+        },
+    )
+    oversized_url = client.post(
+        "/api/v1/qa/policy",
+        json={
+            "question": "政策问题",
+            "documents": [
+                {
+                    "document_id": "P-1",
+                    "title": "政策",
+                    "content": "政策内容",
+                    "source_url": " " + "https://example.com/" + ("a" * 1_981),
+                }
+            ],
+        },
+    )
+
+    assert oversized_identifier.status_code == 422
+    assert oversized_url.status_code == 422
+
+
+def test_openapi_preserves_common_string_constraints(client):
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    schemas = response.json()["components"]["schemas"]
+    document = schemas["PolicyDocument"]["properties"]
+    identifier = document["document_id"]
+    source_url = document["source_url"]["anyOf"][0]
+
+    assert identifier["minLength"] == 1
+    assert identifier["maxLength"] == 100
+    assert identifier["pattern"] == r".*\S.*"
+    assert source_url["minLength"] == 8
+    assert source_url["maxLength"] == 2_000
+    assert source_url["pattern"].startswith("^https?://")

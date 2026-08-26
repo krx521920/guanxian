@@ -24,6 +24,8 @@ class PolicyDocument(BaseModel):
     def source_url_must_be_http(cls, value: object) -> object:
         if value is None or not isinstance(value, str):
             return value
+        if len(value) > 2_000:
+            raise ValueError("政策来源地址不能超过2000个字符")
         value = value.strip()
         parsed = urlsplit(value)
         has_unsafe_character = "\\" in value or any(
@@ -61,6 +63,8 @@ class PolicyQARequest(BaseModel):
     def question_must_not_be_blank(cls, value: object) -> object:
         if not isinstance(value, str):
             return value
+        if len(value) > 2_000:
+            raise ValueError("问题不能超过2000个字符")
         value = value.strip()
         if not value:
             raise ValueError("问题不能为空")

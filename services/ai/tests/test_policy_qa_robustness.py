@@ -65,6 +65,16 @@ def test_policy_qa_rejects_boolean_top_k(client):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_policy_qa_rejects_oversized_wire_question_before_trimming(client):
+    response = client.post(
+        "/api/v1/qa/policy",
+        json={"question": "\u2000" + ("问" * 2_000), "documents": []},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_policy_qa_accepts_maximum_document_count_and_rejects_one_over(client):
     documents = [
         {

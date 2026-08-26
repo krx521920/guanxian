@@ -26,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "spring.flyway.enabled=true",
+        "spring.flyway.baseline-on-migrate=true",
+        "spring.flyway.baseline-version=0",
         "guanxian.member.repository=postgres",
         "guanxian.member.seed-demo-data=false",
         "guanxian.security.mode=demo"
@@ -61,11 +63,46 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(4, migrationCount);
+        org.junit.jupiter.api.Assertions.assertEquals(10, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals("member_import_batch", jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.member_import_batch')::text", String.class));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'user_account' AND column_name = 'external_subject'", Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals("business_entity_history", jdbcTemplate.queryForObject(
+                "SELECT to_regclass('public.business_entity_history')::text", String.class));
+        org.junit.jupiter.api.Assertions.assertEquals("knowledge_chunk", jdbcTemplate.queryForObject(
+                "SELECT to_regclass('public.knowledge_chunk')::text", String.class));
+        org.junit.jupiter.api.Assertions.assertEquals("outbox_event", jdbcTemplate.queryForObject(
+                "SELECT to_regclass('public.outbox_event')::text", String.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM pg_constraint
+                WHERE conname = 'policy_impact_model_execution_fk'
+                  AND conrelid = 'policy_impact_analysis'::regclass
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM pg_indexes
+                WHERE schemaname = 'public'
+                  AND tablename = 'knowledge_chunk'
+                  AND indexname = 'knowledge_chunk_search_idx'
+                  AND indexdef LIKE '%USING gin (search_vector)%'
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM information_schema.table_constraints
+                WHERE table_schema = 'public'
+                  AND table_name = 'object_file'
+                  AND constraint_type = 'UNIQUE'
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_name = 'notification_subscription' AND column_name = 'version'
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pg_indexes
+                WHERE schemaname = 'public' AND indexname = 'notification_subscription_user_type_uq'
+                """, Integer.class));
 
         mockMvc.perform(get("/api/v1/members/{id}", LEGACY_MEMBER_ID)
                         .with(httpBasic("association-admin", "admin123")))

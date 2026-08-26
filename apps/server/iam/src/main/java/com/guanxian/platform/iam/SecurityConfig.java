@@ -56,23 +56,28 @@ public class SecurityConfig {
             "MEMBER_IMPORT",
             "MEMBER_REVIEW",
             "AUDIT_READ",
-            "ACCESS_BINDING_WRITE");
+            "ACCESS_BINDING_WRITE",
+            "NOTIFICATION_READ",
+            "NOTIFICATION_PUBLISH",
+            "OBSERVABILITY_READ");
     private static final Map<String, Set<String>> ROLE_PERMISSIONS = Map.of(
             "SYSTEM_ADMIN", KNOWN_PERMISSIONS,
             "ASSOCIATION_ADMIN", Set.of(
                     "MEMBER_READ", "ENTERPRISE_WRITE", "POLICY_READ", "MATCH_REQUEST",
                     "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ",
-                    "MEMBER_IMPORT", "MEMBER_REVIEW", "AUDIT_READ"),
+                    "MEMBER_IMPORT", "MEMBER_REVIEW", "AUDIT_READ",
+                    "NOTIFICATION_READ", "NOTIFICATION_PUBLISH"),
             "ASSOCIATION_OPERATOR", Set.of(
                     "MEMBER_READ", "ENTERPRISE_WRITE", "POLICY_READ", "MATCH_REQUEST",
-                    "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ", "MEMBER_IMPORT"),
+                    "COLLABORATION_READ", "DASHBOARD_ASSOCIATION_READ", "MEMBER_IMPORT",
+                    "NOTIFICATION_READ"),
             "ENTERPRISE_ADMIN", Set.of(
                     "MEMBER_READ", "ENTERPRISE_WRITE", "POLICY_READ", "MATCH_REQUEST",
-                    "COLLABORATION_READ", "DASHBOARD_ENTERPRISE_READ"),
+                    "COLLABORATION_READ", "DASHBOARD_ENTERPRISE_READ", "NOTIFICATION_READ"),
             "ENTERPRISE_MEMBER", Set.of(
                     "MEMBER_READ", "POLICY_READ", "MATCH_REQUEST",
-                    "COLLABORATION_READ", "DASHBOARD_ENTERPRISE_READ"),
-            "OBSERVER", Set.of("MEMBER_READ", "POLICY_READ"));
+                    "COLLABORATION_READ", "DASHBOARD_ENTERPRISE_READ", "NOTIFICATION_READ"),
+            "OBSERVER", Set.of("MEMBER_READ", "POLICY_READ", "NOTIFICATION_READ"));
 
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -88,6 +93,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/health", "/actuator/health").permitAll()
+                        .requestMatchers("/actuator/prometheus").hasAuthority("OBSERVABILITY_READ")
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) -> writeError(

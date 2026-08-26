@@ -1,0 +1,70 @@
+{
+  "realm": "guanxian-ci",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "roles": {
+    "realm": [
+      { "name": "ASSOCIATION_ADMIN" },
+      { "name": "SYSTEM_ADMIN" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "guanxian-web",
+      "name": "Guanxian browser CI client",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://127.0.0.1:18082/auth/callback"],
+      "webOrigins": ["http://127.0.0.1:18082"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      }
+    },
+    {
+      "clientId": "guanxian-load",
+      "name": "Guanxian load-test CI client",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true
+    }
+  ],
+  "users": [
+    {
+      "username": "ci-association-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "CI",
+      "lastName": "Association Admin",
+      "email": "ci-association-admin@invalid.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ci-only-user-password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ASSOCIATION_ADMIN"]
+    },
+    {
+      "username": "ci-load-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "CI",
+      "lastName": "Load Admin",
+      "email": "ci-load-admin@invalid.example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ci-only-user-password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["SYSTEM_ADMIN"]
+    }
+  ]
+}

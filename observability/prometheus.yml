@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+rule_files:
+  - /etc/prometheus/alerts.yml
+
+scrape_configs:
+  # This profile is for the private Compose network. Production deployments should
+  # keep the same endpoint behind their TLS gateway and inject a short-lived OIDC
+  # service token instead of storing a user credential in this repository.
+  - job_name: guanxian-server
+    metrics_path: /actuator/prometheus
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/prometheus_scrape_token
+    static_configs:
+      - targets: ["server:8080"]

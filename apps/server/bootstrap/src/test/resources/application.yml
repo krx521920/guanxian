@@ -7,6 +7,8 @@ spring:
     enabled: false
 
 guanxian:
+  business:
+    repository: memory
   member:
     repository: memory
     seed-demo-data: true

@@ -1,0 +1,71 @@
+groups:
+  - name: guanxian-server
+    rules:
+      - alert: GuanxianServerDown
+        expr: up{job="guanxian-server"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "管线平台后端不可抓取"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianHighHttp5xxRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{job="guanxian-server",status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(http_server_requests_seconds_count{job="guanxian-server"}[5m])), 0.001) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "管线平台 5xx 比例持续超过 5%"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianHighHttpP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_server_requests_seconds_bucket{job="guanxian-server"}[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "管线平台 HTTP P95 延迟持续超过 2 秒"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianJvmHeapPressure
+        expr: |
+          sum(jvm_memory_used_bytes{job="guanxian-server",area="heap"})
+          /
+          clamp_min(sum(jvm_memory_max_bytes{job="guanxian-server",area="heap"}), 1) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "管线平台 JVM 堆使用率持续超过 85%"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianDatabasePoolSaturation
+        expr: |
+          hikaricp_connections_active{job="guanxian-server"}
+          /
+          clamp_min(hikaricp_connections_max{job="guanxian-server"}, 1) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "管线平台数据库连接池使用率持续超过 85%"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianLowDiskSpace
+        expr: |
+          disk_free_bytes{job="guanxian-server"}
+          /
+          clamp_min(disk_total_bytes{job="guanxian-server"}, 1) < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "管线平台应用节点可用磁盘空间低于 15%"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"

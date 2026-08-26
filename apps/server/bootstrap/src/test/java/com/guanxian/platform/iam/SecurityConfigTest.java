@@ -52,8 +52,26 @@ class SecurityConfigTest {
         assertTrue(authorities.contains("ENTERPRISE_WRITE"));
         assertTrue(authorities.contains("DASHBOARD_ENTERPRISE_READ"));
         assertTrue(authorities.contains("POLICY_READ"));
+        assertTrue(authorities.contains("NOTIFICATION_READ"));
+        assertTrue(authorities.contains("NOTIFICATION_PUBLISH"));
         assertFalse(authorities.contains("ROLE_UNTRUSTED_ROLE"));
         assertFalse(authorities.contains("ROOT_ACCESS"));
+    }
+
+    @Test
+    void enterpriseRoleCannotAcquireNotificationPublishPermission() {
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .subject("enterprise-user")
+                .claim("roles", List.of("ENTERPRISE_ADMIN"))
+                .build();
+
+        List<String> authorities = SecurityConfig.authoritiesFor(jwt).stream()
+                .map(authority -> authority.getAuthority())
+                .toList();
+
+        assertTrue(authorities.contains("NOTIFICATION_READ"));
+        assertFalse(authorities.contains("NOTIFICATION_PUBLISH"));
     }
 
     @Test

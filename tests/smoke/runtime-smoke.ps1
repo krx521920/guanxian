@@ -4,6 +4,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$isWindowsHost = $env:OS -eq 'Windows_NT'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $runDir = Join-Path $root 'test-results/smoke'
 New-Item -ItemType Directory -Force -Path $runDir | Out-Null
@@ -13,28 +14,53 @@ if (-not (Test-Path $serverJar)) {
   throw "未找到后端可执行包：$serverJar。请先运行 Maven verify。"
 }
 
+$requiredSmokeServerOverrides = @(
+  '--guanxian.business.repository=memory'
+  '--guanxian.member.repository=memory'
+  '--guanxian.member.seed-demo-data=true'
+  '--guanxian.security.mode=demo'
+  '--spring.flyway.enabled=true'
+)
+$smokeServerOverrides = @(
+  '--guanxian.business.repository=memory'
+  '--guanxian.member.repository=memory'
+  '--guanxian.member.seed-demo-data=true'
+  '--guanxian.security.mode=demo'
+  '--spring.flyway.enabled=true'
+)
+
 $serverStart = @{
   FilePath = 'java'
-  ArgumentList = @('-jar', $serverJar, "--server.port=$ServerPort")
+  ArgumentList = @('-jar', $serverJar, "--server.port=$ServerPort") + $smokeServerOverrides
   RedirectStandardOutput = (Join-Path $runDir 'server.out.log')
   RedirectStandardError = (Join-Path $runDir 'server.err.log')
-  WindowStyle = 'Hidden'
   PassThru = $true
 }
-$serverProc = Start-Process @serverStart
+$missingSmokeOverrides = @(
+  $requiredSmokeServerOverrides | Where-Object { $serverStart.ArgumentList -notcontains $_ }
+)
+if ($missingSmokeOverrides.Count -gt 0 -or
+    $smokeServerOverrides.Count -ne $requiredSmokeServerOverrides.Count) {
+  throw "Smoke后端运行模式契约不完整：$($missingSmokeOverrides -join ', ')"
+}
+if ($isWindowsHost) { $serverStart.WindowStyle = 'Hidden' }
 
-$aiStart = @{
+$serverProc = $null
+$aiProc = $null
+try {
+  $serverProc = Start-Process @serverStart
+
+  $aiStart = @{
   FilePath = 'python'
   ArgumentList = @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', $AiPort)
   WorkingDirectory = (Join-Path $root 'services/ai')
   RedirectStandardOutput = (Join-Path $runDir 'ai.out.log')
   RedirectStandardError = (Join-Path $runDir 'ai.err.log')
-  WindowStyle = 'Hidden'
   PassThru = $true
-}
-$aiProc = Start-Process @aiStart
+  }
+  if ($isWindowsHost) { $aiStart.WindowStyle = 'Hidden' }
+  $aiProc = Start-Process @aiStart
 
-try {
   $serverUrl = "http://127.0.0.1:$ServerPort"
   $aiUrl = "http://127.0.0.1:$AiPort"
   $serverReady = $false
@@ -219,6 +245,10 @@ try {
   $result | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $runDir 'result.json')
   $result | ConvertTo-Json
 } finally {
-  Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
-  Stop-Process -Id $aiProc.Id -Force -ErrorAction SilentlyContinue
+  if ($null -ne $serverProc -and -not $serverProc.HasExited) {
+    Stop-Process -Id $serverProc.Id -Force -ErrorAction SilentlyContinue
+  }
+  if ($null -ne $aiProc -and -not $aiProc.HasExited) {
+    Stop-Process -Id $aiProc.Id -Force -ErrorAction SilentlyContinue
+  }
 }
