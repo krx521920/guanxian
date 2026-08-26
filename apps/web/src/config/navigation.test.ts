@@ -16,7 +16,7 @@ describe('role navigation', () => {
 
   it('allows association operators to manage members and collaboration', () => {
     const paths = navigationForRole('ASSOCIATION_OPERATOR').map((item) => item.to)
-    expect(paths).toEqual(expect.arrayContaining(['/association', '/members', '/policies', '/matching', '/collaborations']))
+    expect(paths).toEqual(expect.arrayContaining(['/association', '/ecosystem', '/members', '/policies', '/matching', '/collaborations']))
   })
 
   it('selects the correct landing page for each workspace', () => {
@@ -39,7 +39,7 @@ describe('role navigation', () => {
 
   it.each([...associationRoles, ...enterpriseRoles])('shows shared ecosystem navigation to %s', (role) => {
     const paths = navigationForRole(role).map((item) => item.to)
-    expect(paths).toEqual(expect.arrayContaining(['/policies', '/matching', '/collaborations']))
+    expect(paths).toEqual(expect.arrayContaining(['/ecosystem', '/policies', '/matching', '/collaborations']))
   })
 
   it('denies access by default when a protected route omits role constraints', () => {
@@ -80,6 +80,7 @@ describe('role navigation', () => {
     expect(navigation.map(({ label, to, icon, badge }) => ({ label, to, icon, badge }))).toEqual([
       { label: '协会工作台', to: '/association', icon: 'dashboard', badge: undefined },
       { label: '企业工作台', to: '/enterprise', icon: 'dashboard', badge: undefined },
+      { label: '生态全景', to: '/ecosystem', icon: 'ecosystem', badge: undefined },
       { label: '会员企业', to: '/members', icon: 'enterprise', badge: undefined },
       { label: '政策标准', to: '/policies', icon: 'policy', badge: undefined },
       { label: '生态匹配', to: '/matching', icon: 'match', badge: '6' },

@@ -7,6 +7,7 @@ describe('protected route permissions', () => {
     expect(Object.keys(protectedRouteRoles).sort()).toEqual([
       '/association',
       '/collaborations',
+      '/ecosystem',
       '/enterprise',
       '/matching',
       '/members',
@@ -29,6 +30,7 @@ describe('protected route permissions', () => {
     expect(protectedRouteRoles['/members/edit']).not.toContain('ENTERPRISE_MEMBER')
     expect(protectedRouteRoles['/members/new']).not.toContain('ENTERPRISE_ADMIN')
     expect(protectedRouteRoles['/policies']).toEqual([...ROLES])
+    expect(protectedRouteRoles['/ecosystem']).toEqual([...ROLES])
     expect(protectedRouteRoles['/matching']).toEqual([...ROLES])
     expect(protectedRouteRoles['/collaborations']).toEqual([...ROLES])
   })
