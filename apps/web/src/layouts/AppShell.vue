@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router'
 import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
-import { roleLabels } from '../config/roles'
 import { useAuth } from '../services/auth'
 import type { UserRole } from '../types/domain'
 
@@ -47,10 +46,27 @@ async function logout() {
         </RouterLink>
       </nav>
 
-      <div class="sidebar-context">
-        <div class="context-label">当前组织</div>
-        <strong>{{ auth.user.value?.organization }}</strong>
-        <span>{{ auth.user.value ? roleLabels[auth.user.value.role] : '' }}</span>
+      <div class="sidebar-profile">
+        <button
+          class="profile-button"
+          type="button"
+          :aria-expanded="profileOpen"
+          aria-haspopup="menu"
+          @click="profileOpen = !profileOpen"
+        >
+          <span class="avatar">{{ initials }}</span>
+          <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
+          <span class="chevron" :class="{ open: profileOpen }">⌄</span>
+        </button>
+        <div v-if="profileOpen" class="profile-menu">
+          <template v-if="auth.isDemoMode">
+            <label>本地测试身份</label>
+            <select :value="auth.user.value?.role" @change="switchRole">
+              <option v-for="(user, role) in auth.demoUsers" :key="role" :value="role">{{ user.title }}</option>
+            </select>
+          </template>
+          <button @click="logout">退出登录</button>
+        </div>
       </div>
     </aside>
     <button v-if="mobileOpen" class="sidebar-mask" aria-label="关闭导航" @click="mobileOpen = false" />
@@ -63,20 +79,6 @@ async function logout() {
           <button class="icon-button notification-button" aria-label="消息通知">
             <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i />
           </button>
-          <button class="profile-button" @click="profileOpen = !profileOpen">
-            <span class="avatar">{{ initials }}</span>
-            <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
-            <span class="chevron">⌄</span>
-          </button>
-          <div v-if="profileOpen" class="profile-menu">
-            <template v-if="auth.isDemoMode">
-              <label>本地测试身份</label>
-              <select :value="auth.user.value?.role" @change="switchRole">
-                <option v-for="(user, role) in auth.demoUsers" :key="role" :value="role">{{ user.title }}</option>
-              </select>
-            </template>
-            <button @click="logout">退出登录</button>
-          </div>
         </div>
       </header>
       <div class="page-container"><RouterView /></div>
