@@ -24,11 +24,13 @@ const profile: MemberProfile = {
   version: 7,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-08-20T00:00:00Z',
+  deletedAt: null,
+  deletedBySubject: null,
+  statusBeforeDelete: null,
 }
 
-async function loadApi(mockFallback = 'false') {
+async function loadApi() {
   vi.resetModules()
-  vi.stubEnv('VITE_MOCK_FALLBACK', mockFallback)
   vi.stubEnv('MODE', 'test')
   vi.stubEnv('VITE_API_BASE_URL', '/api/v1')
   return import('./platform-api')
@@ -205,6 +207,8 @@ describe('member ETag API contract', () => {
     await platformApi.policies()
     await platformApi.matches()
     await platformApi.collaborations()
+    await platformApi.notifications(true, 2, 15)
+    await platformApi.markNotificationRead('message /一')
 
     const calls = fetchMock.mock.calls.map(([url, init]) => ({
       url,
@@ -213,15 +217,17 @@ describe('member ETag API contract', () => {
     expect(calls).toEqual([
       { url: '/api/v1/dashboards/association', method: 'GET' },
       { url: '/api/v1/dashboards/enterprise', method: 'GET' },
-      { url: '/api/v1/members', method: 'GET' },
+      { url: '/api/v1/members/page?q=&status=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80/commit', method: 'POST' },
-      { url: '/api/v1/policies', method: 'GET' },
+      { url: '/api/v1/policies/page?q=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/matches', method: 'GET' },
-      { url: '/api/v1/collaborations', method: 'GET' },
+      { url: '/api/v1/collaborations/page?query=&page=0&size=20&includeDeleted=false', method: 'GET' },
+      { url: '/api/v1/notifications/messages?unreadOnly=true&page=2&size=15', method: 'GET' },
+      { url: '/api/v1/notifications/messages/message%20%2F%E4%B8%80/read', method: 'PUT' },
     ])
     expect(fetchMock.mock.calls.map(([, init]) => (init as RequestInit).body)).toEqual(
-      Array(8).fill(undefined),
+      Array(10).fill(undefined),
     )
   })
 
@@ -297,15 +303,12 @@ describe('member ETag API contract', () => {
     })
   })
 
-  it('returns deterministic demo data only for an explicitly enabled network fallback', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
-    const { platformApi } = await loadApi('true')
+  it('propagates network failures instead of returning demo records', async () => {
+    const failure = new TypeError('offline')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(failure))
+    const { platformApi } = await loadApi()
 
-    await expect(platformApi.associationDashboard()).resolves.toMatchObject({ metrics: expect.any(Array) })
-    await expect(platformApi.enterpriseDashboard()).resolves.toMatchObject({ metrics: expect.any(Array) })
-    await expect(platformApi.members()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.policies()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.matches()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.collaborations()).resolves.toEqual(expect.any(Array))
+    await expect(platformApi.associationDashboard()).rejects.toBe(failure)
+    await expect(platformApi.members()).rejects.toBe(failure)
   })
 })

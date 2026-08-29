@@ -9,6 +9,7 @@ public record CollaborationView(
         UUID id,
         UUID associationId,
         UUID enterpriseId,
+        UUID matchId,
         String title,
         List<String> participants,
         String owner,

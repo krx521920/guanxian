@@ -1,6 +1,8 @@
 package com.guanxian.platform.collaboration;
 
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -31,6 +33,16 @@ class InMemoryCollaborationStore implements CollaborationStore {
     private final AtomicLong historySequence = new AtomicLong();
 
     InMemoryCollaborationStore() {
+        this(false);
+    }
+
+    @Autowired
+    InMemoryCollaborationStore(
+            @Value("${guanxian.business.seed-demo-data:${guanxian.member.seed-demo-data:false}}")
+            boolean seedDemoData) {
+        if (!seedDemoData) {
+            return;
+        }
         seed("00000000-0000-0000-0000-00000000c001", "高压燃气管道零泄漏阀门联合评估",
                 List.of("北京市政建设集团", "北方阀门制造有限公司"), "徐明",
                 "IN_PROGRESS", "HIGH", "确认试验场地与技术参数", LocalDate.of(2026, 8, 18), 62);
@@ -78,6 +90,13 @@ class InMemoryCollaborationStore implements CollaborationStore {
     }
 
     @Override
+    public boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
+        // The memory adapter has no durable ecosystem catalog and is only enabled explicitly
+        // for isolated tests. PostgreSQL performs the authoritative scope check.
+        return true;
+    }
+
+    @Override
     public synchronized CollaborationView create(
             UUID associationId,
             UUID enterpriseId,
@@ -85,7 +104,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             ActorScope actor) {
         Instant now = Instant.now();
         CollaborationView value = new CollaborationView(
-                UUID.randomUUID(), associationId, enterpriseId, request.title().trim(),
+                UUID.randomUUID(), associationId, enterpriseId, request.matchId(), request.title().trim(),
                 cleanList(request.participants()), owner(request.owner(), actor), "DRAFT",
                 priority(request.priority()), clean(request.nextAction()), request.dueDate(),
                 progress(request.progress()), 0, false, false, now);
@@ -104,7 +123,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             return Optional.empty();
         }
         CollaborationView updated = new CollaborationView(
-                current.id(), current.associationId(), current.enterpriseId(), request.title().trim(),
+                current.id(), current.associationId(), current.enterpriseId(), request.matchId(), request.title().trim(),
                 cleanList(request.participants()), owner(request.owner(), actor), current.stage(),
                 priority(request.priority()), clean(request.nextAction()), request.dueDate(),
                 progress(request.progress()), current.version() + 1, current.disabled(), false, Instant.now());
@@ -223,7 +242,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             LocalDate dueDate,
             int progress) {
         CollaborationView item = new CollaborationView(
-                UUID.fromString(id), DEMO_ASSOCIATION, null, title, participants, owner, stage,
+                UUID.fromString(id), DEMO_ASSOCIATION, null, null, title, participants, owner, stage,
                 priority, nextAction, dueDate, progress, 0, false, false, Instant.now());
         items.put(item.id(), item);
     }
@@ -260,7 +279,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             boolean deleted,
             int progress) {
         return new CollaborationView(
-                old.id(), old.associationId(), old.enterpriseId(), old.title(), old.participants(),
+                old.id(), old.associationId(), old.enterpriseId(), old.matchId(), old.title(), old.participants(),
                 old.owner(), stage, old.priority(), old.nextAction(), old.dueDate(), progress,
                 version, disabled, deleted, Instant.now());
     }
@@ -269,6 +288,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", value.id().toString());
         result.put("title", value.title());
+        result.put("matchId", value.matchId() == null ? "" : value.matchId().toString());
         result.put("participants", value.participants());
         result.put("owner", value.owner() == null ? "" : value.owner());
         result.put("stage", value.stage());

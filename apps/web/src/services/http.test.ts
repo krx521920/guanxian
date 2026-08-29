@@ -6,10 +6,10 @@ const browserWindow = {
 }
 const randomUUIDMock = vi.fn(() => 'generated-request-id')
 
-async function loadRequest(options?: { mockFallback?: boolean; baseUrl?: string; mode?: string }) {
+async function loadRequest(options?: { baseUrl?: string; mode?: string; authMode?: string }) {
   vi.resetModules()
-  vi.stubEnv('VITE_MOCK_FALLBACK', options?.mockFallback ? 'true' : 'false')
   vi.stubEnv('MODE', options?.mode ?? 'test')
+  vi.stubEnv('VITE_AUTH_MODE', options?.authMode ?? 'oidc')
   if (options?.baseUrl !== undefined) vi.stubEnv('VITE_API_BASE_URL', options.baseUrl)
   return import('./http')
 }
@@ -69,6 +69,23 @@ describe('request', () => {
     expect(headers.get('Content-Type')).toBe('application/merge-patch+json')
     expect(headers.get('X-Request-Id')).toBe('client.Trace:01')
     expect(randomUUIDMock).not.toHaveBeenCalled()
+  })
+
+  it('sends the current demo role to the local development proxy without exposing credentials', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: 'done' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { request } = await loadRequest({ authMode: 'demo' })
+    const { setDemoRole } = await import('./token-store')
+    setDemoRole('ENTERPRISE_MEMBER')
+
+    await request('/health', {
+      headers: { 'X-Guanxian-Demo-Role': 'SYSTEM_ADMIN' },
+    })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const headers = new Headers(init.headers)
+    expect(headers.get('X-Guanxian-Demo-Role')).toBe('ENTERPRISE_MEMBER')
+    expect(headers.get('Authorization')).toBeNull()
   })
 
   it('preserves a safe request ID supplied through a Headers instance', async () => {
@@ -282,16 +299,14 @@ describe('request', () => {
     await expect(request('/members')).rejects.toMatchObject({ requestId: 'generated-request-id' })
   })
 
-  it('never hides HTTP or business contract errors behind mock data', async () => {
-    const mock = vi.fn().mockReturnValue(['mock'])
+  it('never hides HTTP or business contract errors', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(Response.json({ code: 'FORBIDDEN', message: '无权访问', data: null }, { status: 403 })),
     )
-    const { request } = await loadRequest({ mockFallback: true })
+    const { request } = await loadRequest()
 
-    await expect(request('/members', {}, mock)).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
-    expect(mock).not.toHaveBeenCalled()
+    await expect(request('/members')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' })
   })
 
   it('does not treat a primitive JSON error body as successful data', async () => {
@@ -354,7 +369,7 @@ describe('request', () => {
     const { request } = await loadRequest()
 
     const pendingRequest = request('/slow')
-    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 2500)
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 15000)
     timeoutCallback?.()
 
     await expect(pendingRequest).rejects.toMatchObject({
@@ -366,10 +381,9 @@ describe('request', () => {
     expect(clearTimeoutMock).toHaveBeenCalledWith(42)
   })
 
-  it('preserves caller cancellation and never falls back to mock data', async () => {
+  it('preserves caller cancellation', async () => {
     const externalController = new AbortController()
     const cancellation = new DOMException('用户取消', 'AbortError')
-    const mock = vi.fn().mockReturnValue(['mock'])
     const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(init.signal?.reason))
     }))
@@ -377,18 +391,17 @@ describe('request', () => {
       'fetch',
       fetchMock,
     )
-    const { request } = await loadRequest({ mockFallback: true })
+    const { request } = await loadRequest()
 
     const pendingRequest = request('/members', {
       signal: externalController.signal,
       headers: { 'X-Request-Id': 'cancel-request-id' },
-    }, mock)
+    })
     externalController.abort(cancellation)
 
     await expect(pendingRequest).rejects.toBe(cancellation)
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(new Headers(init.headers).get('X-Request-Id')).toBe('cancel-request-id')
-    expect(mock).not.toHaveBeenCalled()
   })
 
   it('normalizes a non-Error caller cancellation reason', async () => {
@@ -515,54 +528,20 @@ describe('request', () => {
     expect(secondHeaders.get('X-Request-Id')).toBe('concurrent-request-2')
   })
 
-  it('uses mock data after a network failure only when explicitly enabled', async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
-    vi.stubGlobal('fetch', fetchMock)
-    const mock = vi.fn().mockReturnValue([{ id: 'mock-member' }])
-    const { request } = await loadRequest({ mockFallback: true })
-
-    await expect(request('/members', {}, mock)).resolves.toEqual([{ id: 'mock-member' }])
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(new Headers(init.headers).get('X-Request-Id')).toBe('generated-request-id')
-    expect(mock).toHaveBeenCalledOnce()
-  })
-
-  it('disables mock fallback unconditionally in production mode', async () => {
+  it('propagates network failures without inventing records', async () => {
     const networkError = new TypeError('Failed to fetch')
-    const mock = vi.fn().mockReturnValue([])
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError))
-    const { request } = await loadRequest({ mockFallback: true, mode: 'production' })
+    const { request } = await loadRequest()
 
-    await expect(request('/members', {}, mock)).rejects.toBe(networkError)
-    expect(mock).not.toHaveBeenCalled()
+    await expect(request('/members')).rejects.toBe(networkError)
   })
 
   it('does not classify arbitrary fetch exceptions as recoverable network failures', async () => {
     const unexpectedError = new Error('fetch implementation failed')
-    const mock = vi.fn().mockReturnValue([])
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(unexpectedError))
-    const { request } = await loadRequest({ mockFallback: true })
+    const { request } = await loadRequest()
 
-    await expect(request('/members', {}, mock)).rejects.toBe(unexpectedError)
-    expect(mock).not.toHaveBeenCalled()
-  })
-
-  it('does not hide API failures when mock fallback is disabled', async () => {
-    const networkError = new TypeError('Failed to fetch')
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError))
-    const mock = vi.fn().mockReturnValue([])
-    const { request } = await loadRequest({ mockFallback: false })
-
-    await expect(request('/members', {}, mock)).rejects.toBe(networkError)
-    expect(mock).not.toHaveBeenCalled()
-  })
-
-  it('does not invent mock data when no mock provider is supplied', async () => {
-    const networkError = new TypeError('Failed to fetch')
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(networkError))
-    const { request } = await loadRequest({ mockFallback: true })
-
-    await expect(request('/members')).rejects.toBe(networkError)
+    await expect(request('/members')).rejects.toBe(unexpectedError)
   })
   it('adds the in-memory OIDC access token without overriding caller authorization', async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ code: 'OK', data: 'done' })))
@@ -578,6 +557,24 @@ describe('request', () => {
     await request('/members', { headers: { Authorization: 'Bearer caller-token' } })
     headers = new Headers((fetchMock.mock.calls[1]?.[1] as RequestInit).headers)
     expect(headers.get('Authorization')).toBe('Bearer caller-token')
+  })
+
+  it('injects only the trusted system administrator context and ignores caller overrides', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ code: 'OK', data: 'done' })))
+    vi.stubGlobal('fetch', fetchMock)
+    const { request } = await loadRequest()
+    const { setSystemContext } = await import('./token-store')
+    setSystemContext('11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222')
+
+    await request('/members', { headers: {
+      'X-Guanxian-Association-Id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'X-Guanxian-Enterprise-Id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    } })
+
+    const headers = new Headers((fetchMock.mock.calls[0]?.[1] as RequestInit).headers)
+    expect(headers.get('X-Guanxian-Association-Id')).toBe('11111111-1111-4111-8111-111111111111')
+    expect(headers.get('X-Guanxian-Enterprise-Id')).toBe('22222222-2222-4222-8222-222222222222')
+    setSystemContext(null, null)
   })
 
 })

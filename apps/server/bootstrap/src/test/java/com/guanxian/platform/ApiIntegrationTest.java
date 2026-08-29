@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -120,7 +121,8 @@ class ApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/matches").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].score").isNumber());
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
 
         mockMvc.perform(get("/api/v1/collaborations").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())
@@ -129,7 +131,8 @@ class ApiIntegrationTest {
         mockMvc.perform(get("/api/v1/dashboards/association")
                         .with(httpBasic("association-admin", "admin123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.metrics").isArray());
+                .andExpect(jsonPath("$.data.metrics").isArray())
+                .andExpect(jsonPath("$.data.activities[*].type", hasItem("task")));
 
         mockMvc.perform(get("/api/v1/dashboards/enterprise")
                         .with(httpBasic("enterprise-admin", "enterprise123")))

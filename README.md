@@ -1,4 +1,8 @@
-# 北京地下管线协会 AI 管理协作平台
+# 北京地下管线协会管理协作平台
+
+> 当前对外定位为“管理协作平台”。文档解析、可见范围检索、引用追踪和可选 Embedding
+> 已进入技术验证，但在真实模型供应商、协会语料评测、费用阈值和数据出境审批全部验收前，
+> 不对外宣称为“AI 平台”。
 
 本仓库用于实现平台第二版方案：**向上连接政策与标准，横向连接友好协会，向下服务会员企业，在平台内部形成可持续运营的产业生态。**
 
@@ -65,4 +69,4 @@ docker compose --profile app up --build -d
 
 快速入口和本轮实测结果见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，耗时和主动扫描任务按周或手动执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
 
-> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计和 Excel 批量采集闭环；本地测试仍可显式使用演示身份与内存仓储。AI 服务目前仍为确定性规则实现，生产上线前还需配置真实 IdP、执行 V3 数据库迁移演练并完成实际会员数据验收。
+> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、执行 V1–V12 迁移/恢复演练，并用协会真实语料完成效果和费用验收。

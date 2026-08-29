@@ -70,12 +70,38 @@ public class MemberService implements MemberDirectory {
 
     @Override
     public List<MemberProfile> findAll(String query, ActorScope actor) {
+        return findAll(query, null, false, actor);
+    }
+
+    public List<MemberProfile> findAll(String query, String status, ActorScope actor) {
+        return findAll(query, status, false, actor);
+    }
+
+    public List<MemberProfile> findAll(
+            String query, String status, boolean includeDeleted, ActorScope actor) {
         String keyword = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        String normalizedStatus = status == null ? "" : status.trim().toUpperCase(Locale.ROOT);
+        boolean allowDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationReviewer());
         return repository.findAll().stream()
+                .filter(member -> allowDeleted || !member.deleted())
                 .filter(member -> MemberAccessPolicy.canRead(actor, member))
+                .filter(member -> normalizedStatus.isEmpty() || member.status().equals(normalizedStatus))
                 .filter(member -> keyword.isEmpty() || searchableText(member).contains(keyword))
                 .sorted(Comparator.comparing(MemberProfile::name).thenComparing(MemberProfile::id))
                 .toList();
+    }
+
+    public List<MemberProfile> page(
+            String query, String status, boolean includeDeleted, ActorScope actor, int page, int size) {
+        List<MemberProfile> visible = findAll(query, status, includeDeleted, actor);
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(100, Math.max(1, size));
+        long offset = (long) safePage * safeSize;
+        if (offset >= visible.size()) {
+            return List.of();
+        }
+        int from = Math.toIntExact(offset);
+        return visible.subList(from, Math.min(visible.size(), from + safeSize));
     }
 
     List<MemberProfile> findAll(String query) {
@@ -83,11 +109,22 @@ public class MemberService implements MemberDirectory {
     }
     @Override
     public Optional<MemberProfile> findById(UUID id, ActorScope actor) {
-        return repository.findById(id).filter(member -> MemberAccessPolicy.canRead(actor, member));
+        return findById(id, actor, false);
+    }
+
+    public Optional<MemberProfile> findById(UUID id, ActorScope actor, boolean includeDeleted) {
+        boolean allowDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationReviewer());
+        return repository.findById(id)
+                .filter(member -> allowDeleted || !member.deleted())
+                .filter(member -> MemberAccessPolicy.canRead(actor, member));
     }
 
     public MemberProfile get(UUID id, ActorScope actor) {
         return findById(id, actor).orElseThrow(() -> new NotFoundException("member", id));
+    }
+
+    public MemberProfile get(UUID id, ActorScope actor, boolean includeDeleted) {
+        return findById(id, actor, includeDeleted).orElseThrow(() -> new NotFoundException("member", id));
     }
 
     MemberProfile get(UUID id) {
@@ -100,8 +137,14 @@ public class MemberService implements MemberDirectory {
             throw scopeDenied();
         }
         UUID associationId = actor.isSystemAdmin()
-                ? request.associationId() == null ? repository.defaultAssociationId() : request.associationId()
+                ? request.associationId() != null ? request.associationId() : actor.associationId()
                 : actor.associationId();
+        if (associationId == null) {
+            throw new com.guanxian.platform.shared.error.ApiException(
+                    "ASSOCIATION_CONTEXT_REQUIRED",
+                    "system administrators must select an association context",
+                    org.springframework.http.HttpStatus.BAD_REQUEST);
+        }
         String status = actor.isSystemAdmin() || actor.isAssociationReviewer()
                 ? normalizeStatus(request.status(), "ACTIVE")
                 : "PENDING_REVIEW";
@@ -112,7 +155,13 @@ public class MemberService implements MemberDirectory {
     }
 
     public synchronized MemberProfile create(MemberUpsertRequest request) {
-        return create(request, SYSTEM_ACTOR);
+        UUID associationId = request.associationId() == null
+                ? repository.defaultAssociationId()
+                : request.associationId();
+        ActorScope internalActor = new ActorScope(
+                null, SYSTEM_ACTOR.subject(), SYSTEM_ACTOR.username(), associationId, null,
+                SYSTEM_ACTOR.roles(), SYSTEM_ACTOR.partnerAssociationIds());
+        return create(request, internalActor);
     }
 
     @Transactional
@@ -133,6 +182,7 @@ public class MemberService implements MemberDirectory {
     public synchronized MemberProfile update(
             UUID id, long expectedVersion, MemberUpsertRequest request, ActorScope actor) {
         MemberProfile existing = getUnscoped(id);
+        ensureNotDeleted(existing);
         if (!MemberAccessPolicy.canUpdate(actor, existing)) {
             throw scopeDenied();
         }
@@ -167,6 +217,7 @@ public class MemberService implements MemberDirectory {
     public synchronized MemberProfile review(
             UUID id, long expectedVersion, MemberReviewRequest request, ActorScope actor) {
         MemberProfile existing = getUnscoped(id);
+        ensureNotDeleted(existing);
         if (!MemberAccessPolicy.canReview(actor, existing)) {
             throw scopeDenied();
         }
@@ -186,24 +237,58 @@ public class MemberService implements MemberDirectory {
             throw scopeDenied();
         }
         ensureVersion(existing, expectedVersion);
-        if (!repository.deleteById(id, expectedVersion)) {
+        ensureNotDeleted(existing);
+        Instant now = Instant.now();
+        MemberProfile deleted = new MemberProfile(
+                existing.id(), existing.associationId(), existing.name(), existing.unifiedSocialCreditCode(),
+                existing.category(), existing.address(), existing.contactName(), existing.contactPhone(),
+                existing.introduction(), existing.capabilities(), existing.products(), existing.cooperationNeeds(),
+                existing.visibility(), "DELETED", nextVersion(existing), existing.createdAt(), now,
+                now, actor.subject(), existing.status());
+        if (!repository.update(deleted, expectedVersion)) {
             throw versionMismatch();
         }
         auditTrail.record(actor, "MEMBER_DELETE", "ENTERPRISE", id.toString(),
-                existing.associationId(), id, auditDetails(existing, null));
-        return existing;
+                existing.associationId(), id, auditDetails(existing, deleted));
+        return deleted;
     }
 
     public synchronized MemberProfile delete(UUID id, long expectedVersion) {
         return delete(id, expectedVersion, SYSTEM_ACTOR);
     }
 
+    @Transactional
+    public synchronized MemberProfile restore(UUID id, long expectedVersion, ActorScope actor) {
+        MemberProfile existing = getUnscoped(id);
+        if (!MemberAccessPolicy.canDelete(actor, existing)) {
+            throw scopeDenied();
+        }
+        ensureVersion(existing, expectedVersion);
+        if (!existing.deleted()) {
+            throw new ConflictException("member is not deleted");
+        }
+        Instant now = Instant.now();
+        String restoredStatus = normalizeStatus(existing.statusBeforeDelete(), "DISABLED");
+        MemberProfile restored = new MemberProfile(
+                existing.id(), existing.associationId(), existing.name(), existing.unifiedSocialCreditCode(),
+                existing.category(), existing.address(), existing.contactName(), existing.contactPhone(),
+                existing.introduction(), existing.capabilities(), existing.products(), existing.cooperationNeeds(),
+                existing.visibility(), restoredStatus, nextVersion(existing), existing.createdAt(), now,
+                null, null, null);
+        if (!repository.update(restored, expectedVersion)) {
+            throw versionMismatch();
+        }
+        auditTrail.record(actor, "MEMBER_RESTORE", "ENTERPRISE", id.toString(),
+                restored.associationId(), id, auditDetails(existing, restored));
+        return restored;
+    }
+
     public boolean canEdit(ActorScope actor, MemberProfile member) {
-        return MemberAccessPolicy.canUpdate(actor, member);
+        return !member.deleted() && MemberAccessPolicy.canUpdate(actor, member);
     }
 
     public boolean canReview(ActorScope actor, MemberProfile member) {
-        return MemberAccessPolicy.canReview(actor, member);
+        return !member.deleted() && MemberAccessPolicy.canReview(actor, member);
     }
 
     private MemberProfile createInternal(
@@ -243,7 +328,7 @@ public class MemberService implements MemberDirectory {
                 request.category().trim(), trimToNull(request.address()), trimToNull(request.contactName()),
                 trimToNull(request.contactPhone()), trimToNull(request.introduction()),
                 immutable(request.capabilities()), immutable(request.products()), immutable(request.cooperationNeeds()),
-                visibility, status, version, createdAt, updatedAt);
+                visibility, status, version, createdAt, updatedAt, null, null, null);
     }
 
     private static MemberProfile copyWithStatus(MemberProfile member, String status, Instant updatedAt) {
@@ -254,7 +339,8 @@ public class MemberService implements MemberDirectory {
                 member.id(), member.associationId(), member.name(), member.unifiedSocialCreditCode(),
                 member.category(), member.address(), member.contactName(), member.contactPhone(),
                 member.introduction(), member.capabilities(), member.products(), member.cooperationNeeds(),
-                member.visibility(), status, member.version() + 1, member.createdAt(), updatedAt);
+                member.visibility(), status, member.version() + 1, member.createdAt(), updatedAt,
+                member.deletedAt(), member.deletedBySubject(), member.statusBeforeDelete());
     }
 
     private MemberProfile getUnscoped(UUID id) {
@@ -265,6 +351,19 @@ public class MemberService implements MemberDirectory {
         if (existing.version() != expectedVersion) {
             throw versionMismatch();
         }
+    }
+
+    private static void ensureNotDeleted(MemberProfile member) {
+        if (member.deleted()) {
+            throw new ConflictException("deleted member must be restored before modification");
+        }
+    }
+
+    private static long nextVersion(MemberProfile member) {
+        if (member.version() == Long.MAX_VALUE) {
+            throw new ConflictException("member version is exhausted");
+        }
+        return member.version() + 1;
     }
 
     private static PreconditionFailedException versionMismatch() {

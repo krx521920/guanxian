@@ -16,14 +16,14 @@ onMounted(load)
 <template>
   <div>
     <PageHeader eyebrow="ENTERPRISE WORKSPACE" title="企业工作台" :description="`${auth.user.value?.organization} · 管理能力资产，发现政策与合作机会`">
-      <button class="secondary-button">预览企业主页</button><button class="primary-button">+ 发布供需</button>
+      <RouterLink class="secondary-button" to="/members">查看企业资料</RouterLink><RouterLink v-if="auth.user.value?.role === 'ENTERPRISE_ADMIN'" class="primary-button" to="/ecosystem?create=demand">+ 发布需求</RouterLink><RouterLink v-else class="primary-button" to="/ecosystem">查看产品与需求</RouterLink>
     </PageHeader>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="data">
       <section class="profile-completeness panel">
         <div class="completeness-ring" :style="{ '--progress': `${data.completeness * 3.6}deg` }"><div><strong>{{ data.completeness }}%</strong><span>资料完整度</span></div></div>
-        <div><span class="eyebrow">ENTERPRISE PROFILE</span><h2>企业资料已具备匹配条件</h2><p>补充 2 项产品技术参数和 1 个项目案例，可进一步提升 AI 匹配准确度。</p><button class="text-button">继续完善资料 →</button></div>
-        <div class="profile-checks"><span class="done">✓ 基本信息</span><span class="done">✓ 场景能力</span><span class="todo">• 技术参数</span><span class="todo">• 典型案例</span></div>
+        <div><span class="eyebrow">ENTERPRISE PROFILE</span><h2>企业资料完整度 {{ data.completeness }}%</h2><p>完整度来自当前企业档案的实时字段统计；产品、需求和附件可在对应页面持续维护。</p><RouterLink class="text-button" to="/members">{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '继续完善资料 →' : '查看企业资料 →' }}</RouterLink></div>
+        <div class="profile-checks"><RouterLink to="/members">企业基本信息</RouterLink><RouterLink to="/ecosystem">产品与需求</RouterLink><RouterLink to="/attachments">资质与案例</RouterLink><RouterLink to="/matching">生态匹配</RouterLink></div>
       </section>
 
       <section class="metrics-grid enterprise-metrics"><MetricCard v-for="(metric, index) in data.metrics" :key="metric.label" :metric="metric" :icon="['品', '机', '协', '策'][index]" /></section>

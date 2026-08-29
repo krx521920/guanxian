@@ -1,0 +1,38 @@
+export function splitItems(value: string): string[] {
+  return [...new Set(value.split(/[\n,，、;；]+/).map((item) => item.trim()).filter(Boolean))]
+}
+
+export function nullableText(value: string): string | null {
+  return value.trim() || null
+}
+
+export function apiActionMessage(reason: unknown, fallback: string): string {
+  if (reason && typeof reason === 'object' && 'status' in reason) {
+    if (reason.status === 403) return '当前账号没有执行该操作的权限。'
+    if (reason.status === 409 || reason.status === 412) return '数据已发生变化，请刷新后重试。'
+  }
+  return fallback
+}
+
+export function displayBusinessStatus(value: string): string {
+  const labels: Record<string, string> = {
+    DRAFT: '草稿', PENDING_REVIEW: '待审核', PUBLISHED: '已发布', ACTIVE: '进行中',
+    APPROVED: '已通过', REJECTED: '已退回', DISABLED: '已停用', CLOSED: '已关闭',
+    PROPOSED: '待确认', PENDING_CONFIRMATION: '待双方确认', RECOMMENDED: '已推荐',
+    PARTIALLY_CONFIRMED: '一方已确认', CONFIRMED: '双方已确认', INVITED: '已邀请',
+    NEGOTIATING: '洽谈中', OUTCOME_PENDING: '成果待归档', ARCHIVED: '成果已归档',
+    INITIAL_CONTACT: '初次联系', TECHNICAL_EXCHANGE: '技术交流',
+    COMMERCIAL_NEGOTIATION: '商务洽谈', CONTRACTING: '合同推进',
+    CONTRACT_SIGNED: '合同已签署', TERMINATED: '洽谈终止',
+    SUCCESS: '已达成合作', NO_DEAL: '未达成合作', WITHDRAWN: '主动退出',
+    COMPLETED: '已完成', OPEN: '已开放',
+    IN_PROGRESS: '进行中', PENDING: '待处理', SUSPENDED: '已暂停', REVOKED: '已撤销',
+  }
+  return labels[value] || value || '未知'
+}
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
+}

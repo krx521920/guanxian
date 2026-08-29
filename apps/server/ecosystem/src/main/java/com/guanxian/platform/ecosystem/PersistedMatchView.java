@@ -17,6 +17,9 @@ public record PersistedMatchView(
         int score,
         List<String> reasons,
         String state,
+        Instant recommendedAt,
+        Instant demandConfirmedAt,
+        Instant candidateConfirmedAt,
         String closedReason,
         long version,
         Instant updatedAt) {

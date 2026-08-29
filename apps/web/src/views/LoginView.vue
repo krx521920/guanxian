@@ -40,9 +40,9 @@ async function login() {
       <div class="visual-copy">
         <span class="visual-kicker">北京地下管线协会</span>
         <h1>让行业资源<br />真正连接起来</h1>
-        <p>向上连接政策标准，横向协同兄弟协会，向下服务会员企业，以 AI 构建可信、高效的地下管线产业生态。</p>
+        <p>向上连接政策标准，横向协同兄弟协会，向下服务会员企业，以可信数据构建高效的地下管线产业生态。</p>
         <div class="network-visual" aria-hidden="true">
-          <div class="network-core"><b>AI</b><span>生态中枢</span></div>
+          <div class="network-core"><b>数据</b><span>生态中枢</span></div>
           <div class="network-node node-a">政策</div>
           <div class="network-node node-b">协会</div>
           <div class="network-node node-c">企业</div>

@@ -36,18 +36,27 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
         String createdBySubject = previous == null ? command.actorSubject() : previous.createdBySubject();
         UUID versionId = UUID.randomUUID();
         MemoryDocument document = new MemoryDocument(documentId, command.associationId(), command.title(),
-                command.sourceUrl(), command.visibility(), command.status(), createdBySubject,
+                command.sourceUrl(), command.sourceFileId(), command.visibility(), command.status(), createdBySubject,
                 version, versionId, command.contentHash());
         documents.put(documentId, document);
-        for (TextChunk source : command.chunks()) {
+        for (int index = 0; index < command.chunks().size(); index++) {
+            TextChunk source = command.chunks().get(index);
             UUID chunkId = UUID.randomUUID();
-            chunks.put(chunkId, new MemoryChunk(chunkId, documentId, versionId, version, source.index(), source.content()));
+            double[] embedding = command.embeddings().isEmpty() ? null : command.embeddings().get(index);
+            chunks.put(chunkId, new MemoryChunk(chunkId, documentId, versionId, version,
+                    source.index(), source.content(), embedding));
         }
-        return new IngestionResult(documentId, versionId, version, command.chunks().size(), command.contentHash());
+        return new IngestionResult(documentId, versionId, version, command.chunks().size(), command.contentHash(),
+                command.embeddings().isEmpty() ? null : command.embeddingProvider(),
+                command.embeddings().isEmpty() ? null : command.embeddingModel(), command.embeddingDimensions());
     }
 
     @Override
-    public synchronized List<RetrievedChunk> retrieve(RetrievalScope scope, String query, int limit) {
+    public synchronized List<RetrievedChunk> retrieve(
+            RetrievalScope scope,
+            String query,
+            double[] queryEmbedding,
+            int limit) {
         if (query == null || query.isBlank() || limit < 1) return List.of();
         Set<String> terms = queryTerms(query);
         List<RetrievedChunk> matches = new ArrayList<>();
@@ -55,10 +64,13 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
             MemoryDocument document = documents.get(chunk.documentId());
             if (document == null || chunk.version() != document.version() || !"PUBLISHED".equals(document.status())) continue;
             if (!visibleTo(scope, document)) continue;
-            double score = relevance(chunk.content(), query, terms);
+            double lexical = relevance(chunk.content(), query, terms);
+            double semantic = Math.max(0, cosine(queryEmbedding, chunk.embedding()));
+            double score = Math.min(99.999999,
+                    semantic * 75 + Math.min(25, Math.max(0, lexical)));
             if (score > 0) {
                 matches.add(new RetrievedChunk(chunk.id(), document.id(), document.title(), chunk.version(),
-                        chunk.index(), document.sourceUrl(), chunk.content(), score));
+                        chunk.index(), document.sourceUrl(), document.sourceFileId(), null, chunk.content(), score));
             }
         }
         return matches.stream()
@@ -123,11 +135,29 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
         return score;
     }
 
-    private record MemoryDocument(UUID id, UUID associationId, String title, String sourceUrl,
+    private double cosine(double[] left, double[] right) {
+        if (left == null || right == null || left.length != right.length) return 0;
+        double dot = 0;
+        double leftMagnitude = 0;
+        double rightMagnitude = 0;
+        for (int index = 0; index < left.length; index++) {
+            dot += left[index] * right[index];
+            leftMagnitude += left[index] * left[index];
+            rightMagnitude += right[index] * right[index];
+        }
+        return leftMagnitude == 0 || rightMagnitude == 0
+                ? 0 : dot / Math.sqrt(leftMagnitude * rightMagnitude);
+    }
+
+    private record MemoryDocument(UUID id, UUID associationId, String title, String sourceUrl, UUID sourceFileId,
                                   String visibility, String status, String createdBySubject,
                                   int version, UUID versionId, String contentHash) {
     }
 
-    private record MemoryChunk(UUID id, UUID documentId, UUID versionId, int version, int index, String content) {
+    private record MemoryChunk(UUID id, UUID documentId, UUID versionId, int version, int index,
+                               String content, double[] embedding) {
+        private MemoryChunk {
+            embedding = embedding == null ? null : embedding.clone();
+        }
     }
 }

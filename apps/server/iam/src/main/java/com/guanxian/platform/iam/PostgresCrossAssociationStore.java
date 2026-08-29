@@ -359,9 +359,11 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
         jdbc.update("""
                 INSERT INTO audit_log
                   (actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
-                   action, resource_type, resource_id, details, request_id)
-                VALUES (:actorUserId, :actorSubject, :actorUsername, :associationId, :enterpriseId,
-                        :action, :resourceType, :resourceId, CAST(:details AS jsonb), :requestId)
+                   action, resource_type, resource_id, resource_version, outcome, details, request_id)
+                VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
+                        :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId, :enterpriseId,
+                        :action, :resourceType, :resourceId, NULL, 'SUCCESS',
+                        CAST(:details AS jsonb), COALESCE(:requestId, 'internal'))
                 """, params("actorUserId", actor.userId()).addValue("actorSubject", actor.subject())
                 .addValue("actorUsername", actor.username()).addValue("associationId", associationId)
                 .addValue("enterpriseId", enterpriseId).addValue("action", action)

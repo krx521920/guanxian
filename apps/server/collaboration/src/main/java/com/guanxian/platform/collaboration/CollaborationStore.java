@@ -14,6 +14,8 @@ interface CollaborationStore {
 
     Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted);
 
+    boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId);
+
     CollaborationView create(
             UUID associationId,
             UUID enterpriseId,

@@ -8,6 +8,7 @@ import com.guanxian.platform.ai.rag.KnowledgeRepository.ModelExecutionDraft;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.RetrievalScope;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.RetrievedChunk;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.TraceDraft;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -28,13 +29,24 @@ public class PolicyRagService {
     private final ChatModelProvider modelProvider;
     private final RagProperties properties;
     private final RagSecurityGuard securityGuard;
+    private final EmbeddingProvider embeddingProvider;
 
     public PolicyRagService(KnowledgeRepository repository, ChatModelProvider modelProvider, RagProperties properties) {
+        this(repository, modelProvider, properties, EmbeddingProvider.disabled());
+    }
+
+    @Autowired
+    public PolicyRagService(
+            KnowledgeRepository repository,
+            ChatModelProvider modelProvider,
+            RagProperties properties,
+            EmbeddingProvider embeddingProvider) {
         properties.validate();
         this.repository = repository;
         this.modelProvider = modelProvider;
         this.properties = properties;
         this.securityGuard = new RagSecurityGuard(properties);
+        this.embeddingProvider = embeddingProvider;
     }
 
     public RagAnswer ask(RagQuestion question) {
@@ -48,7 +60,11 @@ public class PolicyRagService {
                 : Math.min(Math.max(1, question.maxCitations()), properties.getRetrievalLimit());
         RetrievalScope retrievalScope = new RetrievalScope(
                 question.associationId(), question.actorSubject(), question.privilegedKnowledgeAccess());
-        List<RetrievedChunk> chunks = repository.retrieve(retrievalScope, question.question(), limit).stream()
+        double[] queryEmbedding = embeddingProvider.enabled()
+                ? embeddingProvider.embed(List.of(question.question())).getFirst()
+                : null;
+        List<RetrievedChunk> chunks = repository.retrieve(
+                        retrievalScope, question.question(), queryEmbedding, limit).stream()
                 .filter(chunk -> securityGuard.safeRetrievedDocument(
                         chunk.documentTitle(), chunk.sourceUrl(), chunk.content()))
                 .toList();
@@ -119,11 +135,15 @@ public class PolicyRagService {
                 .toList();
         UUID traceId = repository.saveRetrieval(new TraceDraft(
                 question.associationId(), question.actorSubject(), question.question(),
-                DocumentTextChunker.sha256(question.question()), externalModelAllowed ? modelProvider.providerName() : "local",
+                DocumentTextChunker.sha256(question.question()), externalModelAllowed
+                        ? modelProvider.providerName()
+                        : embeddingProvider.enabled() ? embeddingProvider.providerName() : "local",
                 model, mode, inputTokens, outputTokens, estimatedCost, latencyMs,
                 firstNonBlank(question.requestId(), providerRequestId)
         ), citationDrafts);
-        return new RagAnswer(answer, citations, traceId, mode, inputTokens, outputTokens, estimatedCost);
+        return new RagAnswer(answer, citations, traceId, mode,
+                embeddingProvider.enabled() ? "HYBRID_VECTOR" : "LEXICAL",
+                inputTokens, outputTokens, estimatedCost);
     }
 
     private List<Citation> citations(List<RetrievedChunk> chunks) {
@@ -131,7 +151,7 @@ public class PolicyRagService {
         for (int index = 0; index < chunks.size(); index++) {
             RetrievedChunk chunk = chunks.get(index);
             citations.add(new Citation(index + 1, chunk.documentTitle(), chunk.documentVersion(), chunk.chunkId(),
-                    chunk.chunkIndex(), firstNonBlank(chunk.sourceUrl(), "knowledge-document:" + chunk.documentId()),
+                    chunk.chunkIndex(), chunk.sourceUrl(), chunk.sourceFileId(), chunk.sourceFilename(),
                     clip(chunk.content().replaceAll("\\s+", " "), 500), chunk.score()));
         }
         return List.copyOf(citations);
@@ -186,10 +206,12 @@ public class PolicyRagService {
     }
 
     public record Citation(int order, String documentName, int version, UUID chunkId, int chunkIndex,
-                           String source, String quote, double score) {
+                           String source, UUID sourceAttachmentId, String sourceFilename,
+                           String quote, double score) {
     }
 
     public record RagAnswer(String answer, List<Citation> citations, UUID traceId, String mode,
+                            String retrievalMode,
                             int inputTokens, int outputTokens, BigDecimal estimatedCost) {
         public RagAnswer {
             citations = citations == null ? List.of() : List.copyOf(citations);

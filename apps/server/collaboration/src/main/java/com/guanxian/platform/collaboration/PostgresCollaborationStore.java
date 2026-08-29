@@ -26,7 +26,7 @@ class PostgresCollaborationStore implements CollaborationStore {
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() { };
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() { };
     private static final String SELECT = """
-            SELECT c.id, c.association_id, c.enterprise_id, c.title,
+            SELECT c.id, c.association_id, c.enterprise_id, c.match_id, c.title,
                    c.participants::text AS participants,
                    coalesce(c.owner_subject, u.display_name) AS owner,
                    c.status, c.priority, c.next_action, c.due_at, c.progress,
@@ -68,6 +68,32 @@ class PostgresCollaborationStore implements CollaborationStore {
     }
 
     @Override
+    public boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
+        if (matchId == null) {
+            return true;
+        }
+        Boolean allowed = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                      JOIN enterprise de ON de.id=d.enterprise_id
+                     WHERE m.id=:matchId
+                       AND m.deleted_at IS NULL
+                       AND d.deleted_at IS NULL
+                       AND de.association_id=:associationId
+                       AND (:enterpriseId IS NULL
+                            OR d.enterprise_id=:enterpriseId
+                            OR m.candidate_enterprise_id=:enterpriseId)
+                )
+                """, new MapSqlParameterSource()
+                .addValue("matchId", matchId)
+                .addValue("associationId", associationId)
+                .addValue("enterpriseId", enterpriseId), Boolean.class);
+        return Boolean.TRUE.equals(allowed);
+    }
+
+    @Override
     public CollaborationView create(
             UUID associationId, UUID enterpriseId, CollaborationUpsertRequest request, ActorScope actor) {
         UUID id = UUID.randomUUID();
@@ -75,10 +101,10 @@ class PostgresCollaborationStore implements CollaborationStore {
                 .addValue("id", id).addValue("associationId", associationId).addValue("enterpriseId", enterpriseId);
         jdbc.update("""
                 INSERT INTO collaboration_task (
-                    id, association_id, enterprise_id, owner_subject, title,
+                    id, association_id, enterprise_id, match_id, owner_subject, title,
                     participants, priority, next_action, progress, status, due_at)
                 VALUES (
-                    :id, :associationId, :enterpriseId, :owner, :title,
+                    :id, :associationId, :enterpriseId, :matchId, :owner, :title,
                     CAST(:participants AS jsonb), :priority, :nextAction, :progress, 'DRAFT', :dueAt)
                 """, values);
         return find(id, actor, false).orElseThrow();
@@ -90,6 +116,7 @@ class PostgresCollaborationStore implements CollaborationStore {
         int updated = jdbc.update("""
                 UPDATE collaboration_task
                    SET title=:title, participants=CAST(:participants AS jsonb), owner_subject=:owner,
+                       match_id=:matchId,
                        priority=:priority, next_action=:nextAction, due_at=:dueAt, progress=:progress,
                        version=version+1, updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NULL
@@ -217,11 +244,14 @@ class PostgresCollaborationStore implements CollaborationStore {
         jdbc.update("""
                 INSERT INTO audit_log (
                     actor_user_id, actor_subject, actor_username, association_id,
-                    enterprise_id, action, resource_type, resource_id, details, request_id)
+                    enterprise_id, action, resource_type, resource_id, resource_version,
+                    outcome, details, request_id)
                 VALUES (
-                    :actorUserId, :subject, :actorUsername, :associationId,
+                    (SELECT id FROM user_account WHERE id = :actorUserId),
+                    :subject, COALESCE(:actorUsername, :subject), :associationId,
                     :enterpriseId, :action, 'COLLABORATION_TASK',
-                    CAST(:collaborationId AS varchar), CAST(:snapshot AS jsonb), :requestId)
+                    CAST(:collaborationId AS varchar), :version, 'SUCCESS',
+                    CAST(:snapshot AS jsonb), COALESCE(:requestId, 'internal'))
                 """, values);
     }
 
@@ -233,7 +263,14 @@ class PostgresCollaborationStore implements CollaborationStore {
             sql.append("c.association_id=:associationId");
         } else if (actor.associationId() != null) {
             sql.append("c.association_id=:associationId")
-                    .append(" AND (c.enterprise_id IS NULL OR c.enterprise_id=:enterpriseId)");
+                    .append(" AND (c.enterprise_id=:enterpriseId")
+                    .append(" OR (c.enterprise_id IS NULL AND c.match_id IS NULL)")
+                    .append(" OR EXISTS (SELECT 1 FROM ecosystem_match sm")
+                    .append(" WHERE sm.id=c.match_id AND sm.deleted_at IS NULL")
+                    .append(" AND (sm.candidate_enterprise_id=:enterpriseId")
+                    .append(" OR EXISTS (SELECT 1 FROM cooperation_demand sd")
+                    .append(" WHERE sd.id=sm.demand_id AND sd.enterprise_id=:enterpriseId)")
+                    .append(")))");
         } else {
             sql.append("FALSE");
         }
@@ -259,6 +296,7 @@ class PostgresCollaborationStore implements CollaborationStore {
                 .addValue("participants", json(cleanList(request.participants())))
                 .addValue("owner", owner(request.owner(), actor)).addValue("priority", priority(request.priority()))
                 .addValue("nextAction", clean(request.nextAction()))
+                .addValue("matchId", request.matchId())
                 .addValue("dueAt", request.dueDate() == null ? null
                         : Timestamp.from(request.dueDate().atStartOfDay(ZoneOffset.UTC).toInstant()))
                 .addValue("progress", request.progress() == null ? 0 : request.progress());
@@ -268,7 +306,8 @@ class PostgresCollaborationStore implements CollaborationStore {
         Timestamp dueAt = rs.getTimestamp("due_at");
         return new CollaborationView(
                 rs.getObject("id", UUID.class), rs.getObject("association_id", UUID.class),
-                rs.getObject("enterprise_id", UUID.class), rs.getString("title"),
+                rs.getObject("enterprise_id", UUID.class), rs.getObject("match_id", UUID.class),
+                rs.getString("title"),
                 readList(rs.getString("participants")), rs.getString("owner"), rs.getString("status"),
                 rs.getString("priority"), rs.getString("next_action"),
                 dueAt == null ? null : dueAt.toInstant().atZone(ZoneOffset.UTC).toLocalDate(),

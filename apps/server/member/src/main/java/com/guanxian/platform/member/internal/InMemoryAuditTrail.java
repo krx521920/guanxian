@@ -23,7 +23,11 @@ class InMemoryAuditTrail implements AuditTrail {
                        UUID associationId, UUID enterpriseId, Map<String, Object> details) {
         entries.add(new AuditRecord(
                 sequence.incrementAndGet(), actor.subject(), actor.username(), associationId, enterpriseId,
-                action, resourceType, resourceId, Map.copyOf(details), MDC.get("requestId"), Instant.now()));
+                action, resourceType, resourceId,
+                details.get("newVersion") instanceof Number number && number.longValue() >= 0
+                        ? number.longValue() : null,
+                "SUCCESS", Map.copyOf(details),
+                MDC.get("requestId") == null ? "internal" : MDC.get("requestId"), Instant.now()));
     }
 
     @Override

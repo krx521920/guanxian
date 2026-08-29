@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -328,6 +329,22 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
+    public boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        if (enterpriseId == null || associationId == null) {
+            return false;
+        }
+        Boolean belongs = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM enterprise
+                    WHERE id=:enterpriseId AND association_id=:associationId
+                )
+                """, new MapSqlParameterSource("enterpriseId", enterpriseId)
+                .addValue("associationId", associationId), Boolean.class);
+        return Boolean.TRUE.equals(belongs);
+    }
+
+    @Override
     public void recordChange(
             ActorScope actor,
             String action,
@@ -347,6 +364,8 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                 .addValue("action", action)
                 .addValue("subject", actor.subject())
                 .addValue("actorUserId", actor.userId())
+                .addValue("actorUsername", actor.username())
+                .addValue("requestId", MDC.get("requestId"))
                 .addValue("snapshot", json);
         jdbc.update("""
                 INSERT INTO business_entity_history (
@@ -358,10 +377,13 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                 """, params);
         jdbc.update("""
                 INSERT INTO audit_log (
-                    actor_user_id, action, resource_type, resource_id, details)
+                    actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
+                    action, resource_type, resource_id, resource_version, outcome, details, request_id)
                 VALUES (
-                    :actorUserId, :action, :resourceType, CAST(:resourceId AS varchar),
-                    CAST(:snapshot AS jsonb))
+                    (SELECT id FROM user_account WHERE id = :actorUserId),
+                    :subject, COALESCE(:actorUsername, :subject), :associationId, :enterpriseId,
+                    :action, :resourceType, CAST(:resourceId AS varchar), :version, 'SUCCESS',
+                    CAST(:snapshot AS jsonb), COALESCE(:requestId, 'internal'))
                 """, params);
     }
 
@@ -379,9 +401,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
             sql.append("(e.association_id=:associationId");
             if (!actor.partnerAssociationIds().isEmpty()) {
                 params.addValue("partnerIds", actor.partnerAssociationIds());
-                sql.append(" OR (e.association_id IN (:partnerIds) AND ")
-                        .append(alias).append(".visibility IN ('PARTNERS','PUBLIC') AND ")
-                        .append(alias).append(".status=:publishedStatus)");
+                appendAuthorizedPartnerRead(sql, alias);
             }
             sql.append(")");
         } else if (actor.enterpriseId() != null) {
@@ -393,9 +413,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
             }
             if (!actor.partnerAssociationIds().isEmpty()) {
                 params.addValue("partnerIds", actor.partnerAssociationIds());
-                sql.append(" OR (e.association_id IN (:partnerIds) AND ")
-                        .append(alias).append(".visibility IN ('PARTNERS','PUBLIC') AND ")
-                        .append(alias).append(".status=:publishedStatus)");
+                appendAuthorizedPartnerRead(sql, alias);
             }
             sql.append(")");
         } else {
@@ -415,6 +433,33 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
             }
         }
         return sql.toString();
+    }
+
+    private static void appendAuthorizedPartnerRead(StringBuilder sql, String alias) {
+        String resourceType = "p".equals(alias) ? "upper(p.kind)" : "'DEMAND'";
+        sql.append(" OR (e.association_id IN (:partnerIds) AND ")
+                .append(alias).append(".visibility IN ('PARTNERS','PUBLIC') AND ")
+                .append(alias).append(".status=:publishedStatus AND ")
+                .append(alias).append(".deleted_at IS NULL AND ")
+                .append("EXISTS (SELECT 1 FROM association_relationship ar ")
+                .append("WHERE ar.status='ACTIVE' AND ar.allow_member_data=TRUE ")
+                .append("AND ar.suspended_at IS NULL AND ar.revoked_at IS NULL ")
+                .append("AND (ar.expires_at IS NULL OR ar.expires_at>now()) ")
+                .append("AND ((ar.source_association_id=e.association_id AND ar.target_association_id=:associationId) ")
+                .append("OR (ar.target_association_id=e.association_id AND ar.source_association_id=:associationId))) ")
+                .append("AND EXISTS (SELECT 1 FROM association_share_policy sp ")
+                .append("WHERE sp.source_association_id=e.association_id ")
+                .append("AND sp.target_association_id=:associationId ")
+                .append("AND sp.resource_type=").append(resourceType).append(" ")
+                .append("AND sp.status='ACTIVE' AND sp.valid_from<=now() ")
+                .append("AND (sp.expires_at IS NULL OR sp.expires_at>now())) ")
+                .append("AND EXISTS (SELECT 1 FROM enterprise_share_consent esc ")
+                .append("WHERE esc.enterprise_id=").append(alias).append(".enterprise_id ")
+                .append("AND esc.target_association_id=:associationId ")
+                .append("AND esc.resource_type=").append(resourceType).append(" ")
+                .append("AND esc.resource_id=").append(alias).append(".id ")
+                .append("AND esc.status='ACTIVE' AND esc.revoked_at IS NULL ")
+                .append("AND (esc.expires_at IS NULL OR esc.expires_at>now())))");
     }
 
     private MapSqlParameterSource commonParams(ActorScope actor, String query) {

@@ -142,11 +142,13 @@ public class AttachmentService {
 
     private Scope writableScope(ActorScope actor, UUID associationId, UUID enterpriseId) {
         if (actor.isSystemAdmin()) {
-            if (associationId == null) {
+            UUID selectedAssociation = associationId != null ? associationId : actor.associationId();
+            UUID selectedEnterprise = enterpriseId != null ? enterpriseId : actor.enterpriseId();
+            if (selectedAssociation == null) {
                 throw new ApiException("ASSOCIATION_REQUIRED",
                         "system administrators must select an association", HttpStatus.BAD_REQUEST);
             }
-            return new Scope(associationId, enterpriseId);
+            return new Scope(selectedAssociation, selectedEnterprise);
         }
         if (actor.associationId() == null) {
             throw new ForbiddenException("ASSOCIATION_SCOPE_REQUIRED", "actor has no association scope");

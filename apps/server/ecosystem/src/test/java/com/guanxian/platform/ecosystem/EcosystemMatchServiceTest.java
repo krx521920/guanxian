@@ -15,11 +15,13 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EcosystemMatchServiceTest {
     private static final UUID ASSOCIATION_ID = UUID.randomUUID();
     private static final UUID DEMAND_ENTERPRISE = UUID.randomUUID();
     private static final UUID SUPPLIER_ENTERPRISE = UUID.randomUUID();
+    private static final UUID PROFILE_ONLY_ENTERPRISE = UUID.randomUUID();
 
     @Test
     void generatedMatchesArePersistedVersionedAndClosedByParticipants() {
@@ -36,31 +38,53 @@ class EcosystemMatchServiceTest {
         DemandView opened = catalogService.reviewDemand(
                 demand.id(), submitted.version(), new ReviewDecisionRequest(true, null), reviewer);
 
+        OfferingView offering = catalogService.createOffering(new OfferingUpsertRequest(
+                "零泄漏高压球阀", "PRODUCT", "适用于高压燃气管网的阀门",
+                List.of("燃气管网"), List.of("阀门生产资质"), "MEMBERS"), supplier);
+        OfferingView offeringSubmitted = catalogService.submitOffering(
+                offering.id(), offering.version(), supplier);
+        OfferingView activeOffering = catalogService.reviewOffering(
+                offering.id(), offeringSubmitted.version(), new ReviewDecisionRequest(true, null), reviewer);
+        assertEquals("ACTIVE", activeOffering.status());
+
         MemberDirectory directory = new StubMemberDirectory(List.of(
                 member(DEMAND_ENTERPRISE, "需求企业", List.of("管线施工"), List.of()),
-                member(SUPPLIER_ENTERPRISE, "供应企业", List.of("阀门"), List.of("零泄漏球阀"))));
+                member(SUPPLIER_ENTERPRISE, "供应企业", List.of("阀门"), List.of("零泄漏球阀")),
+                member(PROFILE_ONLY_ENTERPRISE, "仅有会员档案的企业", List.of("阀门"), List.of("零泄漏球阀"))));
         AiTextService tags = text -> List.of("阀门");
         EcosystemMatchService service = new EcosystemMatchService(
                 directory, tags, catalogService, new InMemoryEcosystemMatchStore(), catalogStore);
 
+        assertEquals(List.of(), service.persisted(demandOwner));
+
         List<PersistedMatchView> generated = service.generate(opened.id(), 5, demandOwner);
         assertEquals(1, generated.size());
         assertEquals(SUPPLIER_ENTERPRISE, generated.getFirst().candidateEnterpriseId());
+        assertTrue(generated.getFirst().solution().contains("零泄漏高压球阀"));
         assertEquals("PENDING_CONFIRMATION", generated.getFirst().state());
+        assertEquals(generated, service.persisted(demandOwner));
 
-        PersistedMatchView confirmed = service.confirm(
+        PersistedMatchView supplierConfirmed = service.confirm(
                 generated.getFirst().id(), generated.getFirst().version(), supplier);
         PersistedMatchView recommended = service.recommend(
-                confirmed.id(), confirmed.version(), reviewer);
-        assertEquals("RECOMMENDED", recommended.state());
+                supplierConfirmed.id(), supplierConfirmed.version(), reviewer);
+        assertEquals("PARTIALLY_CONFIRMED", recommended.state());
+        assertTrue(recommended.candidateConfirmedAt() != null);
+        assertTrue(recommended.demandConfirmedAt() == null);
+
+        PersistedMatchView confirmed = service.confirm(
+                recommended.id(), recommended.version(), demandOwner);
+        assertEquals("CONFIRMED", confirmed.state());
+        assertTrue(confirmed.demandConfirmedAt() != null);
+        assertTrue(confirmed.candidateConfirmedAt() != null);
 
         assertThrows(PreconditionFailedException.class,
-                () -> service.confirm(recommended.id(), confirmed.version(), supplier));
+                () -> service.confirm(confirmed.id(), confirmed.version(), supplier));
 
         PersistedMatchView closed = service.close(
-                recommended.id(), recommended.version(), new MatchCloseRequest("合作已完成"), demandOwner);
+                confirmed.id(), confirmed.version(), new MatchCloseRequest("合作终止"), demandOwner);
         assertEquals("CLOSED", closed.state());
-        assertEquals("合作已完成", closed.closedReason());
+        assertEquals("合作终止", closed.closedReason());
     }
 
     private static ActorScope enterprise(UUID enterpriseId) {
@@ -81,7 +105,7 @@ class EcosystemMatchServiceTest {
         return new MemberProfile(
                 id, ASSOCIATION_ID, name, null, "制造",
                 "北京市", null, null, name + "简介", capabilities, products,
-                List.of(), "MEMBERS", "ACTIVE", 0, now, now);
+                List.of(), "MEMBERS", "ACTIVE", 0, now, now, null, null, null);
     }
 
     private record StubMemberDirectory(List<MemberProfile> members) implements MemberDirectory {

@@ -19,6 +19,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +49,8 @@ class PostgresMemberMigrationIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("guanxian.security.demo.association-id",
+                () -> "10000000-0000-0000-0000-000000000001");
     }
 
     @Autowired
@@ -63,7 +66,7 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(10, migrationCount);
+        org.junit.jupiter.api.Assertions.assertEquals(13, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals("member_import_batch", jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.member_import_batch')::text", String.class));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
@@ -138,8 +141,9 @@ class PostgresMemberMigrationIntegrationTest {
                         .header(HttpHeaders.IF_MATCH, "\"0\""))
                 .andExpect(status().isOk());
 
-        org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM enterprise WHERE id = ?::uuid", Integer.class, id));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM enterprise WHERE id = ?::uuid AND status = 'DELETED' AND deleted_at IS NOT NULL",
+                Integer.class, id));
         org.junit.jupiter.api.Assertions.assertEquals(2, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM audit_log
                 WHERE enterprise_id = ?::uuid AND action IN ('MEMBER_CREATE', 'MEMBER_DELETE')
@@ -155,5 +159,17 @@ class PostgresMemberMigrationIntegrationTest {
                   AND constraint_info.constraint_type = 'FOREIGN KEY'
                   AND column_info.column_name IN ('association_id', 'enterprise_id')
                 """, Integer.class));
+
+        mockMvc.perform(put("/api/v1/members/{id}/restore", id)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"1\""))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, "\"2\""))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.deletedAt").doesNotExist());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM enterprise WHERE id = ?::uuid AND deleted_at IS NULL",
+                Integer.class, id));
     }
 }

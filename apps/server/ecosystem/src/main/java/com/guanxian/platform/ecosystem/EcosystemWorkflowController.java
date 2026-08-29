@@ -32,12 +32,14 @@ public class EcosystemWorkflowController {
     }
 
     @PostMapping("/{matchId}/invitations")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ResponseEntity<ApiResponse<MatchInvitationView>> invite(
             @PathVariable UUID matchId,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
             @Valid @RequestBody MatchInvitationRequest request,
             Authentication authentication) {
-        return versioned(service.invite(matchId, request, actor(authentication)));
+        return versioned(service.invite(
+                matchId, VersionEtags.requireVersion(ifMatch), request, actor(authentication)));
     }
 
     @GetMapping("/{matchId}/invitations")
@@ -59,12 +61,14 @@ public class EcosystemWorkflowController {
     }
 
     @PostMapping("/{matchId}/negotiations")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ApiResponse<NegotiationView> addNegotiation(
             @PathVariable UUID matchId,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
             @Valid @RequestBody NegotiationRequest request,
             Authentication authentication) {
-        return ApiResponse.ok(service.addNegotiation(matchId, request, actor(authentication)));
+        return ApiResponse.ok(service.addNegotiation(
+                matchId, VersionEtags.requireVersion(ifMatch), request, actor(authentication)));
     }
 
     @GetMapping("/{matchId}/negotiations")
@@ -83,13 +87,22 @@ public class EcosystemWorkflowController {
         return ApiResponse.ok(service.feedback(matchId, request, actor(authentication)));
     }
 
+    @GetMapping("/{matchId}/feedback")
+    @PreAuthorize("hasAuthority('MATCH_REQUEST')")
+    ApiResponse<List<MatchFeedbackView>> feedback(
+            @PathVariable UUID matchId, Authentication authentication) {
+        return ApiResponse.ok(service.feedback(matchId, actor(authentication)));
+    }
+
     @PostMapping("/{matchId}/outcomes")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ApiResponse<OutcomeArchiveView> archive(
             @PathVariable UUID matchId,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
             @Valid @RequestBody OutcomeArchiveRequest request,
             Authentication authentication) {
-        return ApiResponse.ok(service.archive(matchId, request, actor(authentication)));
+        return ApiResponse.ok(service.archive(
+                matchId, VersionEtags.requireVersion(ifMatch), request, actor(authentication)));
     }
 
     @GetMapping("/{matchId}/outcomes")

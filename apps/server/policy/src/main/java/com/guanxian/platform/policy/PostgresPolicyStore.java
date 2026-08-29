@@ -164,10 +164,12 @@ class PostgresPolicyStore implements PolicyStore {
                     .addValue("requestId", MDC.get("requestId"));
             jdbc.update("""
                     INSERT INTO audit_log (
-                        actor_user_id, actor_subject, actor_username, association_id, action,
-                        resource_type, resource_id, details, request_id)
-                    VALUES (:actorUserId, :actorSubject, :actorUsername, :associationId, :action,
-                            'POLICY_DOCUMENT', :resourceId, CAST(:snapshot AS jsonb), :requestId)
+                        actor_user_id, actor_subject, actor_username, association_id, enterprise_id, action,
+                        resource_type, resource_id, resource_version, outcome, details, request_id)
+                    VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
+                            :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId,
+                            NULL, :action, 'POLICY_DOCUMENT', :resourceId, :version, 'SUCCESS',
+                            CAST(:snapshot AS jsonb), COALESCE(:requestId, 'internal'))
                     """, params);
             jdbc.update("""
                     INSERT INTO business_entity_history (

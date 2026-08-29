@@ -2,6 +2,7 @@ package com.guanxian.platform.ai.rag;
 
 import com.guanxian.platform.ai.rag.KnowledgeRepository.IngestCommand;
 import com.guanxian.platform.ai.rag.KnowledgeRepository.IngestionResult;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -17,11 +18,21 @@ public class KnowledgeIngestionService {
     private final KnowledgeRepository repository;
     private final DocumentTextChunker chunker;
     private final RagSecurityGuard securityGuard;
+    private final EmbeddingProvider embeddingProvider;
 
     public KnowledgeIngestionService(KnowledgeRepository repository, RagProperties properties) {
+        this(repository, properties, EmbeddingProvider.disabled());
+    }
+
+    @Autowired
+    public KnowledgeIngestionService(
+            KnowledgeRepository repository,
+            RagProperties properties,
+            EmbeddingProvider embeddingProvider) {
         this.repository = repository;
         this.chunker = new DocumentTextChunker(properties);
         this.securityGuard = new RagSecurityGuard(properties);
+        this.embeddingProvider = embeddingProvider;
     }
 
     public IngestionResult ingest(KnowledgeTextDocument document) {
@@ -37,11 +48,17 @@ public class KnowledgeIngestionService {
         validateSourceUrl(document.sourceUrl());
         var chunks = chunker.split(document.content());
         if (chunks.isEmpty()) throw new IllegalArgumentException("knowledge document content is required");
+        var embeddings = embeddingProvider.enabled()
+                ? embeddingProvider.embed(chunks.stream().map(DocumentTextChunker.TextChunk::content).toList())
+                : java.util.List.<double[]>of();
         String contentHash = DocumentTextChunker.sha256(document.content().replace("\r\n", "\n").replace('\r', '\n').trim());
         return repository.ingest(new IngestCommand(
                 document.documentId(), document.associationId(), document.title(), document.documentType(),
-                document.sourceType(), document.sourceUrl(), visibility, status, document.actorSubject(),
-                contentHash, chunks
+                document.sourceType(), document.sourceUrl(), visibility, status,
+                document.actorUserId(), document.actorSubject(), document.actorUsername(),
+                contentHash, chunks, document.sourceFileId(), document.parserName(), document.parserVersion(),
+                document.pageCount(), embeddingProvider.enabled() ? embeddingProvider.providerName() : null,
+                embeddingProvider.enabled() ? embeddingProvider.modelName() : null, embeddings
         ));
     }
 
@@ -64,6 +81,14 @@ public class KnowledgeIngestionService {
 
     public record KnowledgeTextDocument(UUID documentId, UUID associationId, String title, String documentType,
                                         String sourceType, String sourceUrl, String visibility, String status,
-                                        String actorSubject, String content) {
+                                        UUID actorUserId, String actorSubject, String actorUsername,
+                                        String content, UUID sourceFileId,
+                                        String parserName, String parserVersion, Integer pageCount) {
+        public KnowledgeTextDocument(UUID documentId, UUID associationId, String title, String documentType,
+                                     String sourceType, String sourceUrl, String visibility, String status,
+                                     String actorSubject, String content) {
+            this(documentId, associationId, title, documentType, sourceType, sourceUrl, visibility, status,
+                    null, actorSubject, actorSubject, content, null, null, null, null);
+        }
     }
 }

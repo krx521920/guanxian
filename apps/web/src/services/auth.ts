@@ -8,7 +8,7 @@ import {
 import { defaultRouteForRole } from '../config/roles'
 import { ROLES, type SessionUser, type UserRole } from '../types/domain'
 import { request } from './http'
-import { setAccessToken } from './token-store'
+import { setAccessToken, setDemoRole, setSystemContext as setTransportSystemContext } from './token-store'
 
 const ROLE_STORAGE_KEY = 'guanxian.demo.role'
 const LEGACY_STORAGE_KEY = 'guanxian.demo.session'
@@ -16,11 +16,11 @@ const configuredMode = (import.meta.env.VITE_AUTH_MODE || 'oidc').trim().toLower
 const demoMode = import.meta.env.MODE !== 'production' && configuredMode === 'demo'
 
 const demoUsers: Record<UserRole, SessionUser> = {
-  SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [] },
-  ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [] },
-  ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [] },
-  ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [] },
-  ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [] },
+  SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+  ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+  ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+  ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
+  ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
 }
 
 interface CurrentUserView {
@@ -31,6 +31,8 @@ interface CurrentUserView {
   title: string
   roles: string[]
   permissions: string[]
+  associationId?: string | null
+  enterpriseId?: string | null
 }
 
 interface RedirectState {
@@ -84,6 +86,13 @@ const state = reactive<{
   error: null,
   postLoginRoute: null,
 })
+setDemoRole(demoMode ? state.user?.role ?? null : null)
+if (demoMode) {
+  setTransportSystemContext(
+    state.user?.role === 'SYSTEM_ADMIN' ? state.user.associationId || null : null,
+    state.user?.role === 'SYSTEM_ADMIN' ? state.user.enterpriseId || null : null,
+  )
+}
 
 let manager: UserManager | null = null
 let initialization: Promise<void> | null = null
@@ -118,6 +127,11 @@ function userManager(): UserManager {
 
 function setDemoUser(user: SessionUser | null) {
   state.user = user
+  setDemoRole(user?.role ?? null)
+  setTransportSystemContext(
+    user?.role === 'SYSTEM_ADMIN' ? user.associationId || null : null,
+    user?.role === 'SYSTEM_ADMIN' ? user.enterpriseId || null : null,
+  )
   clearLegacySession()
   try {
     if (user) sessionStorage.setItem(ROLE_STORAGE_KEY, user.role)
@@ -141,6 +155,7 @@ async function loadVerifiedUser(oidcUser: User): Promise<void> {
     state.user = null
     throw new Error('当前账号没有平台角色')
   }
+  if (role !== 'SYSTEM_ADMIN') setTransportSystemContext(null, null)
   state.user = {
     id: verified.subject,
     name: verified.displayName || verified.username,
@@ -148,6 +163,8 @@ async function loadVerifiedUser(oidcUser: User): Promise<void> {
     organization: verified.organization || '未设置组织',
     title: verified.title || role,
     permissions: verified.permissions,
+    associationId: verified.associationId,
+    enterpriseId: verified.enterpriseId,
   }
   state.postLoginRoute = safeLocalPath(
     (oidcUser.state as RedirectState | null)?.returnTo,
@@ -203,6 +220,16 @@ export function useAuth() {
       setDemoUser(demoUsers[role])
       return defaultRouteForRole(role)
     },
+    setSystemContext(associationId: string | null, associationName: string, enterpriseId: string | null) {
+      if (state.user?.role !== 'SYSTEM_ADMIN') throw new Error('仅系统管理员可切换管理上下文')
+      setTransportSystemContext(associationId, enterpriseId)
+      state.user = {
+        ...state.user,
+        associationId,
+        enterpriseId,
+        organization: associationId ? associationName : '全平台',
+      }
+    },
     takePostLoginRoute() {
       const route = state.postLoginRoute
       state.postLoginRoute = null
@@ -210,6 +237,7 @@ export function useAuth() {
     },
     async logout() {
       setAccessToken(null)
+      setTransportSystemContext(null, null)
       state.user = null
       if (demoMode) {
         setDemoUser(null)

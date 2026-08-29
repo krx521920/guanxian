@@ -95,13 +95,15 @@ async function loadOidc(scenario: Scenario = {}) {
     permissions: ['member:read', 'member:write'],
   })
   const setAccessToken = vi.fn()
+  const setDemoRole = vi.fn()
+  const setSystemContext = vi.fn()
 
   vi.doMock('oidc-client-ts', () => ({
     UserManager: MockUserManager,
     WebStorageStateStore: MockWebStorageStateStore,
   }))
   vi.doMock('./http', () => ({ request }))
-  vi.doMock('./token-store', () => ({ setAccessToken }))
+  vi.doMock('./token-store', () => ({ setAccessToken, setDemoRole, setSystemContext }))
 
   const module = await import('./auth')
   return {
@@ -109,6 +111,7 @@ async function loadOidc(scenario: Scenario = {}) {
     session,
     request,
     setAccessToken,
+    setSystemContext,
     getUser,
     signinRedirectCallback,
     signinRedirect,

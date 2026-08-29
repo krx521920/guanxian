@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentMap;
 class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     private final ConcurrentMap<UUID, StoredOffering> offerings = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, StoredDemand> demands = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> enterpriseAssociations = new ConcurrentHashMap<>();
 
     @Override
     public List<OfferingView> listOfferings(
@@ -63,6 +64,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
                 clean(request.description()), list(request.scenarios()), list(request.qualifications()),
                 visibility(request.visibility(), "MEMBERS"), "DRAFT", 0, false, Instant.now());
         offerings.put(id, new StoredOffering(value, false));
+        bindEnterpriseAssociation(enterpriseId, actor);
         return value;
     }
 
@@ -170,6 +172,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
                 visibility(request.visibility(), "DIRECTED"), request.budgetMin(), request.budgetMax(),
                 request.responseDeadline(), "DRAFT", null, 0, false, Instant.now());
         demands.put(id, new StoredDemand(value, false));
+        bindEnterpriseAssociation(enterpriseId, actor);
         return value;
     }
 
@@ -234,6 +237,11 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
+    public boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return associationId != null && associationId.equals(enterpriseAssociations.get(enterpriseId));
+    }
+
+    @Override
     public void recordChange(
             ActorScope actor,
             String action,
@@ -246,13 +254,31 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
         // In-memory mode is isolated for tests and demos. Durable history is provided by the PostgreSQL adapter.
     }
 
-    private static boolean canRead(
+    private boolean canRead(
             ActorScope actor, UUID enterpriseId, String visibility, String status) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff() || enterpriseId.equals(actor.enterpriseId())) {
+        if (actor.isSystemAdmin() || enterpriseId.equals(actor.enterpriseId())) {
             return true;
         }
-        return "ACTIVE".equals(status) && ("PUBLIC".equals(visibility) || "MEMBERS".equals(visibility)
-                || "PARTNERS".equals(visibility));
+        UUID ownerAssociationId = enterpriseAssociations.get(enterpriseId);
+        boolean sameAssociation = ownerAssociationId != null && ownerAssociationId.equals(actor.associationId());
+        if (sameAssociation && actor.isAssociationStaff()) {
+            return true;
+        }
+        if (!"ACTIVE".equals(status) || ownerAssociationId == null) {
+            return false;
+        }
+        if (sameAssociation) {
+            return "MEMBERS".equals(visibility) || "PUBLIC".equals(visibility);
+        }
+        // The memory adapter has no durable share-policy or consent store. Fail closed
+        // instead of treating a partner relationship as blanket resource consent.
+        return false;
+    }
+
+    private void bindEnterpriseAssociation(UUID enterpriseId, ActorScope actor) {
+        if (actor.associationId() != null) {
+            enterpriseAssociations.putIfAbsent(enterpriseId, actor.associationId());
+        }
     }
 
     private static boolean matches(String query, String... values) {

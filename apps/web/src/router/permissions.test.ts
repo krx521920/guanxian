@@ -6,9 +6,11 @@ describe('protected route permissions', () => {
   it('declares an explicit non-empty role list for every protected page', () => {
     expect(Object.keys(protectedRouteRoles).sort()).toEqual([
       '/association',
+      '/attachments',
       '/collaborations',
       '/ecosystem',
       '/enterprise',
+      '/federation',
       '/matching',
       '/members',
       '/members/edit',
@@ -30,8 +32,10 @@ describe('protected route permissions', () => {
     expect(protectedRouteRoles['/members/edit']).not.toContain('ENTERPRISE_MEMBER')
     expect(protectedRouteRoles['/members/new']).not.toContain('ENTERPRISE_ADMIN')
     expect(protectedRouteRoles['/policies']).toEqual([...ROLES])
-    expect(protectedRouteRoles['/ecosystem']).toEqual([...ROLES])
     expect(protectedRouteRoles['/matching']).toEqual([...ROLES])
     expect(protectedRouteRoles['/collaborations']).toEqual([...ROLES])
+    expect(protectedRouteRoles['/ecosystem']).toEqual([...ROLES])
+    expect(protectedRouteRoles['/attachments']).toEqual([...ROLES])
+    expect(protectedRouteRoles['/federation']).not.toContain('ENTERPRISE_ADMIN')
   })
 })

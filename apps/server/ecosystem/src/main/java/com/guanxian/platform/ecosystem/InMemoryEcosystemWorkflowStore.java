@@ -52,6 +52,30 @@ class InMemoryEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
+    public synchronized void expirePendingInvitations(UUID matchId) {
+        Instant now = Instant.now();
+        invitations.replaceAll((id, value) -> value.matchId().equals(matchId)
+                && "PENDING".equals(value.status())
+                && value.expiresAt() != null
+                && !value.expiresAt().isAfter(now)
+                ? new MatchInvitationView(
+                value.id(), value.matchId(), value.senderEnterpriseId(),
+                value.recipientEnterpriseId(), value.invitationType(), "EXPIRED",
+                value.message(), value.responseComment(), value.sentBySubject(),
+                value.respondedBySubject(), value.expiresAt(), value.respondedAt(),
+                value.version() + 1, value.createdAt(), now)
+                : value);
+    }
+
+    @Override
+    public boolean hasPendingInvitation(UUID matchId) {
+        Instant now = Instant.now();
+        return invitations.values().stream().anyMatch(value -> value.matchId().equals(matchId)
+                && "PENDING".equals(value.status())
+                && (value.expiresAt() == null || value.expiresAt().isAfter(now)));
+    }
+
+    @Override
     public synchronized Optional<MatchInvitationView> respondInvitation(
             UUID invitationId,
             long expectedVersion,
@@ -97,6 +121,11 @@ class InMemoryEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
+    public Optional<NegotiationView> latestNegotiation(UUID matchId, ActorScope actor) {
+        return negotiations(matchId, actor).stream().findFirst();
+    }
+
+    @Override
     public MatchFeedbackView upsertFeedback(
             UUID matchId, UUID enterpriseId, MatchFeedbackRequest request, ActorScope actor) {
         UUID id = UUID.nameUUIDFromBytes(
@@ -106,6 +135,15 @@ class InMemoryEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 clean(request.closeReason()), clean(request.comment()), actor.subject(), Instant.now());
         feedback.put(id, value);
         return value;
+    }
+
+    @Override
+    public List<MatchFeedbackView> feedback(UUID matchId, ActorScope actor) {
+        return feedback.values().stream()
+                .filter(value -> value.matchId().equals(matchId))
+                .sorted(Comparator.comparing(MatchFeedbackView::submittedAt).reversed()
+                        .thenComparing(MatchFeedbackView::id))
+                .toList();
     }
 
     @Override

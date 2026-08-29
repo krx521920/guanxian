@@ -62,7 +62,7 @@ public class DashboardController {
         List<CollaborationView> collaborations = collaborationService.findAll(actor);
         List<OfferingView> offerings = catalogService.offerings(actor, null, false, 0, 100).items();
         List<DemandView> demands = catalogService.demands(actor, null, false, 0, 100).items();
-        List<PersistedMatchView> matches = matches(demands, actor);
+        List<PersistedMatchView> matches = matchService.persisted(actor);
         long pending = collaborations.stream()
                 .filter(item -> !"COMPLETED".equals(item.stage()) && !"DISABLED".equals(item.stage()))
                 .count();
@@ -94,7 +94,7 @@ public class DashboardController {
         List<CollaborationView> collaborations = collaborationService.findAll(actor);
         List<OfferingView> offerings = catalogService.offerings(actor, null, false, 0, 100).items();
         List<DemandView> demands = catalogService.demands(actor, null, false, 0, 100).items();
-        List<PersistedMatchView> persistedMatches = matches(demands, actor);
+        List<PersistedMatchView> persistedMatches = matchService.persisted(actor);
         long activeCollaborations = collaborations.stream()
                 .filter(item -> !"COMPLETED".equals(item.stage()) && !"DISABLED".equals(item.stage()))
                 .count();
@@ -117,15 +117,6 @@ public class DashboardController {
                         .toList()));
     }
 
-    private List<PersistedMatchView> matches(List<DemandView> demands, ActorScope actor) {
-        return demands.stream()
-                .flatMap(demand -> matchService.persisted(demand.id(), actor).stream())
-                .distinct()
-                .sorted(Comparator.comparing(PersistedMatchView::updatedAt).reversed()
-                        .thenComparing(PersistedMatchView::id))
-                .toList();
-    }
-
     private static List<Activity> activities(
             List<PolicyView> policies,
             List<CollaborationView> collaborations,
@@ -138,7 +129,7 @@ public class DashboardController {
         collaborations.forEach(item -> values.add(new TimedActivity(
                 item.updatedAt(),
                 new Activity("COLLAB-" + item.id(), item.title(),
-                        "协作阶段：" + item.stage(), displayTime(item.updatedAt()), "collaboration"))));
+                        "协作阶段：" + item.stage(), displayTime(item.updatedAt()), "task"))));
         matches.forEach(item -> values.add(new TimedActivity(
                 item.updatedAt(),
                 new Activity("MATCH-" + item.id(), item.demandTitle(),

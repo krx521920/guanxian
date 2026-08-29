@@ -20,8 +20,25 @@ class CollaborationServiceTest {
     private static final UUID ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-00000000e001");
     private static final UUID OTHER_ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-00000000e002");
 
-    private final InMemoryCollaborationStore store = new InMemoryCollaborationStore();
+    private final InMemoryCollaborationStore store = new InMemoryCollaborationStore(true);
     private final CollaborationService service = new CollaborationService(store, authentication -> enterprise());
+
+    @Test
+    void memoryAdapterStartsEmptyWhenDemoSeedIsDisabled() {
+        CollaborationService emptyService = new CollaborationService(
+                new InMemoryCollaborationStore(false), authentication -> enterprise());
+        assertTrue(emptyService.findAll(enterprise()).isEmpty());
+    }
+
+    @Test
+    void linkedMatchSurvivesCollaborationLifecycle() {
+        UUID matchId = UUID.randomUUID();
+        CollaborationView created = service.create(request("匹配转协作", matchId), enterprise());
+        CollaborationView submitted = service.submit(created.id(), created.version(), enterprise());
+
+        assertEquals(matchId, created.matchId());
+        assertEquals(matchId, submitted.matchId());
+    }
 
     @Test
     void completesReviewedLifecycleWithVersionHistoryAndTimeline() {
@@ -102,9 +119,13 @@ class CollaborationServiceTest {
     }
 
     private static CollaborationUpsertRequest request(String title) {
+        return request(title, null);
+    }
+
+    private static CollaborationUpsertRequest request(String title, UUID matchId) {
         return new CollaborationUpsertRequest(
                 title, List.of("甲方", "乙方"), "负责人", "HIGH",
-                "确认技术参数", LocalDate.of(2026, 9, 1), 10);
+                "确认技术参数", LocalDate.of(2026, 9, 1), 10, matchId);
     }
 
     private static ActorScope enterprise() {

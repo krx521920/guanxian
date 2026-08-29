@@ -32,8 +32,8 @@ public class EcosystemMatchController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('MATCH_REQUEST')")
-    ApiResponse<List<EcosystemMatch>> list() {
-        return ApiResponse.ok(matchService.demoMatches());
+    ApiResponse<List<PersistedMatchView>> list(Authentication authentication) {
+        return ApiResponse.ok(matchService.persisted(actor(authentication)));
     }
 
     @PostMapping
@@ -51,7 +51,7 @@ public class EcosystemMatchController {
     }
 
     @PostMapping("/demand/{demandId}/generate")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ApiResponse<List<PersistedMatchView>> generate(
             @PathVariable UUID demandId,
             @Valid @RequestBody(required = false) MatchGenerationRequest request,
@@ -81,7 +81,7 @@ public class EcosystemMatchController {
     }
 
     @PostMapping("/{id}/close")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ResponseEntity<ApiResponse<PersistedMatchView>> close(
             @PathVariable UUID id,
             @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,

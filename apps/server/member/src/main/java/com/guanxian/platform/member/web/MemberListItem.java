@@ -22,7 +22,9 @@ public record MemberListItem(
         String visibility,
         boolean canEdit,
         boolean canReview,
-        Instant updatedAt) {
+        long version,
+        Instant updatedAt,
+        Instant deletedAt) {
 
     static MemberListItem from(MemberProfile member, ActorScope actor, MemberService service) {
         int populated = 3;
@@ -40,9 +42,11 @@ public record MemberListItem(
                     case "PENDING_REVIEW" -> "待审核";
                     case "INCOMPLETE" -> "待完善";
                     case "DISABLED" -> "已停用";
+                    case "DELETED" -> "已删除";
                     default -> "已认证";
                 },
-                member.visibility(), service.canEdit(actor, member), service.canReview(actor, member), member.updatedAt());
+                member.visibility(), service.canEdit(actor, member), service.canReview(actor, member),
+                member.version(), member.updatedAt(), member.deletedAt());
     }
 
     private static String abbreviate(String name) {

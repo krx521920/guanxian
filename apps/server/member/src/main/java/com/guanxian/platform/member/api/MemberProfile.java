@@ -21,7 +21,10 @@ public record MemberProfile(
         String status,
         long version,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Instant deletedAt,
+        String deletedBySubject,
+        String statusBeforeDelete) {
 
     public MemberProfile {
         if (associationId == null) {
@@ -31,5 +34,16 @@ public record MemberProfile(
             throw new IllegalArgumentException("version must be non-negative");
         }
         visibility = visibility == null ? "MEMBERS" : visibility;
+        if ((deletedAt == null) != (deletedBySubject == null)
+                || (deletedAt == null) != (statusBeforeDelete == null)) {
+            throw new IllegalArgumentException("member deletion metadata must be complete");
+        }
+        if (deletedAt != null && !"DELETED".equals(status)) {
+            throw new IllegalArgumentException("deleted member must have DELETED status");
+        }
+    }
+
+    public boolean deleted() {
+        return deletedAt != null;
     }
 }

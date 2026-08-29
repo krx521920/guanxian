@@ -222,10 +222,12 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
             jdbc.update("""
                     INSERT INTO audit_log (
                         actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
-                        action, resource_type, resource_id, details, request_id)
+                        action, resource_type, resource_id, resource_version, outcome, details, request_id)
                     VALUES (
-                        :actorUserId, :actorSubject, :actorUsername, :associationId, :enterpriseId,
-                        :action, 'OBJECT_FILE', :resourceId, CAST(:details AS jsonb), :requestId)
+                        (SELECT id FROM user_account WHERE id = :actorUserId),
+                        :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId, :enterpriseId,
+                        :action, 'OBJECT_FILE', :resourceId, :resourceVersion, 'SUCCESS',
+                        CAST(:details AS jsonb), COALESCE(:requestId, 'internal'))
                     """, new MapSqlParameterSource()
                     .addValue("actorUserId", actor.userId())
                     .addValue("actorSubject", actor.subject())
@@ -234,6 +236,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                     .addValue("enterpriseId", value.enterpriseId())
                     .addValue("action", action)
                     .addValue("resourceId", value.id().toString())
+                    .addValue("resourceVersion", value.version())
                     .addValue("details", details)
                     .addValue("requestId", MDC.get("requestId")));
         } catch (JsonProcessingException exception) {

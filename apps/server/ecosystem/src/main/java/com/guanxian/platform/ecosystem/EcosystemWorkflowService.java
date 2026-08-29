@@ -29,9 +29,19 @@ public class EcosystemWorkflowService {
 
     @Transactional
     public MatchInvitationView invite(
-            UUID matchId, MatchInvitationRequest request, ActorScope actor) {
+            UUID matchId, long expectedMatchVersion,
+            MatchInvitationRequest request, ActorScope actor) {
         PersistedMatchView match = match(matchId, actor);
         requireDemandOwnerOrAssociation(match, actor);
+        requireVersion(match, expectedMatchVersion);
+        workflowStore.expirePendingInvitations(match.id());
+        if (MatchLifecycle.INVITED.equals(match.state())
+                && !workflowStore.hasPendingInvitation(match.id())) {
+            match = transition(match, expectedMatchVersion, MatchLifecycle.CONFIRMED,
+                    null, "EXPIRE_INVITATION", actor);
+            expectedMatchVersion = match.version();
+        }
+        MatchLifecycle.requireInvitationAllowed(match);
         if (!request.recipientEnterpriseId().equals(match.candidateEnterpriseId())) {
             throw new PreconditionFailedException(
                     "invitation recipient must be the candidate enterprise of this match");
@@ -39,6 +49,20 @@ public class EcosystemWorkflowService {
         if (request.expiresAt() != null && !request.expiresAt().isAfter(Instant.now())) {
             throw new PreconditionFailedException("invitation expiry must be in the future");
         }
+        if (actor.isAssociationStaff()
+                && !"ASSOCIATION_RECOMMENDATION".equals(request.invitationType())) {
+            throw new PreconditionFailedException(
+                    "association staff must send an ASSOCIATION_RECOMMENDATION invitation");
+        }
+        if (!actor.isAssociationStaff()
+                && !"ENTERPRISE".equals(request.invitationType())) {
+            throw new PreconditionFailedException(
+                    "enterprise users must send an ENTERPRISE invitation");
+        }
+        if (workflowStore.hasPendingInvitation(match.id())) {
+            throw new PreconditionFailedException("this match already has a pending invitation");
+        }
+        transition(match, expectedMatchVersion, MatchLifecycle.INVITED, null, "SEND_INVITATION", actor);
         MatchInvitationView created = workflowStore.createInvitation(
                 match.id(), actor.associationId(), actor.enterpriseId(), request, actor);
         record(actor, "CREATE_INVITATION", "MATCH_INVITATION", created.id(),
@@ -72,12 +96,20 @@ public class EcosystemWorkflowService {
         if (invitation.expiresAt() != null && !invitation.expiresAt().isAfter(Instant.now())) {
             throw new PreconditionFailedException("invitation has expired");
         }
+        MatchLifecycle.requireInvitationResponseAllowed(match);
         if (invitation.version() != expectedVersion) {
             throw stale("invitation");
         }
         MatchInvitationView updated = workflowStore.respondInvitation(
                         invitationId, expectedVersion, response.accepted(), response.comment(), actor)
                 .orElseThrow(() -> stale("invitation"));
+        String targetState = response.accepted()
+                ? MatchLifecycle.NEGOTIATING : MatchLifecycle.CLOSED;
+        String closeReason = response.accepted() ? null
+                : response.comment() == null || response.comment().isBlank()
+                ? "candidate enterprise rejected the invitation" : response.comment().trim();
+        transition(match, match.version(), targetState, closeReason,
+                response.accepted() ? "ACCEPT_INVITATION" : "REJECT_INVITATION", actor);
         record(actor, response.accepted() ? "ACCEPT_INVITATION" : "REJECT_INVITATION",
                 "MATCH_INVITATION", updated.id(), match.demandEnterpriseId(), updated.version(), updated);
         return updated;
@@ -85,11 +117,26 @@ public class EcosystemWorkflowService {
 
     @Transactional
     public NegotiationView addNegotiation(
-            UUID matchId, NegotiationRequest request, ActorScope actor) {
+            UUID matchId, long expectedMatchVersion,
+            NegotiationRequest request, ActorScope actor) {
         PersistedMatchView match = match(matchId, actor);
         requireParticipantOrAssociation(match, actor);
+        MatchLifecycle.requireNegotiationAllowed(match);
+        requireVersion(match, expectedMatchVersion);
+        String stage = request.stage().trim();
+        String previousStage = workflowStore.latestNegotiation(matchId, actor)
+                .map(NegotiationView::stage).orElse(null);
+        MatchLifecycle.requireNextNegotiationStage(previousStage, stage);
         NegotiationView created = workflowStore.addNegotiation(
                 matchId, actor.associationId(), actor.enterpriseId(), request, actor);
+        String targetState = MatchLifecycle.CONTRACT_SIGNED.equals(stage)
+                ? MatchLifecycle.OUTCOME_PENDING
+                : MatchLifecycle.TERMINATED.equals(stage)
+                ? MatchLifecycle.CLOSED : MatchLifecycle.NEGOTIATING;
+        String closeReason = MatchLifecycle.TERMINATED.equals(stage)
+                ? request.summary().trim() : null;
+        transition(match, expectedMatchVersion, targetState, closeReason,
+                "ADVANCE_NEGOTIATION", actor);
         record(actor, "ADD_NEGOTIATION", "NEGOTIATION_RECORD", created.id(),
                 match.demandEnterpriseId(), 0, created);
         return created;
@@ -111,6 +158,20 @@ public class EcosystemWorkflowService {
             throw new ForbiddenException(
                     "MATCH_PARTICIPANT_REQUIRED", "only a participating enterprise can submit feedback");
         }
+        MatchLifecycle.requireFeedbackAllowed(match);
+        String outcome = request.outcome().trim();
+        if (MatchLifecycle.OUTCOME_PENDING.equals(match.state()) && !"SUCCESS".equals(outcome)) {
+            throw new PreconditionFailedException(
+                    "an outcome-pending match only accepts SUCCESS feedback");
+        }
+        if (MatchLifecycle.CLOSED.equals(match.state()) && "SUCCESS".equals(outcome)) {
+            throw new PreconditionFailedException("a closed match cannot receive SUCCESS feedback");
+        }
+        if (!"SUCCESS".equals(outcome)
+                && (request.closeReason() == null || request.closeReason().isBlank())) {
+            throw new PreconditionFailedException(
+                    "closeReason is required for unsuccessful feedback");
+        }
         MatchFeedbackView value = workflowStore.upsertFeedback(
                 matchId, actor.enterpriseId(), request, actor);
         record(actor, "UPSERT_FEEDBACK", "MATCH_FEEDBACK", value.id(),
@@ -118,17 +179,36 @@ public class EcosystemWorkflowService {
         return value;
     }
 
+    @Transactional(readOnly = true)
+    public List<MatchFeedbackView> feedback(UUID matchId, ActorScope actor) {
+        match(matchId, actor);
+        return workflowStore.feedback(matchId, actor);
+    }
+
     @Transactional
     public OutcomeArchiveView archive(
-            UUID matchId, OutcomeArchiveRequest request, ActorScope actor) {
+            UUID matchId, long expectedMatchVersion,
+            OutcomeArchiveRequest request, ActorScope actor) {
         PersistedMatchView match = match(matchId, actor);
         requireDemandOwnerOrAssociation(match, actor);
-        if (!Set.of("CONFIRMED", "CLOSED").contains(match.state())) {
+        MatchLifecycle.requireOutcomeAllowed(match);
+        requireVersion(match, expectedMatchVersion);
+        Set<UUID> successfulFeedback = workflowStore.feedback(matchId, actor).stream()
+                .filter(value -> "SUCCESS".equals(value.outcome()))
+                .map(MatchFeedbackView::enterpriseId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!successfulFeedback.containsAll(Set.of(
+                match.demandEnterpriseId(), match.candidateEnterpriseId()))) {
             throw new PreconditionFailedException(
-                    "only a confirmed or closed match can be archived as an outcome");
+                    "both participating enterprises must submit SUCCESS feedback before outcome archival");
+        }
+        if (!workflowStore.outcomes(matchId, actor).isEmpty()) {
+            throw new PreconditionFailedException("this match already has an archived outcome");
         }
         OutcomeArchiveView value = workflowStore.archive(
                 matchId, actor.associationId(), request, actor);
+        transition(match, expectedMatchVersion, MatchLifecycle.ARCHIVED, null,
+                "ARCHIVE_OUTCOME", actor);
         record(actor, "ARCHIVE_OUTCOME", "OUTCOME_ARCHIVE", value.id(),
                 match.demandEnterpriseId(), value.version(), value);
         return value;
@@ -141,12 +221,25 @@ public class EcosystemWorkflowService {
     }
 
     private PersistedMatchView match(UUID id, ActorScope actor) {
-        return matchStore.find(id, actor).orElseThrow(() -> new NotFoundException("ecosystem match", id));
+        PersistedMatchView value = matchStore.find(id, actor)
+                .orElseThrow(() -> new NotFoundException("ecosystem match", id));
+        boolean owningAssociation = actor.isAssociationStaff()
+                && catalogStore.enterpriseBelongsToAssociation(
+                value.demandEnterpriseId(), actor.associationId());
+        if (actor.isSystemAdmin() || owningAssociation
+                || value.demandEnterpriseId().equals(actor.enterpriseId())
+                || value.candidateEnterpriseId().equals(actor.enterpriseId())) {
+            return value;
+        }
+        throw new NotFoundException("ecosystem match", id);
     }
 
-    private static void requireDemandOwnerOrAssociation(
+    private void requireDemandOwnerOrAssociation(
             PersistedMatchView match, ActorScope actor) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff()
+        boolean owningAssociation = actor.isAssociationStaff()
+                && catalogStore.enterpriseBelongsToAssociation(
+                match.demandEnterpriseId(), actor.associationId());
+        if (actor.isSystemAdmin() || owningAssociation
                 || match.demandEnterpriseId().equals(actor.enterpriseId())) {
             return;
         }
@@ -154,9 +247,12 @@ public class EcosystemWorkflowService {
                 "MATCH_OWNER_REQUIRED", "only the demand owner or association can perform this operation");
     }
 
-    private static void requireParticipantOrAssociation(
+    private void requireParticipantOrAssociation(
             PersistedMatchView match, ActorScope actor) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff()
+        boolean owningAssociation = actor.isAssociationStaff()
+                && catalogStore.enterpriseBelongsToAssociation(
+                match.demandEnterpriseId(), actor.associationId());
+        if (actor.isSystemAdmin() || owningAssociation
                 || match.demandEnterpriseId().equals(actor.enterpriseId())
                 || match.candidateEnterpriseId().equals(actor.enterpriseId())) {
             return;
@@ -175,6 +271,28 @@ public class EcosystemWorkflowService {
             Object snapshot) {
         catalogStore.recordChange(
                 actor, action, type, id, actor.associationId(), enterpriseId, version, snapshot);
+    }
+
+    private PersistedMatchView transition(
+            PersistedMatchView current,
+            long expectedVersion,
+            String target,
+            String reason,
+            String action,
+            ActorScope actor) {
+        requireVersion(current, expectedVersion);
+        PersistedMatchView updated = matchStore.transition(
+                        current.id(), expectedVersion, target, reason, actor)
+                .orElseThrow(() -> stale("match"));
+        record(actor, action, "ECOSYSTEM_MATCH", updated.id(),
+                updated.demandEnterpriseId(), updated.version(), updated);
+        return updated;
+    }
+
+    private static void requireVersion(PersistedMatchView match, long expectedVersion) {
+        if (match.version() != expectedVersion) {
+            throw stale("match");
+        }
     }
 
     private static PreconditionFailedException stale(String resource) {

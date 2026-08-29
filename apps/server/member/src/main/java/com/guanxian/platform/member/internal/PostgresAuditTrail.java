@@ -35,9 +35,11 @@ class PostgresAuditTrail implements AuditTrail {
             jdbc.update("""
                     INSERT INTO audit_log (
                         actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
-                        action, resource_type, resource_id, details, request_id)
-                    VALUES (:actorUserId, :actorSubject, :actorUsername, :associationId, :enterpriseId,
-                            :action, :resourceType, :resourceId, CAST(:details AS jsonb), :requestId)
+                        action, resource_type, resource_id, resource_version, outcome, details, request_id)
+                    VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
+                            :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId, :enterpriseId,
+                            :action, :resourceType, :resourceId, :resourceVersion, 'SUCCESS',
+                            CAST(:details AS jsonb), COALESCE(:requestId, 'internal'))
                     """, new MapSqlParameterSource()
                     .addValue("actorUserId", actor.userId())
                     .addValue("actorSubject", actor.subject())
@@ -47,6 +49,8 @@ class PostgresAuditTrail implements AuditTrail {
                     .addValue("action", action)
                     .addValue("resourceType", resourceType)
                     .addValue("resourceId", resourceId)
+                    .addValue("resourceVersion", details.get("newVersion") instanceof Number number
+                            && number.longValue() >= 0 ? number.longValue() : null)
                     .addValue("details", objectMapper.writeValueAsString(details))
                     .addValue("requestId", MDC.get("requestId")));
         } catch (JsonProcessingException exception) {
@@ -83,7 +87,8 @@ class PostgresAuditTrail implements AuditTrail {
                 .addValue("limit", limit);
         return jdbc.query("""
                 SELECT id, actor_subject, actor_username, association_id, enterprise_id,
-                       action, resource_type, resource_id, details, request_id, occurred_at
+                       action, resource_type, resource_id, resource_version, outcome,
+                       details, request_id, occurred_at
                 FROM audit_log
                 WHERE 1 = 1
                 """ + scope + enterprise + " ORDER BY occurred_at DESC, id DESC LIMIT :limit",
@@ -91,6 +96,7 @@ class PostgresAuditTrail implements AuditTrail {
                         rs.getLong("id"), rs.getString("actor_subject"), rs.getString("actor_username"),
                         rs.getObject("association_id", UUID.class), rs.getObject("enterprise_id", UUID.class),
                         rs.getString("action"), rs.getString("resource_type"), rs.getString("resource_id"),
+                        rs.getObject("resource_version", Long.class), rs.getString("outcome"),
                         readDetails(rs.getString("details")), rs.getString("request_id"),
                         rs.getTimestamp("occurred_at").toInstant()));
     }

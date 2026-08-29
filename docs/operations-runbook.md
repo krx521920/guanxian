@@ -27,6 +27,30 @@
 5. 确认磁盘余量至少能容纳当前数据库的两份备份和一次恢复演练。
 6. 在部署前创建一次 PostgreSQL 备份，并将 MinIO 对象存储快照或版本状态记入同一变更单。
 
+生产编排使用独立的 `compose.production.yml`。它只公开 80/443；PostgreSQL、后端和前端
+没有宿主机端口，分别位于数据、应用和边缘网络。后端访问外部 OIDC、HTTPS MinIO 和
+rediss Redis 时走单独的 egress 网络。数据库密码、对象存储凭据和 Redis URL 通过
+`configtree:/run/secrets/` 装载，禁止回退到明文环境变量。
+
+TLS 证书、私钥和所有 `*_FILE` 必须位于主机受控目录，权限只允许部署账号读取。先渲染
+真实告警接收器（脚本不会打印 Webhook URL）：
+
+```bash
+python tools/operations/render_alertmanager_config.py \
+  --webhook-url-file "$ALERT_WEBHOOK_URL_FILE" \
+  --output observability/runtime/alertmanager.yml
+```
+
+然后预检并启动：
+
+```bash
+python tools/deployment/validate_production_env.py --env-file .env
+docker compose --env-file .env -f compose.production.yml config --quiet
+docker compose --env-file .env -f compose.production.yml --profile observability up -d
+```
+
+`observability/runtime/` 和 `secrets/` 已被 Git 忽略。任何渲染文件、令牌文件或证书都不得提交。
+
 ## 3. PostgreSQL 备份
 
 备份脚本固定调用 Compose 中的 `postgres` 服务，使用 custom format、`--no-owner` 和 `--no-privileges`。输出先写 `.partial` 文件，成功后原子改名，并生成包含文件大小和 SHA-256 的 JSON 清单。备份不会覆盖同名文件，也不会把密码写入清单。
@@ -154,6 +178,17 @@ Docker secret 挂载到 `/run/secrets/prometheus_scrape_token`，Prometheus 使�
 令牌轮换流程原子替换后重载 Prometheus；正式网络还应由网关以 TLS 保护指标链路。仓库中的
 Alertmanager 接收器仅记录/聚合告警，上线前必须由运维在受控配置中接入值班 Webhook、邮件或
 on-call 系统并完成一次演练。
+
+生产编排同时提供 Loki、Promtail 和 Grafana。Promtail 只读采集 Docker JSON 日志，提取
+Spring 结构化日志中的 `requestId`、`level` 和 `application` 标签；Grafana 预置 Prometheus
+与 Loki 数据源，并且只绑定 `127.0.0.1` 管理端口，必须通过运维跳板机或私网访问。Docker
+socket 即使只读也属于高权限接口，只允许在专用日志节点运行 Promtail，并由主机权限阻止普通
+业务账号访问。排障时先以响应头中的 `X-Request-Id` 在 Loki 查询 `{service="server"} |=
+"<requestId>"`，再关联 PostgreSQL `audit_log.request_id`。
+
+生产 Alertmanager 不使用仓库内的 `operator-log` 安全占位接收器，而是强制挂载
+`ALERTMANAGER_CONFIG_FILE`。上线验收必须发送一条受控测试告警，证明值班 Webhook 收到
+firing 和 resolved 两条事件；未完成该演练不得宣称“真实告警已接入”。
 
 预置告警只引用后端已导出的 Micrometer 指标：不可抓取、5xx 比率、HTTP P95、JVM 堆、
 Hikari 连接池和节点磁盘空间。PostgreSQL、Redis、MinIO 还需要按实际部署接入各自的

@@ -32,6 +32,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                    coalesce(m.demand_title_snapshot, d.title) AS demand_title,
                    m.scene_snapshot, coalesce(m.supplier_company_snapshot, ce.name) AS supplier_company,
                    m.solution, m.score, m.reasons::text AS reasons, m.state,
+                   m.recommended_at, m.demand_confirmed_at, m.candidate_confirmed_at,
                    m.closed_reason, m.version, m.updated_at
               FROM ecosystem_match m
               JOIN cooperation_demand d ON d.id=m.demand_id
@@ -83,6 +84,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                         reasons=excluded.reasons,
                         version=ecosystem_match.version+1,
                         updated_at=now()
+                    WHERE ecosystem_match.state IN (
+                        'PENDING_CONFIRMATION', 'RECOMMENDED', 'PARTIALLY_CONFIRMED')
                     """, params);
         }
         return list(demand.id(), actor);
@@ -98,11 +101,86 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
     }
 
     @Override
+    public List<PersistedMatchView> list(ActorScope actor) {
+        return jdbc.query(SELECT + scope(actor)
+                        + " AND m.deleted_at IS NULL"
+                        + " ORDER BY m.updated_at DESC, m.score DESC, m.id",
+                scopeParams(actor), mapper);
+    }
+
+    @Override
     public Optional<PersistedMatchView> find(UUID id, ActorScope actor) {
         MapSqlParameterSource params = scopeParams(actor).addValue("id", id);
         return jdbc.query(SELECT + scope(actor)
                         + " AND m.id=:id AND m.deleted_at IS NULL",
                 params, mapper).stream().findFirst();
+    }
+
+    @Override
+    public Optional<PersistedMatchView> recommend(
+            UUID id, long expectedVersion, ActorScope actor) {
+        int updated = jdbc.update("""
+                UPDATE ecosystem_match
+                   SET state=CASE
+                           WHEN state='PENDING_CONFIRMATION' THEN 'RECOMMENDED'
+                           ELSE state END,
+                       review_status='APPROVED',
+                       recommended_by_subject=:subject,
+                       recommended_at=now(),
+                       version=version+1,
+                       updated_at=now()
+                 WHERE id=:id
+                   AND version=:expectedVersion
+                   AND state IN ('PENDING_CONFIRMATION', 'PARTIALLY_CONFIRMED')
+                   AND recommended_at IS NULL
+                   AND deleted_at IS NULL
+                """, new MapSqlParameterSource()
+                .addValue("id", id)
+                .addValue("expectedVersion", expectedVersion)
+                .addValue("subject", actor.subject()));
+        return updated == 0 ? Optional.empty() : find(id, actor);
+    }
+
+    @Override
+    public Optional<PersistedMatchView> confirm(
+            UUID id, long expectedVersion, UUID enterpriseId, ActorScope actor) {
+        int updated = jdbc.update("""
+                UPDATE ecosystem_match m
+                   SET demand_confirmed_by_subject=CASE
+                           WHEN d.enterprise_id=:enterpriseId THEN :subject
+                           ELSE demand_confirmed_by_subject END,
+                       demand_confirmed_at=CASE
+                           WHEN d.enterprise_id=:enterpriseId THEN now()
+                           ELSE demand_confirmed_at END,
+                       candidate_confirmed_by_subject=CASE
+                           WHEN m.candidate_enterprise_id=:enterpriseId THEN :subject
+                           ELSE candidate_confirmed_by_subject END,
+                       candidate_confirmed_at=CASE
+                           WHEN m.candidate_enterprise_id=:enterpriseId THEN now()
+                           ELSE candidate_confirmed_at END,
+                       state=CASE
+                           WHEN d.enterprise_id=:enterpriseId AND m.candidate_confirmed_at IS NOT NULL
+                               THEN 'CONFIRMED'
+                           WHEN m.candidate_enterprise_id=:enterpriseId AND m.demand_confirmed_at IS NOT NULL
+                               THEN 'CONFIRMED'
+                           ELSE 'PARTIALLY_CONFIRMED' END,
+                       version=m.version+1,
+                       updated_at=now()
+                  FROM cooperation_demand d
+                 WHERE m.demand_id=d.id
+                   AND m.id=:id
+                   AND m.version=:expectedVersion
+                   AND m.state IN ('PENDING_CONFIRMATION', 'RECOMMENDED', 'PARTIALLY_CONFIRMED')
+                   AND (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)
+                   AND ((d.enterprise_id=:enterpriseId AND m.demand_confirmed_at IS NULL)
+                     OR (m.candidate_enterprise_id=:enterpriseId AND m.candidate_confirmed_at IS NULL))
+                   AND m.deleted_at IS NULL
+                """, new MapSqlParameterSource()
+                .addValue("id", id)
+                .addValue("expectedVersion", expectedVersion)
+                .addValue("enterpriseId", enterpriseId)
+                .addValue("subject", actor.subject()));
+        return updated == 0 ? Optional.empty() : find(id, actor);
     }
 
     @Override
@@ -112,27 +190,13 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 .addValue("id", id)
                 .addValue("expectedVersion", expectedVersion)
                 .addValue("targetState", targetState)
-                .addValue("closeReason", closeReason)
-                .addValue("subject", actor.subject());
+                .addValue("closeReason", closeReason);
         int updated = jdbc.update("""
                 UPDATE ecosystem_match
                    SET state=:targetState,
                        review_status=CASE
-                           WHEN :targetState='RECOMMENDED' THEN 'APPROVED'
                            WHEN :targetState='CLOSED' THEN 'CLOSED'
                            ELSE review_status END,
-                       recommended_by_subject=CASE
-                           WHEN :targetState='RECOMMENDED' THEN :subject
-                           ELSE recommended_by_subject END,
-                       recommended_at=CASE
-                           WHEN :targetState='RECOMMENDED' THEN now()
-                           ELSE recommended_at END,
-                       confirmed_by_subject=CASE
-                           WHEN :targetState='CONFIRMED' THEN :subject
-                           ELSE confirmed_by_subject END,
-                       confirmed_at=CASE
-                           WHEN :targetState='CONFIRMED' THEN now()
-                           ELSE confirmed_at END,
                        closed_reason=CASE WHEN :targetState='CLOSED' THEN :closeReason ELSE NULL END,
                        version=version+1,
                        updated_at=now()
@@ -174,9 +238,16 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 rs.getBigDecimal("score").intValue(),
                 readList(rs.getString("reasons")),
                 rs.getString("state"),
+                instant(rs.getTimestamp("recommended_at")),
+                instant(rs.getTimestamp("demand_confirmed_at")),
+                instant(rs.getTimestamp("candidate_confirmed_at")),
                 rs.getString("closed_reason"),
                 rs.getLong("version"),
                 rs.getTimestamp("updated_at").toInstant());
+    }
+
+    private static Instant instant(java.sql.Timestamp value) {
+        return value == null ? null : value.toInstant();
     }
 
     private List<String> readList(String value) {

@@ -19,6 +19,17 @@ export interface SessionUser {
   enterpriseId?: string | null
 }
 
+export interface SystemAssociationOption {
+  id: string
+  name: string
+}
+
+export interface SystemEnterpriseOption {
+  id: string
+  associationId: string
+  name: string
+}
+
 export type StatusTone = 'success' | 'warning' | 'info' | 'neutral' | 'danger'
 
 export interface Metric {
@@ -33,7 +44,7 @@ export interface Activity {
   title: string
   detail: string
   time: string
-  type: 'policy' | 'match' | 'member' | 'task'
+  type: 'policy' | 'match' | 'member' | 'task' | 'collaboration'
 }
 
 export interface MemberEnterprise {
@@ -46,14 +57,16 @@ export interface MemberEnterprise {
   city: string
   contact: string
   completeness: number
-  status: '已认证' | '待完善' | '待审核' | '已停用'
+  status: '已认证' | '待完善' | '待审核' | '已停用' | '已删除'
   visibility: MemberVisibility
   canEdit: boolean
   canReview: boolean
+  version: number
   updatedAt: string
+  deletedAt: string | null
 }
 
-export type MemberStatus = 'ACTIVE' | 'PENDING_REVIEW' | 'INCOMPLETE' | 'DISABLED'
+export type MemberStatus = 'ACTIVE' | 'PENDING_REVIEW' | 'INCOMPLETE' | 'DISABLED' | 'DELETED'
 export type MemberVisibility = 'PRIVATE' | 'ASSOCIATION' | 'PARTNERS' | 'MEMBERS' | 'PUBLIC'
 
 export interface MemberProfile {
@@ -74,6 +87,9 @@ export interface MemberProfile {
   version: number
   createdAt: string
   updatedAt: string
+  deletedAt: string | null
+  deletedBySubject: string | null
+  statusBeforeDelete: Exclude<MemberStatus, 'DELETED'> | null
 }
 
 export interface MemberUpsertPayload {
@@ -136,9 +152,90 @@ export interface Policy {
   category: string
   publishDate: string
   effectiveDate: string | null
-  status: '现行有效' | '即将施行' | '征求意见'
+  status: string
   summary: string
   tags: string[]
+  documentNumber?: string | null
+  sourceUrl?: string | null
+  associationId?: string | null
+  visibility?: string
+  version?: number
+  disabled?: boolean
+  deleted?: boolean
+  updatedAt?: string
+}
+
+export interface PolicyUpsertPayload {
+  associationId?: string | null
+  title: string
+  authority: string | null
+  documentNumber: string | null
+  level: string | null
+  category: string | null
+  publishDate: string | null
+  effectiveDate: string | null
+  sourceUrl: string | null
+  summary: string | null
+  tags: string[]
+  visibility: string
+}
+
+export interface PolicyImpactAnalysis {
+  id: string
+  policyDocumentId: string
+  policyTitle: string
+  enterpriseId: string
+  enterpriseName: string
+  associationId: string
+  impactLevel: string
+  summary: string
+  evidenceChunkIds: string[]
+  status: string
+  version: number
+  updatedAt: string
+  analysisMethod: string
+}
+
+export interface PolicyImpactPage {
+  items: PolicyImpactAnalysis[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface KnowledgeIngestionResult {
+  documentId: string
+  documentVersionId: string
+  version: number
+  chunkCount: number
+  contentHash: string
+  embeddingProvider: string | null
+  embeddingModel: string | null
+  embeddingDimensions: number
+}
+
+export interface KnowledgeCitation {
+  order: number
+  documentName: string
+  version: number
+  chunkId: string
+  chunkIndex: number
+  source: string | null
+  sourceAttachmentId: string | null
+  sourceFilename: string | null
+  quote: string
+  score: number
+}
+
+export interface PolicyQuestionAnswer {
+  answer: string
+  citations: KnowledgeCitation[]
+  traceId: string
+  mode: string
+  retrievalMode: 'HYBRID_VECTOR' | 'LEXICAL'
+  inputTokens: number
+  outputTokens: number
+  estimatedCost: number
 }
 
 export interface EcosystemMatch {
@@ -150,7 +247,7 @@ export interface EcosystemMatch {
   solution: string
   score: number
   reasons: string[]
-  state: '待确认' | '已推荐' | '沟通中' | '已达成'
+  state: string
   updatedAt: string
 }
 
@@ -159,11 +256,245 @@ export interface Collaboration {
   title: string
   participants: string[]
   owner: string
-  stage: '待受理' | '方案沟通' | '联合评估' | '已完成'
+  stage: string
   priority: '高' | '中' | '低'
   nextAction: string
   dueDate: string
   progress: number
+  matchId?: string | null
+  associationId?: string
+  enterpriseId?: string | null
+  version?: number
+  disabled?: boolean
+  deleted?: boolean
+  updatedAt?: string
+}
+
+export interface CollaborationUpsertPayload {
+  matchId?: string | null
+  title: string
+  participants: string[]
+  owner: string | null
+  priority: string | null
+  nextAction: string | null
+  dueDate: string | null
+  progress: number
+}
+
+export interface EcosystemPage<T> {
+  items: T[]
+  page: number
+  size: number
+  total: number
+}
+
+export interface Offering {
+  id: string
+  enterpriseId: string
+  enterpriseName: string
+  name: string
+  kind: 'PRODUCT' | 'SERVICE'
+  description: string | null
+  scenarios: string[]
+  qualifications: string[]
+  visibility: string
+  status: string
+  version: number
+  disabled: boolean
+  updatedAt: string
+}
+
+export interface OfferingUpsertPayload {
+  name: string
+  kind: 'PRODUCT' | 'SERVICE'
+  description: string | null
+  scenarios: string[]
+  qualifications: string[]
+  visibility: string
+}
+
+export interface Demand {
+  id: string
+  enterpriseId: string
+  enterpriseName: string
+  title: string
+  description: string
+  scenarios: string[]
+  requiredCapabilities: string[]
+  visibility: string
+  budgetMin: number | null
+  budgetMax: number | null
+  responseDeadline: string | null
+  status: string
+  closeReason: string | null
+  version: number
+  disabled: boolean
+  updatedAt: string
+}
+
+export interface DemandUpsertPayload {
+  title: string
+  description: string
+  scenarios: string[]
+  requiredCapabilities: string[]
+  visibility: string
+  budgetMin: number | null
+  budgetMax: number | null
+  responseDeadline: string | null
+}
+
+export interface PersistedMatch extends EcosystemMatch {
+  demandId: string
+  demandEnterpriseId: string
+  candidateEnterpriseId: string
+  recommendedAt: string | null
+  demandConfirmedAt: string | null
+  candidateConfirmedAt: string | null
+  closedReason: string | null
+  version: number
+}
+
+export interface MatchInvitation {
+  id: string
+  matchId: string
+  senderEnterpriseId: string | null
+  recipientEnterpriseId: string
+  invitationType: 'ENTERPRISE' | 'ASSOCIATION_RECOMMENDATION'
+  status: string
+  message: string | null
+  responseComment: string | null
+  sentBySubject: string
+  respondedBySubject: string | null
+  expiresAt: string | null
+  respondedAt: string | null
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface MatchNegotiation {
+  id: string
+  matchId: string
+  enterpriseId: string | null
+  stage: string
+  summary: string
+  nextAction: string | null
+  nextActionAt: string | null
+  recordedBySubject: string
+  createdAt: string
+}
+
+export interface MatchFeedback {
+  id: string
+  matchId: string
+  enterpriseId: string
+  rating: number | null
+  outcome: string
+  closeReason: string | null
+  comment: string | null
+  submittedBySubject: string
+  submittedAt: string
+}
+
+export interface MatchOutcome {
+  id: string
+  matchId: string
+  title: string
+  summary: string
+  contractAmount: number | null
+  resultType: string
+  visibility: string
+  archivedBySubject: string
+  archivedAt: string
+  version: number
+}
+
+export interface CollaborationActivity {
+  id: number
+  type: string
+  detail: string
+  actorSubject: string
+  occurredAt: string
+}
+
+export interface Subscription {
+  id: string
+  userId: string
+  associationId: string | null
+  subscriptionType: string
+  filters: Record<string, unknown>
+  channels: string[]
+  status: string
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Attachment {
+  id: string
+  associationId: string | null
+  enterpriseId: string | null
+  originalFilename: string
+  mediaType: string
+  sizeBytes: number
+  sha256: string
+  scanStatus: string
+  visibility: string
+  status: string
+  version: number
+  uploadedAt: string
+  updatedAt: string
+  deletedAt: string | null
+}
+
+export interface AttachmentPage {
+  items: Attachment[]
+  page: number
+  size: number
+  total: number
+}
+
+export interface AssociationAccessRequest {
+  id: string
+  applicantAssociationId: string
+  targetAssociationId: string
+  reason: string | null
+  status: string
+  requestedBySubject: string
+  reviewedBySubject: string | null
+  reviewComment: string | null
+  requestedAt: string
+  reviewedAt: string | null
+}
+
+export interface AssociationRelationship {
+  sourceAssociationId: string
+  targetAssociationId: string
+  status: string
+  allowMemberData: boolean
+  expiresAt: string | null
+  version: number
+  updatedAt: string
+}
+
+export interface NotificationMessage {
+  id: string
+  notificationType: string
+  title: string
+  body: string
+  resourceType: string | null
+  resourceId: string | null
+  status: string
+  readAt: string | null
+  createdAt: string
+  deliveredAt: string | null
+}
+
+export interface NotificationMessagePage {
+  items: NotificationMessage[]
+  total: number
+  page: number
+  size: number
 }
 
 export interface DashboardData {

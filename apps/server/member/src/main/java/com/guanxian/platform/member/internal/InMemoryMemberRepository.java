@@ -60,16 +60,4 @@ class InMemoryMemberRepository implements MemberRepository {
         }
     }
 
-    @Override
-    public boolean deleteById(UUID id, long expectedVersion) {
-        while (true) {
-            MemberProfile current = members.get(id);
-            if (current == null || current.version() != expectedVersion) {
-                return false;
-            }
-            if (members.remove(id, current)) {
-                return true;
-            }
-        }
-    }
 }

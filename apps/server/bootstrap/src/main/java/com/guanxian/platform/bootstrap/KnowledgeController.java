@@ -1,6 +1,7 @@
 package com.guanxian.platform.bootstrap;
 
 import com.guanxian.platform.ai.rag.KnowledgeIngestionService;
+import com.guanxian.platform.ai.rag.KnowledgeDocumentParser;
 import com.guanxian.platform.ai.rag.PolicyRagService;
 import com.guanxian.platform.ai.rag.PolicyRagService.RagLimitException;
 import com.guanxian.platform.ai.rag.RagSecurityGuard.UnsafePromptException;
@@ -9,6 +10,7 @@ import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.ActorScopeResolver;
+import com.guanxian.platform.storage.AttachmentService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -31,14 +33,49 @@ public class KnowledgeController {
     private final KnowledgeIngestionService ingestionService;
     private final PolicyRagService ragService;
     private final ActorScopeResolver actorScopeResolver;
+    private final KnowledgeDocumentParser documentParser;
+    private final AttachmentService attachmentService;
 
     public KnowledgeController(
             KnowledgeIngestionService ingestionService,
             PolicyRagService ragService,
-            ActorScopeResolver actorScopeResolver) {
+            ActorScopeResolver actorScopeResolver,
+            KnowledgeDocumentParser documentParser,
+            AttachmentService attachmentService) {
         this.ingestionService = ingestionService;
         this.ragService = ragService;
         this.actorScopeResolver = actorScopeResolver;
+        this.documentParser = documentParser;
+        this.attachmentService = attachmentService;
+    }
+
+    @PostMapping("/documents/file")
+    @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
+    ApiResponse<Object> ingestFile(
+            @Valid @RequestBody KnowledgeFileRequest request,
+            Authentication authentication) {
+        ActorScope actor = actorScopeResolver.resolve(authentication);
+        UUID associationId = associationId(request.associationId(), actor);
+        try {
+            AttachmentService.AttachmentDownload download = attachmentService.download(
+                    request.attachmentId(), actor);
+            if (!associationId.equals(download.metadata().associationId())) {
+                throw new ForbiddenException(
+                        "KNOWLEDGE_SOURCE_SCOPE_MISMATCH",
+                        "attachment does not belong to the selected association");
+            }
+            KnowledgeDocumentParser.ParsedDocument parsed = documentParser.parse(
+                    download.metadata().originalFilename(), download.metadata().mediaType(), download.content());
+            Object result = ingestionService.ingest(new KnowledgeIngestionService.KnowledgeTextDocument(
+                    request.documentId(), associationId, request.title(),
+                    defaultValue(request.documentType(), "POLICY"), "FILE", request.sourceUrl(),
+                    defaultValue(request.visibility(), "ASSOCIATION"), defaultValue(request.status(), "PUBLISHED"),
+                    actor.userId(), actor.subject(), actor.username(), parsed.text(),
+                    download.metadata().id(), parsed.parserName(), parsed.parserVersion(), parsed.pageCount()));
+            return ApiResponse.ok(result);
+        } catch (IllegalArgumentException exception) {
+            throw invalidKnowledgeRequest(exception);
+        }
     }
 
     @PostMapping("/documents/text")
@@ -58,8 +95,8 @@ public class KnowledgeController {
                     request.sourceUrl(),
                     defaultValue(request.visibility(), "ASSOCIATION"),
                     defaultValue(request.status(), "PUBLISHED"),
-                    actor.subject(),
-                    request.content()));
+                    actor.userId(), actor.subject(), actor.username(), request.content(),
+                    null, null, null, null));
             return ApiResponse.ok(result);
         } catch (IllegalArgumentException exception) {
             throw invalidKnowledgeRequest(exception);
@@ -88,12 +125,13 @@ public class KnowledgeController {
 
     private static UUID associationId(UUID requested, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            if (requested == null) {
+            UUID selected = requested == null ? actor.associationId() : requested;
+            if (selected == null) {
                 throw new ForbiddenException(
                         "ASSOCIATION_CONTEXT_REQUIRED",
                         "system administrator must specify the target association");
             }
-            return requested;
+            return selected;
         }
         if (actor.associationId() == null) {
             throw new ForbiddenException(
@@ -132,5 +170,16 @@ public class KnowledgeController {
             UUID associationId,
             @NotBlank @Size(max = 2000) String question,
             @Min(1) @Max(12) Integer maxCitations) {
+    }
+
+    public record KnowledgeFileRequest(
+            UUID documentId,
+            UUID associationId,
+            @jakarta.validation.constraints.NotNull UUID attachmentId,
+            @NotBlank @Size(max = 300) String title,
+            @Size(max = 64) String documentType,
+            @Size(max = 2000) String sourceUrl,
+            @Size(max = 32) String visibility,
+            @Size(max = 32) String status) {
     }
 }

@@ -74,6 +74,7 @@ public class CollaborationService {
         } else {
             throw scopeViolation();
         }
+        requireMatchLink(request.matchId(), associationId, enterpriseId);
         CollaborationView created = store.create(associationId, enterpriseId, request, actor);
         store.recordChange(actor, "CREATE", created, null);
         return created;
@@ -86,6 +87,7 @@ public class CollaborationService {
         requireManager(actor, current);
         requireState(current.stage(), EDITABLE, "collaboration must be DRAFT or REJECTED to edit");
         requireVersion(current.version(), expectedVersion);
+        requireMatchLink(request.matchId(), current.associationId(), current.enterpriseId());
         CollaborationView updated = store.update(id, expectedVersion, request, actor)
                 .orElseThrow(CollaborationService::stale);
         store.recordChange(actor, "UPDATE", updated, null);
@@ -225,7 +227,7 @@ public class CollaborationService {
         return actor.associationId();
     }
 
-    private static void requireManager(ActorScope actor, CollaborationView item) {
+    private void requireManager(ActorScope actor, CollaborationView item) {
         if (actor.isSystemAdmin()) {
             return;
         }
@@ -234,10 +236,20 @@ public class CollaborationService {
         }
         if (actor.isEnterpriseAdmin()
                 && actor.enterpriseId() != null
-                && actor.enterpriseId().equals(item.enterpriseId())) {
+                && (actor.enterpriseId().equals(item.enterpriseId())
+                || item.matchId() != null && store.canLinkMatch(
+                        item.matchId(), item.associationId(), actor.enterpriseId()))) {
             return;
         }
         throw scopeViolation();
+    }
+
+    private void requireMatchLink(UUID matchId, UUID associationId, UUID enterpriseId) {
+        if (matchId != null && !store.canLinkMatch(matchId, associationId, enterpriseId)) {
+            throw new ForbiddenException(
+                    "MATCH_LINK_SCOPE_VIOLATION",
+                    "the linked match is outside the collaboration data scope");
+        }
     }
 
     private static void requireReviewer(ActorScope actor) {

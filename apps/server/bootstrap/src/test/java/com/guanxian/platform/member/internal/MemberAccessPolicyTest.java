@@ -79,6 +79,6 @@ class MemberAccessPolicyTest {
     private static MemberProfile member(UUID id, UUID associationId, String visibility) {
         Instant now = Instant.parse("2026-08-21T00:00:00Z");
         return new MemberProfile(id, associationId, "会员企业", null, "技术服务单位", null, null, null,
-                null, List.of(), List.of(), List.of(), visibility, "ACTIVE", 0, now, now);
+                null, List.of(), List.of(), List.of(), visibility, "ACTIVE", 0, now, now, null, null, null);
     }
 }

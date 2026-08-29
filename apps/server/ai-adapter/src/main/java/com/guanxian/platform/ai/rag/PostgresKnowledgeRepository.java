@@ -10,13 +10,16 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.MDC;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.IntStream;
 
 @Repository
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "postgres", matchIfMissing = true)
@@ -37,10 +40,10 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
         if (documentId == null) {
             documentId = jdbc.queryForObject("""
                     INSERT INTO knowledge_document (
-                      association_id, title, document_type, source_type, source_url, visibility, status,
+                      association_id, title, document_type, source_type, source_url, source_file_id, visibility, status,
                       current_version, content_hash, created_by_subject
                     ) VALUES (
-                      :associationId, :title, :documentType, :sourceType, :sourceUrl, :visibility, :status,
+                      :associationId, :title, :documentType, :sourceType, :sourceUrl, :sourceFileId, :visibility, :status,
                       1, :contentHash, :actorSubject
                     ) RETURNING id
                     """, commonParams(command), UUID.class);
@@ -67,7 +70,8 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
             int changed = jdbc.update("""
                     UPDATE knowledge_document
                     SET title = :title, document_type = :documentType, source_type = :sourceType,
-                        source_url = :sourceUrl, visibility = :visibility, status = :status,
+                        source_url = :sourceUrl, source_file_id = :sourceFileId,
+                        visibility = :visibility, status = :status,
                         current_version = :version, content_hash = :contentHash, updated_at = now()
                     WHERE id = :documentId
                     """, update);
@@ -77,40 +81,92 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
         MapSqlParameterSource versionParams = new MapSqlParameterSource()
                 .addValue("documentId", documentId)
                 .addValue("version", version)
+                .addValue("sourceFileId", command.sourceFileId())
+                .addValue("parserName", command.parserName() == null ? "guanxian-text-chunker" : command.parserName())
+                .addValue("parserVersion", command.parserVersion() == null ? "1" : command.parserVersion())
+                .addValue("pageCount", command.pageCount())
                 .addValue("actorSubject", command.actorSubject());
         UUID versionId = jdbc.queryForObject("""
                 INSERT INTO knowledge_document_version (
-                  document_id, version, parser_name, parser_version, status, created_by_subject
-                ) VALUES (:documentId, :version, 'guanxian-text-chunker', '1', 'READY', :actorSubject)
+                  document_id, version, source_file_id, parser_name, parser_version, page_count,
+                  status, created_by_subject
+                ) VALUES (
+                  :documentId, :version, :sourceFileId, :parserName, :parserVersion, :pageCount,
+                  'READY', :actorSubject)
                 RETURNING id
                 """, versionParams, UUID.class);
 
-        SqlParameterSource[] batches = command.chunks().stream()
-                .map(chunk -> chunkParams(versionId, chunk))
+        SqlParameterSource[] batches = IntStream.range(0, command.chunks().size())
+                .mapToObj(index -> chunkParams(versionId, command.chunks().get(index),
+                        command.embeddings().isEmpty() ? null : command.embeddings().get(index), command))
                 .toArray(SqlParameterSource[]::new);
         jdbc.batchUpdate("""
                 INSERT INTO knowledge_chunk (
-                  document_version_id, chunk_index, content, content_hash, token_count, metadata
+                  document_version_id, chunk_index, content, content_hash, token_count, metadata,
+                  embedding_provider, embedding_model, embedding, embedding_status,
+                  vector_dimension, embedding_updated_at
                 ) VALUES (
-                  :versionId, :chunkIndex, :content, :contentHash, :tokenCount, CAST(:metadata AS JSONB)
+                  :versionId, :chunkIndex, :content, :contentHash, :tokenCount, CAST(:metadata AS JSONB),
+                  :embeddingProvider, :embeddingModel, CAST(:embedding AS JSONB), :embeddingStatus,
+                  :vectorDimension, :embeddingUpdatedAt
                 )
                 """, batches);
-        return new IngestionResult(documentId, versionId, version, command.chunks().size(), command.contentHash());
+        writeAudit(command, documentId, version);
+        return new IngestionResult(documentId, versionId, version, command.chunks().size(), command.contentHash(),
+                command.embeddings().isEmpty() ? null : command.embeddingProvider(),
+                command.embeddings().isEmpty() ? null : command.embeddingModel(), command.embeddingDimensions());
+    }
+
+    private void writeAudit(IngestCommand command, UUID documentId, int version) {
+        try {
+            String details = objectMapper.writeValueAsString(Map.of(
+                    "documentTitle", command.title(),
+                    "documentType", command.documentType(),
+                    "sourceType", command.sourceType(),
+                    "visibility", command.visibility(),
+                    "status", command.status(),
+                    "chunkCount", command.chunks().size(),
+                    "newVersion", version));
+            jdbc.update("""
+                    INSERT INTO audit_log (
+                      actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
+                      action, resource_type, resource_id, resource_version, outcome, details, request_id
+                    ) VALUES (
+                      (SELECT id FROM user_account WHERE id = :actorUserId),
+                      :actorSubject, :actorUsername, :associationId, NULL,
+                      :action, 'KNOWLEDGE_DOCUMENT', :resourceId, :resourceVersion, 'SUCCESS',
+                      CAST(:details AS JSONB), :requestId
+                    )
+                    """, new MapSqlParameterSource()
+                    .addValue("actorUserId", command.actorUserId())
+                    .addValue("actorSubject", command.actorSubject())
+                    .addValue("actorUsername", command.actorUsername() == null || command.actorUsername().isBlank()
+                            ? command.actorSubject() : command.actorUsername())
+                    .addValue("associationId", command.associationId())
+                    .addValue("action", version == 1 ? "KNOWLEDGE_CREATE" : "KNOWLEDGE_UPDATE")
+                    .addValue("resourceId", documentId.toString())
+                    .addValue("resourceVersion", version)
+                    .addValue("details", details)
+                    .addValue("requestId", MDC.get("requestId") == null ? "internal" : MDC.get("requestId")));
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("knowledge audit details could not be serialized", exception);
+        }
     }
 
     @Override
-    public List<RetrievedChunk> retrieve(RetrievalScope scope, String query, int limit) {
+    public List<RetrievedChunk> retrieve(RetrievalScope scope, String query, double[] queryEmbedding, int limit) {
         List<String> terms = MemoryKnowledgeRepository.queryTerms(query).stream()
                 .filter(term -> term.length() >= 2)
                 .limit(12)
                 .toList();
-        if (terms.isEmpty()) return List.of();
+        boolean vectorSearch = queryEmbedding != null && queryEmbedding.length >= 8;
+        if (terms.isEmpty() && !vectorSearch) return List.of();
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("associationId", scope.associationId())
                 .addValue("actorSubject", scope.actorSubject())
                 .addValue("privileged", scope.privileged())
-                .addValue("limit", Math.min(Math.max(1, limit), 12));
+                .addValue("limit", Math.min(Math.max(100, limit * 40), 1000));
         List<String> matches = new ArrayList<>();
         List<String> scores = new ArrayList<>();
         for (int index = 0; index < terms.size(); index++) {
@@ -119,12 +175,18 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
             matches.add("LOWER(kc.content) LIKE :" + name + " ESCAPE '\\'");
             scores.add("CASE WHEN LOWER(kc.content) LIKE :" + name + " ESCAPE '\\' THEN " + Math.max(1, 12 - index) + " ELSE 0 END");
         }
+        String lexicalScore = scores.isEmpty() ? "0" : String.join(" + ", scores);
+        String candidateMatch = matches.isEmpty() ? "kc.embedding_status = 'READY'"
+                : "(" + String.join(" OR ", matches) + ")"
+                + (vectorSearch ? " OR kc.embedding_status = 'READY'" : "");
         String sql = """
                 SELECT kc.id AS chunk_id, d.id AS document_id, d.title, dv.version, kc.chunk_index,
-                       d.source_url, kc.content, (%s) AS relevance
+                       d.source_url, d.source_file_id, fo.original_filename AS source_filename,
+                       kc.content, kc.embedding, (%s) AS relevance
                 FROM knowledge_chunk kc
                 JOIN knowledge_document_version dv ON dv.id = kc.document_version_id
                 JOIN knowledge_document d ON d.id = dv.document_id
+                LEFT JOIN object_file fo ON fo.id = d.source_file_id
                 WHERE d.deleted_at IS NULL
                   AND d.status = 'PUBLISHED'
                   AND dv.status = 'READY'
@@ -140,18 +202,22 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
                   AND (%s)
                 ORDER BY relevance DESC, d.updated_at DESC, kc.chunk_index
                 LIMIT :limit
-                """.formatted(String.join(" + ", scores), String.join(" OR ", matches));
+                """.formatted(lexicalScore, candidateMatch);
 
-        return jdbc.query(sql, params, (resultSet, rowNum) -> new RetrievedChunk(
-                resultSet.getObject("chunk_id", UUID.class),
-                resultSet.getObject("document_id", UUID.class),
-                resultSet.getString("title"),
-                resultSet.getInt("version"),
-                resultSet.getInt("chunk_index"),
-                resultSet.getString("source_url"),
-                resultSet.getString("content"),
-                resultSet.getDouble("relevance")
-        ));
+        List<CandidateChunk> candidates = jdbc.query(sql, params, (resultSet, rowNum) -> new CandidateChunk(
+                resultSet.getObject("chunk_id", UUID.class), resultSet.getObject("document_id", UUID.class),
+                resultSet.getString("title"), resultSet.getInt("version"), resultSet.getInt("chunk_index"),
+                resultSet.getString("source_url"), resultSet.getObject("source_file_id", UUID.class),
+                resultSet.getString("source_filename"), resultSet.getString("content"),
+                resultSet.getDouble("relevance"), vector(resultSet.getString("embedding"))));
+        return candidates.stream()
+                .map(candidate -> candidate.retrieved(queryEmbedding))
+                .filter(candidate -> candidate.score() > 0)
+                .sorted(Comparator.comparingDouble(RetrievedChunk::score).reversed()
+                        .thenComparing(RetrievedChunk::documentTitle)
+                        .thenComparingInt(RetrievedChunk::chunkIndex))
+                .limit(Math.min(Math.max(1, limit), 12))
+                .toList();
     }
 
     @Override
@@ -231,20 +297,67 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
                 .addValue("documentType", command.documentType().trim().toUpperCase())
                 .addValue("sourceType", command.sourceType().trim().toUpperCase())
                 .addValue("sourceUrl", command.sourceUrl())
+                .addValue("sourceFileId", command.sourceFileId())
                 .addValue("visibility", command.visibility())
                 .addValue("status", command.status())
                 .addValue("contentHash", command.contentHash())
                 .addValue("actorSubject", command.actorSubject());
     }
 
-    private MapSqlParameterSource chunkParams(UUID versionId, TextChunk chunk) {
+    private MapSqlParameterSource chunkParams(
+            UUID versionId,
+            TextChunk chunk,
+            double[] embedding,
+            IngestCommand command) {
         return new MapSqlParameterSource()
                 .addValue("versionId", versionId)
                 .addValue("chunkIndex", chunk.index())
                 .addValue("content", chunk.content())
                 .addValue("contentHash", chunk.contentHash())
                 .addValue("tokenCount", chunk.tokenCount())
-                .addValue("metadata", "{}");
+                .addValue("metadata", "{}")
+                .addValue("embeddingProvider", embedding == null ? null : command.embeddingProvider())
+                .addValue("embeddingModel", embedding == null ? null : command.embeddingModel())
+                .addValue("embedding", embedding == null ? null : json(embedding))
+                .addValue("embeddingStatus", embedding == null ? "NOT_CONFIGURED" : "READY")
+                .addValue("vectorDimension", embedding == null ? null : embedding.length)
+                .addValue("embeddingUpdatedAt", embedding == null ? null : java.time.OffsetDateTime.now());
+    }
+
+    private double[] vector(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            return objectMapper.readValue(json, double[].class);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("stored knowledge embedding is invalid", exception);
+        }
+    }
+
+    private static double cosine(double[] left, double[] right) {
+        if (left == null || right == null || left.length != right.length) return 0;
+        double dot = 0;
+        double leftMagnitude = 0;
+        double rightMagnitude = 0;
+        for (int index = 0; index < left.length; index++) {
+            dot += left[index] * right[index];
+            leftMagnitude += left[index] * left[index];
+            rightMagnitude += right[index] * right[index];
+        }
+        return leftMagnitude == 0 || rightMagnitude == 0
+                ? 0 : dot / Math.sqrt(leftMagnitude * rightMagnitude);
+    }
+
+    private record CandidateChunk(
+            UUID chunkId, UUID documentId, String title, int version, int chunkIndex,
+            String sourceUrl, UUID sourceFileId, String sourceFilename,
+            String content, double lexicalScore, double[] embedding) {
+        private RetrievedChunk retrieved(double[] queryEmbedding) {
+            double semantic = Math.max(0, cosine(queryEmbedding, embedding));
+            double combined = Math.min(99.999999,
+                    semantic * 75 + Math.min(25, Math.max(0, lexicalScore)));
+            return new RetrievedChunk(chunkId, documentId, title, version, chunkIndex,
+                    sourceUrl, sourceFileId, sourceFilename, content, combined);
+        }
     }
 
     private String json(Object value) {

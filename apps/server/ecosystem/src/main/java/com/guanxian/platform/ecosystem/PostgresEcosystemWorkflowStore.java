@@ -80,6 +80,29 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
+    public void expirePendingInvitations(UUID matchId) {
+        jdbc.update("""
+                UPDATE match_invitation
+                   SET status='EXPIRED', version=version+1, updated_at=now()
+                 WHERE match_id=:matchId
+                   AND status='PENDING'
+                   AND expires_at IS NOT NULL
+                   AND expires_at <= now()
+                """, new MapSqlParameterSource("matchId", matchId));
+    }
+
+    @Override
+    public boolean hasPendingInvitation(UUID matchId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM match_invitation
+                     WHERE match_id=:matchId
+                       AND status='PENDING'
+                       AND (expires_at IS NULL OR expires_at > now()))
+                """, new MapSqlParameterSource("matchId", matchId), Boolean.class));
+    }
+
+    @Override
     public Optional<MatchInvitationView> respondInvitation(
             UUID invitationId,
             long expectedVersion,
@@ -154,6 +177,11 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
+    public Optional<NegotiationView> latestNegotiation(UUID matchId, ActorScope actor) {
+        return negotiations(matchId, actor).stream().findFirst();
+    }
+
+    @Override
     public MatchFeedbackView upsertFeedback(
             UUID matchId, UUID enterpriseId, MatchFeedbackRequest request, ActorScope actor) {
         MapSqlParameterSource params = new MapSqlParameterSource()
@@ -187,6 +215,20 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                   FROM match_feedback
                  WHERE id=:id
                 """, new MapSqlParameterSource("id", id), this::mapFeedback).getFirst();
+    }
+
+    @Override
+    public List<MatchFeedbackView> feedback(UUID matchId, ActorScope actor) {
+        return jdbc.query("""
+                SELECT f.id, f.match_id, f.enterprise_id, f.rating, f.outcome, f.close_reason,
+                       f.comment, f.submitted_by_subject, f.submitted_at
+                  FROM match_feedback f
+                  JOIN ecosystem_match m ON m.id=f.match_id
+                  JOIN cooperation_demand d ON d.id=m.demand_id
+                  JOIN enterprise de ON de.id=d.enterprise_id
+                """ + matchScope(actor)
+                        + " AND f.match_id=:matchId ORDER BY f.submitted_at DESC, f.id",
+                scopeParams(actor).addValue("matchId", matchId), this::mapFeedback);
     }
 
     @Override

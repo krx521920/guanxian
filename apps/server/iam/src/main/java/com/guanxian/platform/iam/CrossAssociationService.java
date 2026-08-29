@@ -343,6 +343,13 @@ class CrossAssociationService {
 
     private void validateSharePolicy(UUID source, CrossAssociationDtos.SharePolicyUpsert request) {
         requireActiveRelationship(source, request.targetAssociationId());
+        String resourceType = request.resourceType().trim().toUpperCase(Locale.ROOT);
+        if (!CONSENT_RESOURCE_TYPES.contains(resourceType)) {
+            throw invalid("resourceType must be PRODUCT, SERVICE, DEMAND, or MATCH");
+        }
+        if (request.visibleFields().isEmpty()) {
+            throw invalid("visibleFields must contain at least one authorized field");
+        }
         if (request.visibleFields().stream().map(String::trim).anyMatch(String::isEmpty)) {
             throw invalid("visibleFields cannot contain blank values");
         }
@@ -370,6 +377,7 @@ class CrossAssociationService {
         var relationship = store.relationship(source, target)
                 .orElseThrow(() -> new ForbiddenException("CROSS_ASSOCIATION_NOT_AUTHORIZED", "associations are not connected"));
         if (!"ACTIVE".equals(relationship.status())
+                || !relationship.allowMemberData()
                 || relationship.revokedAt() != null
                 || relationship.suspendedAt() != null
                 || (relationship.expiresAt() != null && !relationship.expiresAt().isAfter(Instant.now()))) {

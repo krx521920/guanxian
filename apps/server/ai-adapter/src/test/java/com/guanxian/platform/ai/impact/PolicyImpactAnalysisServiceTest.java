@@ -17,7 +17,7 @@ class PolicyImpactAnalysisServiceTest {
 
     @Test
     void deterministicAnalysisPersistsEvidenceAndSupportsReviewHistory() {
-        MemoryPolicyImpactAnalysisStore store = new MemoryPolicyImpactAnalysisStore();
+        MemoryPolicyImpactAnalysisStore store = new MemoryPolicyImpactAnalysisStore(true);
         PolicyImpactAnalysisService service = new PolicyImpactAnalysisService(
                 store, new DeterministicPolicyImpactAnalyzer());
         ImpactActor associationAdmin = associationAdmin(ASSOCIATION);
@@ -45,7 +45,7 @@ class PolicyImpactAnalysisServiceTest {
 
     @Test
     void enterpriseCanReadOnlyItsOwnResultsAndAssociationScopeIsEnforced() {
-        MemoryPolicyImpactAnalysisStore store = new MemoryPolicyImpactAnalysisStore();
+        MemoryPolicyImpactAnalysisStore store = new MemoryPolicyImpactAnalysisStore(true);
         PolicyImpactAnalysisService service = new PolicyImpactAnalysisService(
                 store, new DeterministicPolicyImpactAnalyzer());
         PolicyImpactAnalysisView created = service.create(POLICY, ENTERPRISE, associationAdmin(ASSOCIATION));

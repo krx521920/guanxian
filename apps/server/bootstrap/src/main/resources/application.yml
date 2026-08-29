@@ -3,8 +3,10 @@ spring:
     name: guanxian-server
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 6MB
+      # Transport ceiling matches attachment storage. Member imports retain
+      # their stricter 5 MiB business limit in MemberImportController.
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:20MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:21MB}
   jackson:
     default-property-inclusion: non_null
   data:
@@ -57,6 +59,7 @@ management:
 guanxian:
   business:
     repository: ${GUANXIAN_BUSINESS_REPOSITORY:postgres}
+    seed-demo-data: ${GUANXIAN_SEED_DEMO_DATA:false}
   notification:
     repository: ${GUANXIAN_NOTIFICATION_REPOSITORY:postgres}
   member:
@@ -100,3 +103,13 @@ guanxian:
       max-output-tokens: ${GUANXIAN_RAG_MAX_OUTPUT_TOKENS:800}
       max-estimated-cost: ${GUANXIAN_RAG_MAX_ESTIMATED_COST:0.50}
       external-model-data-egress-enabled: ${GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED:false}
+      max-document-chars: ${GUANXIAN_RAG_MAX_DOCUMENT_CHARS:2000000}
+      max-document-bytes: ${GUANXIAN_RAG_MAX_DOCUMENT_BYTES:20971520}
+    embedding:
+      enabled: ${GUANXIAN_EMBEDDING_ENABLED:false}
+      endpoint: ${GUANXIAN_EMBEDDING_ENDPOINT:}
+      api-key: ${GUANXIAN_EMBEDDING_API_KEY:}
+      model: ${GUANXIAN_EMBEDDING_MODEL:}
+      dimensions: ${GUANXIAN_EMBEDDING_DIMENSIONS:1536}
+      max-batch-size: ${GUANXIAN_EMBEDDING_MAX_BATCH_SIZE:32}
+      request-timeout: ${GUANXIAN_EMBEDDING_TIMEOUT:30s}

@@ -159,7 +159,15 @@ public class MemberImportService {
             throw scopeDenied();
         }
         if (actor.isSystemAdmin()) {
-            return requestedAssociationId == null ? memberRepository.defaultAssociationId() : requestedAssociationId;
+            UUID selected = requestedAssociationId != null
+                    ? requestedAssociationId : actor.associationId();
+            if (selected == null) {
+                throw new com.guanxian.platform.shared.error.ApiException(
+                        "ASSOCIATION_CONTEXT_REQUIRED",
+                        "system administrators must select an association context",
+                        org.springframework.http.HttpStatus.BAD_REQUEST);
+            }
+            return selected;
         }
         if (actor.associationId() == null
                 || requestedAssociationId != null && !actor.associationId().equals(requestedAssociationId)) {

@@ -5,6 +5,8 @@ import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.AnalysisSource;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.ImpactActor;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.ReadScope;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.SourceChunk;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -29,6 +31,16 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
     private final Map<SourceKey, AnalysisSource> sources = new LinkedHashMap<>();
 
     public MemoryPolicyImpactAnalysisStore() {
+        this(false);
+    }
+
+    @Autowired
+    public MemoryPolicyImpactAnalysisStore(
+            @Value("${guanxian.business.seed-demo-data:${guanxian.member.seed-demo-data:false}}")
+            boolean seedDemoData) {
+        if (!seedDemoData) {
+            return;
+        }
         putSource(new AnalysisSource(
                 DEMO_POLICY,
                 "城市地下管线建设管理工作指导意见",

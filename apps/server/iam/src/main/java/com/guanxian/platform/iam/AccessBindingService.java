@@ -148,19 +148,21 @@ class AccessBindingService {
             jdbc.update("""
                     INSERT INTO audit_log (
                         actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
-                        action, resource_type, resource_id, details, request_id)
-                    VALUES (:actorUserId, :actorSubject, :actorUsername, :associationId, :enterpriseId,
+                        action, resource_type, resource_id, resource_version, outcome, details, request_id)
+                    VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
+                            :actorSubject, :actorUsername, :associationId, :enterpriseId,
                             'ACCESS_BINDING_UPSERT', 'USER_ACCOUNT', :resourceId,
-                            CAST(:details AS jsonb), :requestId)
+                            NULL, 'SUCCESS', CAST(:details AS jsonb), :requestId)
                     """, new MapSqlParameterSource()
                     .addValue("actorUserId", actor.userId())
                     .addValue("actorSubject", actor.subject())
-                    .addValue("actorUsername", actor.username())
+                    .addValue("actorUsername", actor.username() == null || actor.username().isBlank()
+                            ? actor.subject() : actor.username())
                     .addValue("associationId", associationId)
                     .addValue("enterpriseId", enterpriseId)
                     .addValue("resourceId", subject)
                     .addValue("details", objectMapper.writeValueAsString(Map.of("externalSubject", subject)))
-                    .addValue("requestId", MDC.get("requestId")));
+                    .addValue("requestId", MDC.get("requestId") == null ? "internal" : MDC.get("requestId")));
         } catch (JsonProcessingException exception) {
             throw new IllegalStateException("access binding audit could not be serialized", exception);
         }

@@ -58,11 +58,11 @@ describe('useAuth', () => {
     const { auth } = await loadAuth()
 
     expect(auth.demoUsers).toEqual({
-      SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [] },
-      ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [] },
-      ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [] },
-      ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [] },
-      ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [] },
+      SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+      ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+      ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+      ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
+      ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
     })
   })
 
@@ -73,6 +73,8 @@ describe('useAuth', () => {
     expect(auth.switchRole('ENTERPRISE_ADMIN')).toBe('/enterprise')
     expect(auth.user.value?.organization).toBe('京城管网科技有限公司')
     expect(session.getItem(ROLE_STORAGE_KEY)).toBe('ENTERPRISE_ADMIN')
+    const { getDemoRole } = await import('./token-store')
+    expect(getDemoRole()).toBe('ENTERPRISE_ADMIN')
   })
 
   it('logs out and removes the persisted session', async () => {
@@ -99,6 +101,8 @@ describe('useAuth', () => {
       organization: '京城管网科技有限公司',
       title: '市场经理',
       permissions: [],
+      associationId: '00000000-0000-0000-0000-000000000106',
+      enterpriseId: '00000000-0000-0000-0000-000000000201',
     })
   })
 

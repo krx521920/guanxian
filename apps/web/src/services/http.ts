@@ -1,4 +1,4 @@
-import { getAccessToken } from './token-store'
+import { getAccessToken, getDemoRole, getSystemContext } from './token-store'
 
 interface ApiEnvelopeCandidate<T> {
   code: unknown
@@ -7,12 +7,22 @@ interface ApiEnvelopeCandidate<T> {
 }
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
-// Mock data is both opt-in and development-only so production failures are never hidden.
-const allowMockFallback = import.meta.env.MODE !== 'production' && import.meta.env.VITE_MOCK_FALLBACK === 'true'
+const demoTransportEnabled = import.meta.env.MODE !== 'production'
+  && (import.meta.env.VITE_AUTH_MODE || '').trim().toLowerCase() === 'demo'
 
 const successCodes = new Set<string | number>(['OK', 'SUCCESS', 0, 200])
 const requestIdHeader = 'X-Request-Id'
+const demoRoleHeader = 'X-Guanxian-Demo-Role'
+const associationContextHeader = 'X-Guanxian-Association-Id'
+const enterpriseContextHeader = 'X-Guanxian-Enterprise-Id'
 const requestIdPattern = /^[A-Za-z0-9._:-]{1,128}$/
+
+function boundedTimeout(raw: string | undefined, fallback: number): number {
+  const value = Number(raw)
+  return Number.isFinite(value) && value >= 1000 && value <= 300000 ? Math.trunc(value) : fallback
+}
+
+const defaultTimeoutMs = boundedTimeout(import.meta.env.VITE_API_TIMEOUT_MS, 15000)
 
 export class ApiRequestError extends Error {
   constructor(
@@ -56,10 +66,21 @@ function prepareHeaders(headersInit?: HeadersInit, body?: BodyInit | null): { he
   const headers = new Headers()
 
   entries.forEach(([name, value]) => {
-    if (name.toLowerCase() !== requestIdHeader.toLowerCase()) headers.append(name, value)
+    const normalizedName = name.toLowerCase()
+    if (normalizedName !== requestIdHeader.toLowerCase()
+      && normalizedName !== demoRoleHeader.toLowerCase()
+      && normalizedName !== associationContextHeader.toLowerCase()
+      && normalizedName !== enterpriseContextHeader.toLowerCase()) {
+      headers.append(name, value)
+    }
   })
   const accessToken = getAccessToken()
   if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`)
+  const demoRole = demoTransportEnabled ? getDemoRole() : null
+  if (demoRole) headers.set(demoRoleHeader, demoRole)
+  const systemContext = getSystemContext()
+  if (systemContext.associationId) headers.set(associationContextHeader, systemContext.associationId)
+  if (systemContext.enterpriseId) headers.set(enterpriseContextHeader, systemContext.enterpriseId)
   if (!headers.has('Content-Type') && !(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
@@ -102,9 +123,9 @@ function errorFromResponse(
 export async function request<T>(
   path: string,
   options: RequestInit = {},
-  mock?: () => Promise<T> | T,
   observeResponse?: (response: Response) => void,
   responseKind: 'json' | 'blob' = 'json',
+  timeoutMs = defaultTimeoutMs,
 ): Promise<T> {
   const { headers, requestId } = prepareHeaders(options.headers, options.body)
   const controller = new AbortController()
@@ -127,7 +148,7 @@ export async function request<T>(
     if (controller.signal.aborted) return
     abortSource = 'timeout'
     controller.abort()
-  }, 2500)
+  }, timeoutMs)
 
   try {
     if (abortSource === 'external') throw externalAbortError()
@@ -147,7 +168,6 @@ export async function request<T>(
       if (abortSource === 'external') {
         throw externalAbortError()
       }
-      if (allowMockFallback && mock && error instanceof TypeError) return mock()
       throw error
     }
 
@@ -195,6 +215,6 @@ export async function request<T>(
   }
 }
 
-export function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
-  return request<Blob>(path, options, undefined, undefined, 'blob')
+export function requestBlob(path: string, options: RequestInit = {}, timeoutMs = defaultTimeoutMs): Promise<Blob> {
+  return request<Blob>(path, options, undefined, 'blob', timeoutMs)
 }

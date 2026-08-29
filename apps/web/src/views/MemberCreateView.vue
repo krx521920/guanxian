@@ -31,6 +31,8 @@ function payload(): MemberUpsertPayload {
     capabilities: listValue(form.capabilities), products: listValue(form.products),
     cooperationNeeds: listValue(form.cooperationNeeds), visibility: form.visibility,
     status: canSetActive.value ? form.status : 'PENDING_REVIEW',
+    associationId: auth.user.value?.role === 'SYSTEM_ADMIN'
+      ? auth.user.value.associationId || undefined : undefined,
   }
 }
 async function submit() {

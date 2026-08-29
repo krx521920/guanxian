@@ -249,7 +249,8 @@ public class EcosystemCatalogService {
     }
 
     private static UUID requireEnterprise(ActorScope actor) {
-        if (actor.enterpriseId() == null || !actor.isEnterpriseAdmin()) {
+        if (actor.enterpriseId() == null
+                || (!actor.isEnterpriseAdmin() && !actor.isSystemAdmin())) {
             throw new ForbiddenException(
                     "ENTERPRISE_CONTEXT_REQUIRED", "an enterprise administrator identity is required");
         }
@@ -257,14 +258,22 @@ public class EcosystemCatalogService {
     }
 
     private static void requireOwner(ActorScope actor, UUID enterpriseId) {
-        if (!actor.isEnterpriseAdmin() || !enterpriseId.equals(actor.enterpriseId())) {
+        if ((!actor.isEnterpriseAdmin() && !actor.isSystemAdmin())
+                || !enterpriseId.equals(actor.enterpriseId())) {
             throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION", "enterprise can only edit its own data");
         }
     }
 
-    private static void requireOwnerOrAssociation(ActorScope actor, UUID enterpriseId) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
+    private void requireOwnerOrAssociation(ActorScope actor, UUID enterpriseId) {
+        if (actor.isSystemAdmin()) {
             return;
+        }
+        if (actor.isAssociationStaff()) {
+            if (store.enterpriseBelongsToAssociation(enterpriseId, actor.associationId())) {
+                return;
+            }
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION", "association can only manage resources owned by its members");
         }
         requireOwner(actor, enterpriseId);
     }

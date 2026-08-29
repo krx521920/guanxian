@@ -13,10 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class EcosystemMatchService {
@@ -39,14 +42,9 @@ public class EcosystemMatchService {
         this.catalogStore = catalogStore;
     }
 
-    public List<EcosystemMatch> demoMatches() {
-        return List.of(
-                new EcosystemMatch("M001", "北京市政建设集团", "高压燃气管道零泄漏阀门采购", "燃气管网 · 更新改造",
-                        "北方阀门制造有限公司", "智能零泄漏球阀及远程控制方案", 94,
-                        List.of("介质与压力等级匹配", "具备同类产品能力", "北京周边可快速交付"), "沟通中", "今天 10:30"),
-                new EcosystemMatch("M002", "首都城市更新发展有限公司", "老旧街区地下管线综合探测", "城市更新 · 探测测绘",
-                        "京城管网科技有限公司", "多源监测与三维管线建模服务", 88,
-                        List.of("城市更新场景匹配", "具备数字孪生能力", "服务覆盖北京地区"), "已推荐", "昨天 16:18"));
+    @Transactional(readOnly = true)
+    public List<PersistedMatchView> persisted(ActorScope actor) {
+        return matchStore.list(actor).stream().filter(value -> canReadMatch(value, actor)).toList();
     }
 
     public List<EcosystemMatch> match(MatchRequest request, ActorScope actor) {
@@ -81,9 +79,15 @@ public class EcosystemMatchService {
                 scene.isBlank() ? "未分类场景" : scene,
                 requirements,
                 limit);
-        List<MatchCandidateDraft> candidates = memberDirectory.findAll(null, actor).stream()
-                .filter(member -> !member.id().equals(demand.enterpriseId()))
-                .map(member -> toDraft(member, score(member, request, tags)))
+        Map<UUID, MemberProfile> memberProfiles = memberDirectory.findAll(null, actor).stream()
+                .collect(Collectors.toMap(MemberProfile::id, Function.identity(), (left, right) -> left));
+        Map<UUID, MatchCandidateDraft> bestByEnterprise = new LinkedHashMap<>();
+        visibleActiveOfferings(actor).stream()
+                .filter(offering -> !offering.enterpriseId().equals(demand.enterpriseId()))
+                .map(offering -> score(offering, memberProfiles.get(offering.enterpriseId()), request, tags))
+                .forEach(candidate -> bestByEnterprise.merge(
+                        candidate.candidateEnterpriseId(), candidate, EcosystemMatchService::betterCandidate));
+        List<MatchCandidateDraft> candidates = bestByEnterprise.values().stream()
                 .sorted(Comparator.comparingInt(MatchCandidateDraft::score).reversed()
                         .thenComparing(MatchCandidateDraft::supplierCompany)
                         .thenComparing(MatchCandidateDraft::candidateEnterpriseId))
@@ -101,7 +105,7 @@ public class EcosystemMatchService {
     @Transactional(readOnly = true)
     public List<PersistedMatchView> persisted(UUID demandId, ActorScope actor) {
         catalogService.demand(demandId, actor, false);
-        return matchStore.list(demandId, actor);
+        return matchStore.list(demandId, actor).stream().filter(value -> canReadMatch(value, actor)).toList();
     }
 
     @Transactional
@@ -110,8 +114,17 @@ public class EcosystemMatchService {
             throw new ForbiddenException("MATCH_REVIEWER_REQUIRED", "association reviewer identity is required");
         }
         PersistedMatchView current = find(id, actor);
-        requireState(current.state(), Set.of("PENDING_CONFIRMATION", "CONFIRMED"));
-        return transition(current, expectedVersion, "RECOMMENDED", null, "RECOMMEND", actor);
+        requireOwningAssociation(current.demandEnterpriseId(), actor);
+        MatchLifecycle.requireRecommendationAllowed(current);
+        if (current.version() != expectedVersion) {
+            throw stale();
+        }
+        PersistedMatchView updated = matchStore.recommend(current.id(), expectedVersion, actor)
+                .orElseThrow(EcosystemMatchService::stale);
+        catalogStore.recordChange(
+                actor, "RECOMMEND", "ECOSYSTEM_MATCH", updated.id(),
+                actor.associationId(), updated.demandEnterpriseId(), updated.version(), updated);
+        return updated;
     }
 
     @Transactional
@@ -123,27 +136,47 @@ public class EcosystemMatchService {
             throw new ForbiddenException(
                     "MATCH_PARTICIPANT_REQUIRED", "only an enterprise participating in the match can confirm it");
         }
-        requireState(current.state(), Set.of("PENDING_CONFIRMATION", "RECOMMENDED"));
-        return transition(current, expectedVersion, "CONFIRMED", null, "CONFIRM", actor);
+        MatchLifecycle.requireConfirmable(current);
+        if ((current.demandEnterpriseId().equals(actor.enterpriseId())
+                && current.demandConfirmedAt() != null)
+                || (current.candidateEnterpriseId().equals(actor.enterpriseId())
+                && current.candidateConfirmedAt() != null)) {
+            throw new PreconditionFailedException("this enterprise has already confirmed the match");
+        }
+        if (current.version() != expectedVersion) {
+            throw stale();
+        }
+        PersistedMatchView updated = matchStore.confirm(
+                        current.id(), expectedVersion, actor.enterpriseId(), actor)
+                .orElseThrow(EcosystemMatchService::stale);
+        String action = updated.state().equals(MatchLifecycle.CONFIRMED)
+                ? "COMPLETE_BILATERAL_CONFIRMATION" : "CONFIRM_PARTICIPATION";
+        catalogStore.recordChange(
+                actor, action, "ECOSYSTEM_MATCH", updated.id(),
+                actor.associationId(), updated.demandEnterpriseId(), updated.version(), updated);
+        return updated;
     }
 
     @Transactional
     public PersistedMatchView close(
             UUID id, long expectedVersion, MatchCloseRequest request, ActorScope actor) {
         PersistedMatchView current = find(id, actor);
-        if (!actor.isSystemAdmin() && !actor.isAssociationStaff()
+        boolean owningAssociation = actor.isAssociationStaff()
+                && catalogStore.enterpriseBelongsToAssociation(
+                current.demandEnterpriseId(), actor.associationId());
+        if (!actor.isSystemAdmin() && !owningAssociation
                 && !current.demandEnterpriseId().equals(actor.enterpriseId())) {
             throw new ForbiddenException(
                     "MATCH_CLOSE_FORBIDDEN", "only the demand owner or association can close the match");
         }
-        if ("CLOSED".equals(current.state())) {
-            throw new PreconditionFailedException("match is already closed");
-        }
-        return transition(current, expectedVersion, "CLOSED", request.reason(), "CLOSE", actor);
+        MatchLifecycle.requireClosable(current);
+        return transition(
+                current, expectedVersion, MatchLifecycle.CLOSED, request.reason(), "CLOSE", actor);
     }
 
     private PersistedMatchView find(UUID id, ActorScope actor) {
-        return matchStore.find(id, actor).orElseThrow(() -> new NotFoundException("ecosystem match", id));
+        return matchStore.find(id, actor).filter(value -> canReadMatch(value, actor))
+                .orElseThrow(() -> new NotFoundException("ecosystem match", id));
     }
 
     private PersistedMatchView transition(
@@ -165,24 +198,115 @@ public class EcosystemMatchService {
         return updated;
     }
 
-    private static void requireDemandOwnerOrAssociation(DemandView demand, ActorScope actor) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff()
-                || demand.enterpriseId().equals(actor.enterpriseId())) {
+    private void requireDemandOwnerOrAssociation(DemandView demand, ActorScope actor) {
+        boolean owningAssociation = actor.isAssociationStaff()
+                && catalogStore.enterpriseBelongsToAssociation(demand.enterpriseId(), actor.associationId());
+        if (actor.isSystemAdmin() || owningAssociation || demand.enterpriseId().equals(actor.enterpriseId())) {
             return;
         }
         throw new ForbiddenException(
                 "DEMAND_SCOPE_VIOLATION", "only the demand owner or association can generate matches");
     }
 
-    private static void requireState(String state, Set<String> allowed) {
-        if (!allowed.contains(state)) {
-            throw new PreconditionFailedException(
-                    "match state " + state + " does not allow this operation");
+    private void requireOwningAssociation(UUID enterpriseId, ActorScope actor) {
+        if (!actor.isSystemAdmin()
+                && (!actor.isAssociationStaff()
+                || !catalogStore.enterpriseBelongsToAssociation(enterpriseId, actor.associationId()))) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION", "association can only manage matches owned by its members");
         }
+    }
+
+    private boolean canReadMatch(PersistedMatchView value, ActorScope actor) {
+        return actor.isSystemAdmin()
+                || value.demandEnterpriseId().equals(actor.enterpriseId())
+                || value.candidateEnterpriseId().equals(actor.enterpriseId())
+                || actor.isAssociationStaff() && catalogStore.enterpriseBelongsToAssociation(
+                value.demandEnterpriseId(), actor.associationId());
     }
 
     private static PreconditionFailedException stale() {
         return new PreconditionFailedException("match version is stale; reload and retry with the latest ETag");
+    }
+
+    private List<OfferingView> visibleActiveOfferings(ActorScope actor) {
+        List<OfferingView> active = new ArrayList<>();
+        int page = 0;
+        EcosystemPage<OfferingView> current;
+        do {
+            current = catalogService.offerings(actor, null, false, page, 100);
+            current.items().stream()
+                    .filter(offering -> "ACTIVE".equals(offering.status()) && !offering.disabled())
+                    .forEach(active::add);
+            page++;
+        } while ((long) page * current.size() < current.total());
+        return active;
+    }
+
+    private MatchCandidateDraft score(
+            OfferingView offering,
+            MemberProfile member,
+            MatchRequest request,
+            List<String> tags) {
+        String offeringText = String.join(" ",
+                offering.name(), offering.kind(), nullToEmpty(offering.description()),
+                String.join(" ", offering.scenarios()), String.join(" ", offering.qualifications()))
+                .toLowerCase(Locale.ROOT);
+        String demandText = String.join(" ", request.demandTitle(), request.scene(),
+                nullToEmpty(request.requirements())).toLowerCase(Locale.ROOT);
+        List<String> reasons = new ArrayList<>();
+        int score = 45;
+        for (String tag : tags) {
+            if (offeringText.contains(tag.toLowerCase(Locale.ROOT))) {
+                score += 12;
+                reasons.add("已审核产品/服务命中标签：“" + tag + "”");
+            }
+        }
+        for (String scenario : offering.scenarios()) {
+            if (demandText.contains(scenario.toLowerCase(Locale.ROOT))) {
+                score += 10;
+                reasons.add("适用场景“" + scenario + "”与需求一致");
+            }
+        }
+        if (request.requirements() != null && !request.requirements().isBlank()) {
+            for (String requirement : request.requirements().split("\\s+")) {
+                if (!requirement.isBlank() && offeringText.contains(requirement.toLowerCase(Locale.ROOT))) {
+                    score += 8;
+                    reasons.add("产品/服务资料覆盖需求能力“" + requirement + "”");
+                }
+            }
+        }
+        if (member != null) {
+            for (String capability : member.capabilities()) {
+                if (demandText.contains(capability.toLowerCase(Locale.ROOT))) {
+                    score += 4;
+                    reasons.add("企业履约能力“" + capability + "”可作为补充支撑");
+                }
+            }
+            if (member.address() != null && member.address().contains("北京")) {
+                score += 3;
+                reasons.add("本地服务与交付条件较好");
+            }
+        }
+        if (reasons.isEmpty()) {
+            reasons.add("基于已审核产品/服务的行业与场景相关性推荐");
+        }
+        String supplier = offering.enterpriseName() != null && !offering.enterpriseName().isBlank()
+                ? offering.enterpriseName()
+                : member != null ? member.name() : offering.enterpriseId().toString();
+        String solution = offering.description() == null || offering.description().isBlank()
+                ? offering.name()
+                : offering.name() + "：" + offering.description();
+        return new MatchCandidateDraft(
+                offering.enterpriseId(), supplier, solution, Math.min(score, 99), reasons);
+    }
+
+    private static MatchCandidateDraft betterCandidate(MatchCandidateDraft left, MatchCandidateDraft right) {
+        if (left.score() != right.score()) {
+            return left.score() > right.score() ? left : right;
+        }
+        int solutionOrder = left.solution().compareToIgnoreCase(right.solution());
+        return solutionOrder <= 0 ? left : right;
     }
 
     private EcosystemMatch score(MemberProfile member, MatchRequest request, List<String> tags) {
@@ -216,11 +340,6 @@ public class EcosystemMatchService {
         return new EcosystemMatch(
                 stableMatchId(member, request), request.demandCompany(), request.demandTitle(), request.scene(),
                 member.name(), solution, Math.min(score, 99), reasons, "待确认", "刚刚");
-    }
-
-    private static MatchCandidateDraft toDraft(MemberProfile member, EcosystemMatch value) {
-        return new MatchCandidateDraft(
-                member.id(), value.supplierCompany(), value.solution(), value.score(), value.reasons());
     }
 
     private static String stableMatchId(MemberProfile member, MatchRequest request) {

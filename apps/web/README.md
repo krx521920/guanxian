@@ -1,6 +1,6 @@
 # 管线智联 Web 管理端
 
-北京地下管线协会 AI 管理协作平台的 Vue 3 管理端骨架。当前版本围绕第二版产品框架，提供协会与企业两类工作空间，并已接入基于账号身份的前端导航和路由权限。
+北京地下管线协会管理协作平台的 Vue 3 管理端。当前版本围绕第二版产品框架，提供协会与企业两类工作空间，并已接入基于账号身份的前端导航和路由权限。真实模型与语料评测完成前，界面不以“AI 平台”对外宣传。
 
 ## 已有页面
 
@@ -37,7 +37,14 @@ npm run dev
 
 默认地址为 `http://localhost:5173`。生产/联调至少配置 `VITE_OIDC_AUTHORITY`、`VITE_OIDC_CLIENT_ID`、回调地址和退出回调地址；身份提供方必须登记完全一致的 URI。纯本地界面测试可显式设置 `VITE_AUTH_MODE=demo`，但不得用于生产构建。
 
-## API 与 mock 回退
+如需让本地演示页面连接以 HTTP Basic 演示模式运行的后端，可在 `.env.local` 中设置
+`DEV_API_PROXY_AUTH_SYSTEM_ADMIN`、`DEV_API_PROXY_AUTH_ASSOCIATION_ADMIN`、
+`DEV_API_PROXY_AUTH_ASSOCIATION_OPERATOR`、`DEV_API_PROXY_AUTH_ENTERPRISE_ADMIN` 和
+`DEV_API_PROXY_AUTH_ENTERPRISE_MEMBER`。前端切换演示身份时，Vite 开发代理会选择对应账号连接后端。
+这些变量只由 Vite 开发服务器读取，不会随 `VITE_*` 客户端环境变量进入浏览器生产包；
+正式环境不得配置这些演示认证项。
+
+## 真实 API 与失败反馈
 
 前端统一通过 `src/services/http.ts` 请求 `/api/v1`，支持常见的 `{ code, message, data }` 响应包装和直接返回数据两种形式。当前首批接口约定如下：
 
@@ -56,7 +63,6 @@ npm run dev
 | GET | `/api/v1/matches` | 生态匹配 |
 | GET | `/api/v1/collaborations` | 协作事项 |
 
-开发环境显式设置 `VITE_MOCK_FALLBACK=true` 后，只有 `fetch` 抛出的网络类 `TypeError` 才会回退到 `src/mocks/data.ts`。HTTP 4xx/5xx、业务错误码、响应契约错误、超时和用户主动取消均不会触发 mock。生产构建无条件关闭 mock 回退，即使误配了该环境变量也不会隐藏真实接口故障。
 
 每个请求拥有独立的超时控制器，支持调用方通过 `AbortSignal` 取消；并发请求之间互不影响。超时统一返回 `REQUEST_TIMEOUT`，且所有完成、失败和取消路径都会清理计时器与外部监听器。
 
@@ -80,7 +86,7 @@ npm run mutation
 当前自动化测试分为三类：
 
 - 正向测试：验证标准 API 包装解包、直接 JSON 响应、安全请求 ID 传播、异步资源成功与重试恢复、五类账号登录及其默认工作台、各身份可见导航。
-- 反向测试：验证企业账号不可见协会工作台与采集功能、企业业务人员不能编辑、企业管理员只能进入受限编辑路由、缺少角色声明时默认拒绝、生产环境及非网络错误不得回退到 mock。
+- 反向测试：验证企业账号不可见协会工作台与采集功能、企业业务人员不能编辑、企业管理员只能维护绑定企业、缺少角色声明时默认拒绝，且网络错误不会生成任何伪数据。
 - 异常测试：验证 HTTP 4xx/5xx、HTTP 200 但业务码失败、无效 JSON/错误码类型、缺少 `data`、不安全/重复请求 ID、页面安全错误映射、重试去重、卸载后晚到结果、超时与取消竞态、并发请求隔离、伪造会话和浏览器存储被禁用。
 
 主要测试文件：
@@ -88,10 +94,10 @@ npm run mutation
 | 文件 | 覆盖范围 |
 | --- | --- |
 | `src/composables/useAsyncResource.test.ts` | 成功、API/普通异常安全映射、请求编号、重试、并发去重和卸载保护 |
-| `src/services/http.test.ts` | HTTP envelope、业务错误码、请求 ID、正文隔离、超时/取消、并发隔离、开发/生产 mock 开关 |
+| `src/services/http.test.ts` | HTTP envelope、业务错误码、请求 ID、正文隔离、超时/取消、并发隔离与网络错误传递 |
 | `src/services/auth.test.ts` | 演示模式登录、身份切换、退出、角色白名单、旧会话清理和存储异常 |
 | `src/services/auth-oidc.test.ts` | OIDC 配置、回调校验、后端身份映射、令牌过期、开放重定向防护和退出 |
-| `src/services/platform-api.test.ts` | 强 ETag/If-Match、所有会员采集端点的精确路径与方法、multipart 边界、模板下载、批次提交、412 冲突和 mock 隔离 |
+| `src/services/platform-api.test.ts` | 强 ETag/If-Match、所有会员采集端点的精确路径与方法、multipart 边界、模板下载、批次提交、412 冲突和网络失败传递 |
 | `src/config/navigation.test.ts` | 五类身份的默认工作台、正向授权与反向隔离 |
 | `src/router/permissions.test.ts` | 受保护页面显式角色声明与默认拒绝基础 |
 | `src/views/policy-display.test.ts` | 政策施行日期为空时的安全展示 |
@@ -114,7 +120,7 @@ npm run mutation
 
 质量阈值为：80 分以上绿色、60–79.99 分黄色、低于 60 分红色，低于 50 分时命令失败。变异测试比普通单元测试耗时明显更长，适合在提交合并前或 CI 的独立质量任务中运行；日常开发优先运行 `npm run test`。
 
-当前基线（2026-08-21）：122 项 Vitest 测试全部通过；Stryker 对 618 个核心逻辑变异进行验证，杀死 592 个、存活 23 个、无覆盖 3 个，总变异得分 95.79%。其中 API 路径/ETag/导入合同层为 90.63%，HTTP 客户端为 99.55%，认证模块为 91.49%。报告以本次 `npm run mutation` 输出及本地 `reports/mutation/` 产物为准。
+当前基线（2026-08-26）：125 项 Vitest 测试全部通过。Stryker 变异评分以最新一次 `npm run mutation` 输出及本地 `reports/mutation/` 产物为准。
 
 如只想排查一个测试文件，可执行：
 
@@ -122,7 +128,6 @@ npm run mutation
 npx vitest run src/services/http.test.ts
 ```
 
-安全联调时建议设置 `VITE_MOCK_FALLBACK=false`。只有在纯前端开发演示环境才开启 mock 回退。
 
 ## Docker 构建与运行
 

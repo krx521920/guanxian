@@ -17,7 +17,13 @@ class PolicyServiceTest {
     private static final UUID ASSOCIATION_A = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
     private static final UUID ASSOCIATION_B = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
-    private final PolicyService service = new PolicyService(new InMemoryPolicyStore());
+    private final PolicyService service = new PolicyService(new InMemoryPolicyStore(true));
+
+    @Test
+    void memoryAdapterStartsEmptyWhenDemoSeedIsDisabled() {
+        PolicyService emptyService = new PolicyService(new InMemoryPolicyStore(false));
+        assertThat(emptyService.findAll(null, associationAdmin(ASSOCIATION_A))).isEmpty();
+    }
 
     @Test
     void completesReviewLifecycleAndKeepsHistory() {

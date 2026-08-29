@@ -15,6 +15,8 @@ tmp/
 .tools/
 test-results/
 reports/
+/observability/runtime/
+/secrets/
 /backups/
 zap-reports/
 .schemathesis/

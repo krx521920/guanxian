@@ -1,0 +1,2 @@
+管线智联平台真实 API 附件闭环验证文件。
+用途：验证 multipart 上传、MinIO 对象持久化与 Redis 限流记录。
