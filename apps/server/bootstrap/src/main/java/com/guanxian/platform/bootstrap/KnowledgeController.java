@@ -55,7 +55,7 @@ public class KnowledgeController {
             @Valid @RequestBody KnowledgeFileRequest request,
             Authentication authentication) {
         ActorScope actor = actorScopeResolver.resolve(authentication);
-        UUID associationId = associationId(request.associationId(), actor);
+        UUID associationId = writeAssociationId(request.associationId(), actor);
         try {
             AttachmentService.AttachmentDownload download = attachmentService.download(
                     request.attachmentId(), actor);
@@ -84,7 +84,7 @@ public class KnowledgeController {
             @Valid @RequestBody KnowledgeDocumentRequest request,
             Authentication authentication) {
         ActorScope actor = actorScopeResolver.resolve(authentication);
-        UUID associationId = associationId(request.associationId(), actor);
+        UUID associationId = writeAssociationId(request.associationId(), actor);
         try {
             Object result = ingestionService.ingest(new KnowledgeIngestionService.KnowledgeTextDocument(
                     request.documentId(),
@@ -109,7 +109,7 @@ public class KnowledgeController {
             @Valid @RequestBody KnowledgeQuestionRequest request,
             Authentication authentication) {
         ActorScope actor = actorScopeResolver.resolve(authentication);
-        UUID associationId = associationId(request.associationId(), actor);
+        UUID associationId = readAssociationId(request.associationId(), actor);
         try {
             return ApiResponse.ok(ragService.ask(new PolicyRagService.RagQuestion(
                     associationId,
@@ -123,21 +123,41 @@ public class KnowledgeController {
         }
     }
 
-    private static UUID associationId(UUID requested, ActorScope actor) {
+    private static UUID writeAssociationId(UUID requested, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            UUID selected = requested == null ? actor.associationId() : requested;
-            if (selected == null) {
+            if (actor.associationId() == null) {
                 throw new ForbiddenException(
                         "ASSOCIATION_CONTEXT_REQUIRED",
-                        "system administrator must specify the target association");
+                        "system administrator must select an association before ingesting knowledge");
             }
-            return selected;
+            requireRequestMatchesSystemContext(requested, actor);
+            return actor.associationId();
         }
         if (actor.associationId() == null) {
             throw new ForbiddenException(
                     "ASSOCIATION_CONTEXT_REQUIRED", "an association-bound identity is required");
         }
         return actor.associationId();
+    }
+
+    private static UUID readAssociationId(UUID requested, ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            requireRequestMatchesSystemContext(requested, actor);
+            return actor.associationId();
+        }
+        if (actor.associationId() == null) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_CONTEXT_REQUIRED", "an association-bound identity is required");
+        }
+        return actor.associationId();
+    }
+
+    private static void requireRequestMatchesSystemContext(UUID requested, ActorScope actor) {
+        if (requested != null && !requested.equals(actor.associationId())) {
+            throw new ForbiddenException(
+                    "SYSTEM_CONTEXT_FORBIDDEN",
+                    "request association cannot override the selected system context");
+        }
     }
 
     private static ApiException invalidKnowledgeRequest(IllegalArgumentException exception) {

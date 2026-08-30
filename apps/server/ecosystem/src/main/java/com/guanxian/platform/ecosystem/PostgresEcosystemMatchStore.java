@@ -3,6 +3,7 @@ package com.guanxian.platform.ecosystem;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.RowMapper;
@@ -52,6 +53,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
     @Override
     public List<PersistedMatchView> upsert(
             DemandView demand, List<MatchCandidateDraft> candidates, ActorScope actor) {
+        requireSystemUpsertScope(demand, actor);
         for (MatchCandidateDraft candidate : candidates) {
             MapSqlParameterSource params = new MapSqlParameterSource()
                     .addValue("demandId", demand.id())
@@ -134,7 +136,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                    AND state IN ('PENDING_CONFIRMATION', 'PARTIALLY_CONFIRMED')
                    AND recommended_at IS NULL
                    AND deleted_at IS NULL
-                """, new MapSqlParameterSource()
+                """ + writeScope("ecosystem_match", actor, false)
+                + operationalWriteScope("ecosystem_match"), scopeParams(actor)
                 .addValue("id", id)
                 .addValue("expectedVersion", expectedVersion)
                 .addValue("subject", actor.subject()));
@@ -175,7 +178,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                    AND ((d.enterprise_id=:enterpriseId AND m.demand_confirmed_at IS NULL)
                      OR (m.candidate_enterprise_id=:enterpriseId AND m.candidate_confirmed_at IS NULL))
                    AND m.deleted_at IS NULL
-                """, new MapSqlParameterSource()
+                """ + writeScope("m", actor, true)
+                + operationalWriteScope("m"), scopeParams(actor)
                 .addValue("id", id)
                 .addValue("expectedVersion", expectedVersion)
                 .addValue("enterpriseId", enterpriseId)
@@ -201,27 +205,136 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                        version=version+1,
                        updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NULL
-                """, params);
+                """ + writeScope("ecosystem_match", actor, false)
+                + operationalWriteScope("ecosystem_match"), addScopeParams(params, actor));
         return updated == 0 ? Optional.empty() : find(id, actor);
     }
 
     private String scope(ActorScope actor) {
+        String actorScope;
         if (actor.isSystemAdmin()) {
-            return " WHERE TRUE";
+            if (actor.associationId() == null) {
+                actorScope = actor.enterpriseId() == null ? "TRUE" : "FALSE";
+            } else if (actor.enterpriseId() != null) {
+                actorScope = "de.association_id=:associationId"
+                        + " AND (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
+            } else {
+                actorScope = "de.association_id=:associationId";
+            }
+        } else if (actor.isAssociationStaff()) {
+            actorScope = "de.association_id=:associationId";
+        } else if (actor.enterpriseId() != null) {
+            actorScope = "(d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
+        } else {
+            actorScope = "FALSE";
         }
-        if (actor.isAssociationStaff()) {
-            return " WHERE de.association_id=:associationId";
-        }
-        if (actor.enterpriseId() != null) {
-            return " WHERE (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
-        }
-        return " WHERE FALSE";
+        String lifecycleScope = actor.isSystemAdmin() || actor.isAssociationStaff()
+                ? ""
+                : " AND de.status='ACTIVE' AND de.deleted_at IS NULL"
+                + " AND ce.status='ACTIVE' AND ce.deleted_at IS NULL"
+                + " AND d.deleted_at IS NULL";
+        return " WHERE " + actorScope + lifecycleScope;
     }
 
     private static MapSqlParameterSource scopeParams(ActorScope actor) {
         return new MapSqlParameterSource()
                 .addValue("associationId", actor.associationId())
-                .addValue("enterpriseId", actor.enterpriseId());
+                .addValue("enterpriseId", actor.enterpriseId())
+                .addValue("contextEnterpriseId", actor.enterpriseId());
+    }
+
+    private static MapSqlParameterSource addScopeParams(
+            MapSqlParameterSource params, ActorScope actor) {
+        return params.addValue("associationId", actor.associationId())
+                .addValue("contextEnterpriseId", actor.enterpriseId());
+    }
+
+    private static String writeScope(
+            String matchAlias, ActorScope actor, boolean requireSelectedEnterprise) {
+        String scope;
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null) {
+                return " AND FALSE";
+            }
+            scope = " AND EXISTS (SELECT 1 FROM cooperation_demand scope_demand"
+                    + " JOIN enterprise scope_enterprise"
+                    + " ON scope_enterprise.id=scope_demand.enterprise_id"
+                    + " WHERE scope_demand.id=" + matchAlias + ".demand_id"
+                    + " AND scope_enterprise.association_id=:associationId"
+                    + (actor.enterpriseId() == null ? ""
+                    : " AND (scope_demand.enterprise_id=:contextEnterpriseId"
+                    + " OR " + matchAlias + ".candidate_enterprise_id=:contextEnterpriseId)")
+                    + ")";
+        } else if (actor.isAssociationStaff()) {
+            if (actor.associationId() == null) {
+                return " AND FALSE";
+            }
+            scope = " AND EXISTS (SELECT 1 FROM cooperation_demand scope_demand"
+                    + " JOIN enterprise scope_enterprise"
+                    + " ON scope_enterprise.id=scope_demand.enterprise_id"
+                    + " WHERE scope_demand.id=" + matchAlias + ".demand_id"
+                    + " AND scope_enterprise.association_id=:associationId)";
+        } else if (actor.enterpriseId() != null) {
+            scope = " AND EXISTS (SELECT 1 FROM cooperation_demand scope_demand"
+                    + " WHERE scope_demand.id=" + matchAlias + ".demand_id"
+                    + " AND (scope_demand.enterprise_id=:contextEnterpriseId"
+                    + " OR " + matchAlias + ".candidate_enterprise_id=:contextEnterpriseId))";
+        } else {
+            return " AND FALSE";
+        }
+        if (requireSelectedEnterprise) {
+            return actor.enterpriseId() == null
+                    ? " AND FALSE"
+                    : scope + " AND :enterpriseId=:contextEnterpriseId";
+        }
+        return scope;
+    }
+
+    private static String operationalWriteScope(String matchAlias) {
+        return " AND EXISTS (SELECT 1 FROM cooperation_demand operational_demand"
+                + " JOIN enterprise operational_demand_enterprise"
+                + " ON operational_demand_enterprise.id=operational_demand.enterprise_id"
+                + " JOIN enterprise operational_candidate_enterprise"
+                + " ON operational_candidate_enterprise.id=" + matchAlias + ".candidate_enterprise_id"
+                + " WHERE operational_demand.id=" + matchAlias + ".demand_id"
+                + " AND operational_demand.deleted_at IS NULL"
+                + " AND operational_demand_enterprise.status='ACTIVE'"
+                + " AND operational_demand_enterprise.deleted_at IS NULL"
+                + " AND operational_candidate_enterprise.status='ACTIVE'"
+                + " AND operational_candidate_enterprise.deleted_at IS NULL)";
+    }
+
+    private void requireSystemUpsertScope(DemandView demand, ActorScope actor) {
+        if (!actor.isSystemAdmin()) {
+            return;
+        }
+        EcosystemScopeGuard.requireWriteContext(actor);
+        if (actor.enterpriseId() != null
+                && !actor.enterpriseId().equals(demand.enterpriseId())) {
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "matches must be generated for the selected enterprise's demand");
+        }
+        Boolean allowed = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM cooperation_demand d
+                      JOIN enterprise e ON e.id=d.enterprise_id
+                     WHERE d.id=:demandId
+                       AND d.enterprise_id=:enterpriseId
+                       AND d.deleted_at IS NULL
+                       AND e.association_id=:associationId
+                       AND e.status='ACTIVE'
+                       AND e.deleted_at IS NULL)
+                """, new MapSqlParameterSource()
+                .addValue("demandId", demand.id())
+                .addValue("enterpriseId", demand.enterpriseId())
+                .addValue("associationId", actor.associationId()), Boolean.class);
+        if (!Boolean.TRUE.equals(allowed)) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION",
+                    "demand is outside the selected association context");
+        }
     }
 
     private PersistedMatchView map(ResultSet rs, int rowNum) throws SQLException {

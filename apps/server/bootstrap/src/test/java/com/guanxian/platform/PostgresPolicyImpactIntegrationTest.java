@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.flyway.enabled=true",
         "guanxian.business.repository=postgres",
-        "guanxian.member.repository=memory",
+        "guanxian.member.repository=postgres",
         "guanxian.member.seed-demo-data=false",
         "guanxian.security.mode=demo"
 })
@@ -41,6 +41,10 @@ class PostgresPolicyImpactIntegrationTest {
     private static final UUID POLICY = UUID.fromString("52000000-0000-0000-0000-000000000001");
     private static final UUID DOCUMENT = UUID.fromString("52000000-0000-0000-0000-000000000002");
     private static final UUID DOCUMENT_VERSION = UUID.fromString("52000000-0000-0000-0000-000000000003");
+    private static final UUID OTHER_ASSOCIATION = UUID.fromString("52000000-0000-0000-0000-000000000101");
+    private static final UUID OTHER_ENTERPRISE = UUID.fromString("52000000-0000-0000-0000-000000000102");
+    private static final UUID OTHER_POLICY = UUID.fromString("52000000-0000-0000-0000-000000000103");
+    private static final UUID OTHER_ANALYSIS = UUID.fromString("52000000-0000-0000-0000-000000000104");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -131,6 +135,59 @@ class PostgresPolicyImpactIntegrationTest {
                 SELECT count(*) FROM business_entity_history
                  WHERE resource_type = 'POLICY_IMPACT_ANALYSIS' AND resource_id = ?::uuid
                 """, Integer.class, id));
+
+        jdbc.update("UPDATE enterprise SET status='DISABLED', updated_at=now() WHERE id=?", ENTERPRISE);
+        mockMvc.perform(get("/api/v1/policy-impact-analyses/{id}", id)
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(id));
+        mockMvc.perform(get("/api/v1/policy-impact-analyses/{id}", id)
+                        .with(httpBasic("enterprise-admin", "enterprise123")))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/policy-impact-analyses/page")
+                        .with(httpBasic("enterprise-admin", "enterprise123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0));
+        mockMvc.perform(post("/api/v1/policy-impact-analyses")
+                        .with(httpBasic("association-admin", "admin123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"policyDocumentId":"%s","enterpriseId":"%s"}
+                                """.formatted(POLICY, ENTERPRISE)))
+                .andExpect(status().isPreconditionFailed());
+
+        jdbc.update("UPDATE enterprise SET status='ACTIVE', updated_at=now() WHERE id=?", ENTERPRISE);
+        mockMvc.perform(get("/api/v1/policy-impact-analyses/{id}", id)
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isOk());
+
+        insertCrossAssociationAnalysis();
+        mockMvc.perform(get("/api/v1/policy-impact-analyses/{id}", OTHER_ANALYSIS)
+                        .with(httpBasic("system-admin", "system123")))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/policy-impact-analyses/page")
+                        .with(httpBasic("system-admin", "system123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(id));
+        mockMvc.perform(post("/api/v1/policy-impact-analyses")
+                        .with(httpBasic("system-admin", "system123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"policyDocumentId":"%s","enterpriseId":"%s"}
+                                """.formatted(OTHER_POLICY, OTHER_ENTERPRISE)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("POLICY_IMPACT_SCOPE_VIOLATION"));
+        mockMvc.perform(put("/api/v1/policy-impact-analyses/{id}/reanalyze", OTHER_ANALYSIS)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/policy-impact-analyses/{id}/review", OTHER_ANALYSIS)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true}"))
+                .andExpect(status().isForbidden());
     }
 
     private void insertSourceData() {
@@ -174,5 +231,28 @@ class PostgresPolicyImpactIntegrationTest {
                         '管线数据应当按照标准汇交，并制定风险应急处置方案。',
                         repeat('b', 64), 24)
                 """, UUID.fromString("52000000-0000-0000-0000-000000000005"), DOCUMENT_VERSION);
+    }
+
+    private void insertCrossAssociationAnalysis() {
+        jdbc.update("""
+                INSERT INTO association (id, name, status)
+                VALUES (?, '政策影响隔离测试协会', 'ACTIVE')
+                """, OTHER_ASSOCIATION);
+        jdbc.update("""
+                INSERT INTO enterprise (id, association_id, name, category, status)
+                VALUES (?, ?, '政策影响隔离企业', '测试单位', 'ACTIVE')
+                """, OTHER_ENTERPRISE, OTHER_ASSOCIATION);
+        jdbc.update("""
+                INSERT INTO policy_document (
+                    id, association_id, title, source_url, status, summary, visibility)
+                VALUES (?, ?, '外协会政策', 'https://example.test/foreign-policy-impact',
+                        'PUBLISHED', '外协会隔离验证', 'MEMBERS')
+                """, OTHER_POLICY, OTHER_ASSOCIATION);
+        jdbc.update("""
+                INSERT INTO policy_impact_analysis (
+                    id, policy_document_id, enterprise_id, impact_level, summary,
+                    evidence_chunk_ids, status, version)
+                VALUES (?, ?, ?, 'MEDIUM', '外协会政策影响结果', '[]'::jsonb, 'PENDING_REVIEW', 0)
+                """, OTHER_ANALYSIS, OTHER_POLICY, OTHER_ENTERPRISE);
     }
 }

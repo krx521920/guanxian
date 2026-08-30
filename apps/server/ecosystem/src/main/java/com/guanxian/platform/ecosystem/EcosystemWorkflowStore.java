@@ -7,6 +7,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface EcosystemWorkflowStore {
+    default void registerMatchContext(PersistedMatchView match, UUID associationId) {
+    }
+
     MatchInvitationView createInvitation(
             UUID matchId, UUID associationId, UUID senderEnterpriseId,
             MatchInvitationRequest request, ActorScope actor);
@@ -15,9 +18,9 @@ interface EcosystemWorkflowStore {
 
     Optional<MatchInvitationView> findInvitation(UUID invitationId, ActorScope actor);
 
-    void expirePendingInvitations(UUID matchId);
+    void expirePendingInvitations(UUID matchId, ActorScope actor);
 
-    boolean hasPendingInvitation(UUID matchId);
+    boolean hasPendingInvitation(UUID matchId, ActorScope actor);
 
     Optional<MatchInvitationView> respondInvitation(
             UUID invitationId, long expectedVersion, boolean accepted, String comment, ActorScope actor);

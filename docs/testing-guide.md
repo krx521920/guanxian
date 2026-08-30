@@ -17,14 +17,15 @@
 
 ## 2. 可追溯基线
 
-当前仓库包含 Flyway `V1` 至 `V12` 共 12 个版本化迁移。最近一次可读取的 Java Surefire 报告生成于 2026-08-29，共 45 个测试套件、173 项测试，0 失败、0 错误、0 跳过；其中 `bootstrap` 模块 110 项。该数字描述现有报告，不代表本次文档修改重新执行了 Maven。
+当前仓库包含 Flyway `V1` 至 `V15` 共 15 个版本化迁移。Java 普通全量回归包含 57 个 Surefire 测试套件、225 项测试；其中 10 个 PostgreSQL 16 Testcontainers 测试类共执行 16 项真实数据库测试。
 
 2026-08-30 本地常规验证基线：
 
-- Web：11 个 Vitest 文件、137 项测试通过，`vue-tsc -b` 通过。
+- Web：12 个 Vitest 文件、141 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
+- Java：225 项测试通过，失败、错误和跳过均为 0；Flyway V1–V15 空库迁移及 V12→V15 存量升级通过。
 - AI：默认批准范围收集 46 项测试；`stress` 与 `fuzz` 标记均不进入默认执行。
 - 运维配置：`tests/operations` 28 项、`tests/config` 10 项，CI 分目录执行，共 38 项。
-- 真实依赖检查：PostgreSQL 中 Flyway V1–V12 状态成功，Redis 返回 `PONG`，Keycloak discovery 返回 HTTP 200，MinIO 容器健康。该检查不等于完整浏览器 E2E。
+- 真实依赖检查：PostgreSQL 16 Testcontainers 已验证 Flyway V1–V15 空库迁移和 V12→V15 存量升级；Redis、Keycloak、MinIO 仍需在第五阶段完整浏览器 E2E 中联合复验。
 
 测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V3、89 项、125 项或 47 项基线。
 
@@ -63,6 +64,11 @@ python -m unittest discover -s tests/config -p "test_*.py" -v
 - `PostgresMemberMigrationIntegrationTest`：空库/存量库迁移、会员 ETag、软删除恢复和审计。
 - `PostgresCrossTenantAuthorizationIntegrationTest`：跨协会关系、共享策略、企业授权和匹配状态机。
 - `PostgresKnowledgeIsolationIntegrationTest`：知识入库、引用轨迹、向量持久化和跨协会隔离。
+- `PostgresIdentityPolicyNotificationUpgradeIntegrationTest`：V12→V15 身份、政策归属和通知订阅升级合同。
+- `PostgresSystemContextScopeIntegrationTest` 与 `PostgresEcosystemSystemContextIntegrationTest`：系统管理员全局/协会/企业上下文及写入边界。
+- `PostgresEnterpriseLifecycleIsolationIntegrationTest`：企业停用/删除后的历史只读与写入阻断。
+- `PostgresCollaborationSystemContextIntegrationTest`：协作事项系统上下文与跨租户隔离。
+- `PostgresPolicyLifecycleIntegrationTest` 与 `PostgresPolicyImpactIntegrationTest`：政策生命周期、数据域和影响分析落库。
 
 Docker 不可用时，Testcontainers 未执行不能视为通过；应由标准 Ubuntu CI Runner 完成。
 

@@ -28,16 +28,17 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<SubscriptionView> subscriptions(ActorScope actor) {
-        return store.subscriptions(requireUser(actor));
+        return store.subscriptions(requireUser(actor), readAssociation(actor));
     }
 
     @Transactional
     public SubscriptionView createSubscription(SubscriptionRequest request, ActorScope actor) {
         UUID userId = requireUser(actor);
+        UUID associationId = requireWriteAssociation(actor);
         SubscriptionRequest normalized = normalize(request);
         SubscriptionView created;
         try {
-            created = store.createSubscription(userId, actor.associationId(), normalized);
+            created = store.createSubscription(userId, associationId, normalized);
         } catch (org.springframework.dao.DuplicateKeyException exception) {
             throw new ConflictException("a subscription of this type already exists for the current user");
         }
@@ -49,11 +50,12 @@ public class NotificationService {
     public SubscriptionView updateSubscription(
             UUID id, long expectedVersion, SubscriptionRequest request, ActorScope actor) {
         UUID userId = requireUser(actor);
-        SubscriptionView current = getSubscription(id, userId);
+        UUID associationId = requireWriteAssociation(actor);
+        SubscriptionView current = getSubscription(id, userId, associationId);
         requireVersion(current.version(), expectedVersion);
         SubscriptionView updated;
         try {
-            updated = store.updateSubscription(id, userId, expectedVersion, normalize(request))
+            updated = store.updateSubscription(id, userId, associationId, expectedVersion, normalize(request))
                     .orElseThrow(NotificationService::stale);
         } catch (org.springframework.dao.DuplicateKeyException exception) {
             throw new ConflictException("a subscription of this type already exists for the current user");
@@ -75,9 +77,10 @@ public class NotificationService {
     @Transactional
     public void deleteSubscription(UUID id, long expectedVersion, ActorScope actor) {
         UUID userId = requireUser(actor);
-        SubscriptionView current = getSubscription(id, userId);
+        UUID associationId = requireWriteAssociation(actor);
+        SubscriptionView current = getSubscription(id, userId, associationId);
         requireVersion(current.version(), expectedVersion);
-        if (!store.deleteSubscription(id, userId, expectedVersion)) {
+        if (!store.deleteSubscription(id, userId, associationId, expectedVersion)) {
             throw stale();
         }
         auditSubscription(actor, "DELETE", current);
@@ -86,22 +89,24 @@ public class NotificationService {
     @Transactional(readOnly = true)
     public NotificationMessagePage messages(ActorScope actor, boolean unreadOnly, int page, int size) {
         UUID userId = requireUser(actor);
+        UUID associationId = readAssociation(actor);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         return new NotificationMessagePage(
-                store.messages(userId, unreadOnly, safePage * safeSize, safeSize),
-                store.countMessages(userId, unreadOnly), safePage, safeSize);
+                store.messages(userId, associationId, unreadOnly, safePage * safeSize, safeSize),
+                store.countMessages(userId, associationId, unreadOnly), safePage, safeSize);
     }
 
     @Transactional
     public NotificationMessageView markRead(UUID id, ActorScope actor) {
         UUID userId = requireUser(actor);
-        NotificationMessageView current = store.message(id, userId)
+        UUID associationId = requireWriteAssociation(actor);
+        NotificationMessageView current = store.message(id, userId, associationId)
                 .orElseThrow(() -> new NotFoundException("notification_message", id));
         if (current.readAt() != null) {
             return current;
         }
-        NotificationMessageView updated = store.markRead(id, userId)
+        NotificationMessageView updated = store.markRead(id, userId, associationId)
                 .orElseThrow(() -> new NotFoundException("notification_message", id));
         store.audit(actor, updated.associationId(), "MARK_READ", "NOTIFICATION_MESSAGE", id,
                 Map.of("notificationType", updated.notificationType()));
@@ -130,19 +135,21 @@ public class NotificationService {
     private SubscriptionView changeStatus(
             UUID id, long expectedVersion, String status, String action, ActorScope actor) {
         UUID userId = requireUser(actor);
-        SubscriptionView current = getSubscription(id, userId);
+        UUID associationId = requireWriteAssociation(actor);
+        SubscriptionView current = getSubscription(id, userId, associationId);
         requireVersion(current.version(), expectedVersion);
         if (status.equals(current.status())) {
             throw new PreconditionFailedException("subscription is already " + status.toLowerCase(Locale.ROOT));
         }
-        SubscriptionView updated = store.changeSubscriptionStatus(id, userId, expectedVersion, status)
+        SubscriptionView updated = store.changeSubscriptionStatus(
+                        id, userId, associationId, expectedVersion, status)
                 .orElseThrow(NotificationService::stale);
         auditSubscription(actor, action, updated);
         return updated;
     }
 
-    private SubscriptionView getSubscription(UUID id, UUID userId) {
-        return store.subscription(id, userId)
+    private SubscriptionView getSubscription(UUID id, UUID userId, UUID associationId) {
+        return store.subscription(id, userId, associationId)
                 .orElseThrow(() -> new NotFoundException("notification_subscription", id));
     }
 
@@ -179,13 +186,28 @@ public class NotificationService {
     }
 
     private static UUID publishAssociation(UUID requested, ActorScope actor) {
-        if (!actor.isAssociationReviewer() || actor.associationId() == null) {
+        if ((!actor.isSystemAdmin() && !actor.isAssociationReviewer()) || actor.associationId() == null) {
             throw new ForbiddenException("NOTIFICATION_PUBLISH_SCOPE_REQUIRED",
                     "an association administrator identity is required");
         }
         if (requested != null && !requested.equals(actor.associationId())) {
             throw new ForbiddenException("NOTIFICATION_SCOPE_VIOLATION",
                     "association administrators can only publish within their own association");
+        }
+        return actor.associationId();
+    }
+
+    private static UUID readAssociation(ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            return actor.associationId();
+        }
+        return requireWriteAssociation(actor);
+    }
+
+    private static UUID requireWriteAssociation(ActorScope actor) {
+        if (actor.associationId() == null) {
+            throw new ForbiddenException("NOTIFICATION_ASSOCIATION_CONTEXT_REQUIRED",
+                    "an association context is required for notification writes");
         }
         return actor.associationId();
     }

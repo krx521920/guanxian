@@ -1,9 +1,11 @@
 package com.guanxian.platform.policy;
 
+import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -158,9 +160,16 @@ public class PolicyService {
 
     private static UUID writableAssociation(UUID requested, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return requested;
+            UUID selected = requireAssociationContext(actor);
+            if (requested != null && !requested.equals(selected)) {
+                throw scopeViolation();
+            }
+            return selected;
         }
         if (actor.isAssociationStaff() && actor.associationId() != null) {
+            if (requested != null && !requested.equals(actor.associationId())) {
+                throw scopeViolation();
+            }
             return actor.associationId();
         }
         throw new ForbiddenException("POLICY_WRITE_SCOPE_REQUIRED",
@@ -169,17 +178,18 @@ public class PolicyService {
 
     private static void requireWriter(ActorScope actor, UUID associationId) {
         if (actor.isSystemAdmin()) {
+            requireSelectedAssociation(actor, associationId);
             return;
         }
         if (!actor.isAssociationStaff() || actor.associationId() == null
                 || !actor.associationId().equals(associationId)) {
-            throw new ForbiddenException("POLICY_SCOPE_VIOLATION",
-                    "association staff can only maintain their own policies");
+            throw scopeViolation();
         }
     }
 
     private static void requireReviewer(ActorScope actor, UUID associationId) {
         if (actor.isSystemAdmin()) {
+            requireSelectedAssociation(actor, associationId);
             return;
         }
         if (!actor.isAssociationReviewer() || actor.associationId() == null
@@ -203,5 +213,27 @@ public class PolicyService {
 
     private static PreconditionFailedException stale() {
         return new PreconditionFailedException("resource version is stale; reload and retry with the latest ETag");
+    }
+
+    private static void requireSelectedAssociation(ActorScope actor, UUID associationId) {
+        UUID selected = requireAssociationContext(actor);
+        if (!selected.equals(associationId)) {
+            throw scopeViolation();
+        }
+    }
+
+    private static UUID requireAssociationContext(ActorScope actor) {
+        if (actor.associationId() == null) {
+            throw new ApiException(
+                    "ASSOCIATION_CONTEXT_REQUIRED",
+                    "system administrators must select an association context",
+                    HttpStatus.BAD_REQUEST);
+        }
+        return actor.associationId();
+    }
+
+    private static ForbiddenException scopeViolation() {
+        return new ForbiddenException("POLICY_SCOPE_VIOLATION",
+                "policies can only be maintained in the selected association context");
     }
 }

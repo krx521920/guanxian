@@ -8,7 +8,12 @@ import {
 import { defaultRouteForRole } from '../config/roles'
 import { ROLES, type SessionUser, type UserRole } from '../types/domain'
 import { request } from './http'
-import { setAccessToken, setDemoRole, setSystemContext as setTransportSystemContext } from './token-store'
+import {
+  getSystemContext,
+  setAccessToken,
+  setDemoRole,
+  setSystemContext as setTransportSystemContext,
+} from './token-store'
 
 const ROLE_STORAGE_KEY = 'guanxian.demo.role'
 const LEGACY_STORAGE_KEY = 'guanxian.demo.session'
@@ -120,6 +125,7 @@ function userManager(): UserManager {
   manager = new UserManager(settings)
   manager.events.addAccessTokenExpired(() => {
     setAccessToken(null)
+    setTransportSystemContext(null, null)
     state.user = null
   })
   return manager
@@ -144,18 +150,41 @@ function setDemoUser(user: SessionUser | null) {
 async function loadVerifiedUser(oidcUser: User): Promise<void> {
   if (!oidcUser.access_token || oidcUser.expired) {
     setAccessToken(null)
+    setTransportSystemContext(null, null)
     state.user = null
     return
   }
+  const persistedContext = getSystemContext()
   setAccessToken(oidcUser.access_token)
-  const verified = await request<CurrentUserView>('/users/me')
-  const role = verified.roles.find(isUserRole)
+  // A persisted system-admin context must never influence the initial identity
+  // verification. Restore it only after the backend has confirmed the account
+  // is still a system administrator, then validate the selected scope again.
+  setTransportSystemContext(null, null)
+  const baseIdentity = await request<CurrentUserView>('/users/me')
+  const role = baseIdentity.roles.find(isUserRole)
   if (!role) {
     setAccessToken(null)
+    setTransportSystemContext(null, null)
     state.user = null
     throw new Error('当前账号没有平台角色')
   }
-  if (role !== 'SYSTEM_ADMIN') setTransportSystemContext(null, null)
+  let verified = baseIdentity
+  if (role === 'SYSTEM_ADMIN' && persistedContext.associationId) {
+    setTransportSystemContext(persistedContext.associationId, persistedContext.enterpriseId)
+    try {
+      const scopedIdentity = await request<CurrentUserView>('/users/me')
+      const contextMatches = scopedIdentity.roles.includes('SYSTEM_ADMIN')
+        && scopedIdentity.associationId === persistedContext.associationId
+        && (persistedContext.enterpriseId === null
+          || scopedIdentity.enterpriseId === persistedContext.enterpriseId)
+      if (!contextMatches) throw new Error('管理上下文已失效')
+      verified = scopedIdentity
+    } catch {
+      // Losing an old delegated scope must not invalidate the administrator's
+      // base login. Fall back to the unscoped platform identity.
+      setTransportSystemContext(null, null)
+    }
+  }
   state.user = {
     id: verified.subject,
     name: verified.displayName || verified.username,
@@ -185,6 +214,7 @@ async function initializeOidc(): Promise<void> {
       if (user) await loadVerifiedUser(user)
     } catch {
       setAccessToken(null)
+      setTransportSystemContext(null, null)
       state.user = null
       state.error = '身份验证失败，请重新登录；如持续失败请联系系统管理员检查 OIDC 配置。'
     } finally {

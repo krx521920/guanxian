@@ -225,7 +225,9 @@ class PostgresPolicyStore implements PolicyStore {
         if (!includeDeleted) {
             sql.append(" AND p.deleted_at IS NULL");
         }
-        if (!actor.isSystemAdmin()) {
+        if (actor.isSystemAdmin() && actor.associationId() != null) {
+            sql.append(" AND p.association_id = :associationId");
+        } else if (!actor.isSystemAdmin()) {
             sql.append("""
                      AND (
                        (p.association_id = :associationId AND (:associationStaff OR

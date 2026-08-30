@@ -5,6 +5,7 @@ import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
 import { roleLabels } from '../config/roles'
 import { useAuth } from '../services/auth'
+import { createLatestRequestGate } from '../services/latest-request'
 import { platformApi } from '../services/platform-api'
 import type { NotificationMessage, NotificationMessagePage, SystemAssociationOption, SystemEnterpriseOption, UserRole } from '../types/domain'
 
@@ -22,65 +23,114 @@ const systemAssociations = ref<SystemAssociationOption[]>([])
 const systemEnterprises = ref<SystemEnterpriseOption[]>([])
 const systemContextError = ref('')
 const contextRevision = ref(0)
+let notificationRequestRevision = 0
+const systemContextRequestGate = createLatestRequestGate()
 
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
 const unreadCount = computed(() => notificationPage.value?.items.filter((item) => !item.readAt).length ?? 0)
 const isSystemAdmin = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN')
+const crumbOrganization = computed(() => auth.user.value?.organization || '管线智联平台')
+
+function refreshContextDependentState() {
+  notificationRequestRevision += 1
+  notificationOpen.value = false
+  notificationLoading.value = false
+  notificationError.value = ''
+  notificationPage.value = null
+  contextRevision.value += 1
+  void loadNotifications()
+}
 
 async function loadSystemContextOptions() {
   if (!isSystemAdmin.value) return
+  const requestEpoch = systemContextRequestGate.begin()
   systemContextError.value = ''
   try {
-    systemAssociations.value = await platformApi.systemAssociations()
+    const associations = await platformApi.systemAssociations()
+    if (!systemContextRequestGate.isCurrent(requestEpoch)) return
+    systemAssociations.value = associations
     const associationId = auth.user.value?.associationId
-    systemEnterprises.value = associationId
-      ? await platformApi.systemEnterprises(associationId)
-      : []
-    if (associationId) {
-      const associationName = systemAssociations.value.find((item) => item.id === associationId)?.name
-      if (associationName) auth.setSystemContext(
-        associationId, associationName, auth.user.value?.enterpriseId || null,
-      )
+    if (!associationId) {
+      systemEnterprises.value = []
+      return
+    }
+    const association = systemAssociations.value.find((item) => item.id === associationId)
+    if (!association) {
+      auth.setSystemContext(null, '全平台', null)
+      systemEnterprises.value = []
+      systemContextError.value = '此前选择的管理协会已失效，请重新选择'
+      refreshContextDependentState()
+      return
+    }
+    const enterprises = await platformApi.systemEnterprises(associationId)
+    if (!systemContextRequestGate.isCurrent(requestEpoch)) return
+    systemEnterprises.value = enterprises
+    const enterpriseId = auth.user.value?.enterpriseId || null
+    const validEnterpriseId = enterpriseId
+      && systemEnterprises.value.some((item) => item.id === enterpriseId)
+      ? enterpriseId
+      : null
+    auth.setSystemContext(associationId, association.name, validEnterpriseId)
+    if (enterpriseId && !validEnterpriseId) {
+      systemContextError.value = '此前选择的代管企业已失效，请重新选择'
+      refreshContextDependentState()
     }
   } catch {
-    systemContextError.value = '管理上下文加载失败'
+    if (systemContextRequestGate.isCurrent(requestEpoch)) {
+      systemContextError.value = '管理上下文加载失败'
+    }
   }
 }
 
 async function changeSystemAssociation(event: Event) {
+  const requestEpoch = systemContextRequestGate.begin()
   const associationId = (event.target as HTMLSelectElement).value || null
   const associationName = systemAssociations.value.find((item) => item.id === associationId)?.name || '全平台'
-  auth.setSystemContext(associationId, associationName, null)
   systemContextError.value = ''
   try {
-    systemEnterprises.value = associationId
+    const enterprises = associationId
       ? await platformApi.systemEnterprises(associationId)
       : []
-    contextRevision.value += 1
+    if (!systemContextRequestGate.isCurrent(requestEpoch)) return
+    auth.setSystemContext(associationId, associationName, null)
+    systemEnterprises.value = enterprises
+    refreshContextDependentState()
   } catch {
-    systemContextError.value = '代管企业范围加载失败'
+    if (systemContextRequestGate.isCurrent(requestEpoch)) {
+      systemContextError.value = '代管企业范围加载失败'
+    }
   }
 }
 
 function changeSystemEnterprise(event: Event) {
+  systemContextRequestGate.invalidate()
   const enterpriseId = (event.target as HTMLSelectElement).value || null
   const associationId = auth.user.value?.associationId || null
+  if (enterpriseId && !systemEnterprises.value.some((item) => item.id === enterpriseId)) {
+    systemContextError.value = '所选企业不在当前协会的可管理范围内'
+    return
+  }
   const associationName = systemAssociations.value.find((item) => item.id === associationId)?.name || '全平台'
   auth.setSystemContext(associationId, associationName, enterpriseId)
-  contextRevision.value += 1
+  systemContextError.value = ''
+  refreshContextDependentState()
 }
 
 async function loadNotifications() {
   if (notificationLoading.value) return
+  const requestRevision = notificationRequestRevision
   notificationLoading.value = true
   notificationError.value = ''
   try {
-    notificationPage.value = await platformApi.notifications(false, 0, 20)
+    const page = await platformApi.notifications(false, 0, 20)
+    if (requestRevision === notificationRequestRevision) notificationPage.value = page
   } catch {
-    notificationError.value = '通知暂时无法加载，请稍后重试。'
+    if (requestRevision === notificationRequestRevision) {
+      notificationError.value = '通知暂时无法加载，请稍后重试。'
+    }
   } finally {
-    notificationLoading.value = false
+    if (requestRevision === notificationRequestRevision) notificationLoading.value = false
   }
 }
 
@@ -176,6 +226,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  systemContextRequestGate.invalidate()
   window.removeEventListener('pointerdown', closeOverlays)
   window.removeEventListener('keydown', closeOnEscape)
 })
@@ -222,7 +273,7 @@ onBeforeUnmount(() => {
     <main class="main-area">
       <header class="topbar">
         <button class="icon-button menu-button" aria-label="打开导航" @click="mobileOpen = true">☰</button>
-        <div class="crumb"><span>北京地下管线协会</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
+        <div class="crumb"><span>{{ crumbOrganization }}</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
         <div class="top-actions">
           <div ref="notificationWrap" class="notification-wrap">
             <button

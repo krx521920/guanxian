@@ -1,6 +1,9 @@
 package com.guanxian.platform.ecosystem;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -17,10 +20,30 @@ import java.util.concurrent.ConcurrentMap;
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "memory")
 class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     private final ConcurrentMap<UUID, PersistedMatchView> matches = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> matchAssociations = new ConcurrentHashMap<>();
+    private final EnterpriseLifecycle enterpriseLifecycle;
+    private final EcosystemCatalogStore catalogStore;
+
+    @Autowired
+    InMemoryEcosystemMatchStore(
+            EnterpriseLifecycle enterpriseLifecycle,
+            EcosystemCatalogStore catalogStore) {
+        this.enterpriseLifecycle = enterpriseLifecycle;
+        this.catalogStore = catalogStore;
+    }
+
+    InMemoryEcosystemMatchStore(EnterpriseLifecycle enterpriseLifecycle) {
+        this(enterpriseLifecycle, null);
+    }
+
+    InMemoryEcosystemMatchStore() {
+        this(enterpriseId -> true, null);
+    }
 
     @Override
     public synchronized List<PersistedMatchView> upsert(
             DemandView demand, List<MatchCandidateDraft> candidates, ActorScope actor) {
+        requireSystemUpsertScope(demand, actor);
         for (MatchCandidateDraft candidate : candidates) {
             UUID id = UUID.nameUUIDFromBytes(
                     (demand.id() + ":" + candidate.candidateEnterpriseId()).getBytes(StandardCharsets.UTF_8));
@@ -51,6 +74,9 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                     existing == null ? 0 : existing.version() + 1,
                     Instant.now());
             matches.put(id, value);
+            if (actor.associationId() != null) {
+                matchAssociations.putIfAbsent(id, actor.associationId());
+            }
         }
         return list(demand.id(), actor);
     }
@@ -87,7 +113,7 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
             UUID id, long expectedVersion, ActorScope actor) {
         PersistedMatchView old = matches.get(id);
         if (old == null || old.version() != expectedVersion || old.recommendedAt() != null
-                || !canRead(old, actor)) {
+                || !canWrite(old, actor)) {
             return Optional.empty();
         }
         String state = MatchLifecycle.PENDING_CONFIRMATION.equals(old.state())
@@ -102,7 +128,10 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     public synchronized Optional<PersistedMatchView> confirm(
             UUID id, long expectedVersion, UUID enterpriseId, ActorScope actor) {
         PersistedMatchView old = matches.get(id);
-        if (old == null || old.version() != expectedVersion || !canRead(old, actor)) {
+        if (old == null || old.version() != expectedVersion || !canWrite(old, actor)) {
+            return Optional.empty();
+        }
+        if (actor.enterpriseId() == null || !actor.enterpriseId().equals(enterpriseId)) {
             return Optional.empty();
         }
         boolean demand = enterpriseId.equals(old.demandEnterpriseId());
@@ -127,7 +156,7 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     public synchronized Optional<PersistedMatchView> transition(
             UUID id, long expectedVersion, String targetState, String closeReason, ActorScope actor) {
         PersistedMatchView old = matches.get(id);
-        if (old == null || old.version() != expectedVersion || !canRead(old, actor)) {
+        if (old == null || old.version() != expectedVersion || !canWrite(old, actor)) {
             return Optional.empty();
         }
         PersistedMatchView updated = new PersistedMatchView(
@@ -155,9 +184,52 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                 old.version() + 1, Instant.now());
     }
 
-    private static boolean canRead(PersistedMatchView value, ActorScope actor) {
-        return actor.isSystemAdmin() || actor.isAssociationStaff()
-                || value.demandEnterpriseId().equals(actor.enterpriseId())
-                || value.candidateEnterpriseId().equals(actor.enterpriseId());
+    private boolean canRead(PersistedMatchView value, ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null) {
+                return actor.enterpriseId() == null;
+            }
+            return actor.associationId().equals(matchAssociations.get(value.id()))
+                    && (actor.enterpriseId() == null
+                    || value.demandEnterpriseId().equals(actor.enterpriseId())
+                    || value.candidateEnterpriseId().equals(actor.enterpriseId()));
+        }
+        if (actor.isAssociationStaff()) {
+            return actor.associationId() != null
+                    && actor.associationId().equals(matchAssociations.get(value.id()));
+        }
+        return isOperational(value)
+                && (value.demandEnterpriseId().equals(actor.enterpriseId())
+                || value.candidateEnterpriseId().equals(actor.enterpriseId()));
+    }
+
+    private boolean canWrite(PersistedMatchView value, ActorScope actor) {
+        return isOperational(value)
+                && (!actor.isSystemAdmin() || actor.associationId() != null)
+                && canRead(value, actor);
+    }
+
+    private boolean isOperational(PersistedMatchView value) {
+        return enterpriseLifecycle.isOperational(value.demandEnterpriseId())
+                && enterpriseLifecycle.isOperational(value.candidateEnterpriseId());
+    }
+
+    private void requireSystemUpsertScope(DemandView demand, ActorScope actor) {
+        if (!actor.isSystemAdmin()) {
+            return;
+        }
+        EcosystemScopeGuard.requireWriteContext(actor);
+        if (actor.enterpriseId() != null
+                && !actor.enterpriseId().equals(demand.enterpriseId())) {
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "matches must be generated for the selected enterprise's demand");
+        }
+        if (catalogStore == null || !catalogStore.enterpriseBelongsToAssociation(
+                demand.enterpriseId(), actor.associationId())) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION",
+                    "demand is outside the selected association context");
+        }
     }
 }

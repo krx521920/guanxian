@@ -59,7 +59,12 @@ public class CurrentUserController {
         try {
             if (actor.enterpriseId() != null) {
                 List<String> names = jdbc.queryForList(
-                        "SELECT name FROM enterprise WHERE id=:id AND status <> 'DELETED'",
+                        """
+                        SELECT name FROM enterprise
+                         WHERE id=:id
+                           AND status NOT IN ('DISABLED', 'DELETED')
+                           AND deleted_at IS NULL
+                        """,
                         new MapSqlParameterSource("id", actor.enterpriseId()), String.class);
                 if (!names.isEmpty()) {
                     return names.getFirst();

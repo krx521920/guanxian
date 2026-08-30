@@ -1,6 +1,7 @@
 package com.guanxian.platform.ecosystem;
 
 import com.guanxian.platform.ai.AiTextService;
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import com.guanxian.platform.member.api.MemberDirectory;
 import com.guanxian.platform.member.api.MemberProfile;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,8 +27,11 @@ class EcosystemMatchServiceTest {
 
     @Test
     void generatedMatchesArePersistedVersionedAndClosedByParticipants() {
-        InMemoryEcosystemCatalogStore catalogStore = new InMemoryEcosystemCatalogStore();
-        EcosystemCatalogService catalogService = new EcosystemCatalogService(catalogStore);
+        Set<UUID> operational = ConcurrentHashMap.newKeySet();
+        operational.addAll(Set.of(DEMAND_ENTERPRISE, SUPPLIER_ENTERPRISE, PROFILE_ONLY_ENTERPRISE));
+        EnterpriseLifecycle lifecycle = operational::contains;
+        InMemoryEcosystemCatalogStore catalogStore = new InMemoryEcosystemCatalogStore(lifecycle);
+        EcosystemCatalogService catalogService = new EcosystemCatalogService(catalogStore, lifecycle);
         ActorScope demandOwner = enterprise(DEMAND_ENTERPRISE);
         ActorScope supplier = enterprise(SUPPLIER_ENTERPRISE);
         ActorScope reviewer = reviewer();
@@ -52,8 +57,9 @@ class EcosystemMatchServiceTest {
                 member(SUPPLIER_ENTERPRISE, "供应企业", List.of("阀门"), List.of("零泄漏球阀")),
                 member(PROFILE_ONLY_ENTERPRISE, "仅有会员档案的企业", List.of("阀门"), List.of("零泄漏球阀"))));
         AiTextService tags = text -> List.of("阀门");
+        InMemoryEcosystemMatchStore matchStore = new InMemoryEcosystemMatchStore(lifecycle);
         EcosystemMatchService service = new EcosystemMatchService(
-                directory, tags, catalogService, new InMemoryEcosystemMatchStore(), catalogStore);
+                directory, tags, catalogService, matchStore, catalogStore, lifecycle);
 
         assertEquals(List.of(), service.persisted(demandOwner));
 
@@ -62,6 +68,17 @@ class EcosystemMatchServiceTest {
         assertEquals(SUPPLIER_ENTERPRISE, generated.getFirst().candidateEnterpriseId());
         assertTrue(generated.getFirst().solution().contains("零泄漏高压球阀"));
         assertEquals("PENDING_CONFIRMATION", generated.getFirst().state());
+        assertEquals(generated, service.persisted(demandOwner));
+
+        operational.remove(SUPPLIER_ENTERPRISE);
+        assertEquals(List.of(), service.persisted(demandOwner));
+        assertEquals(generated, service.persisted(reviewer));
+        assertEquals(generated, service.persisted(opened.id(), reviewer));
+        assertThrows(PreconditionFailedException.class, () -> service.recommend(
+                generated.getFirst().id(), generated.getFirst().version(), reviewer));
+        assertTrue(matchStore.recommend(
+                generated.getFirst().id(), generated.getFirst().version(), reviewer).isEmpty());
+        operational.add(SUPPLIER_ENTERPRISE);
         assertEquals(generated, service.persisted(demandOwner));
 
         PersistedMatchView supplierConfirmed = service.confirm(

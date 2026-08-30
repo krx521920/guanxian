@@ -1,6 +1,6 @@
 # 管线智联后端
 
-北京地下管线协会 AI 管理协作平台的 Java 21 / Spring Boot 3 模块化单体后端。会员档案默认持久化到 PostgreSQL，数据库结构由 Flyway 管理；生产认证默认使用 OIDC/JWT。
+北京地下管线协会管理协作平台的 Java 21 / Spring Boot 3 模块化单体后端。会员档案默认持久化到 PostgreSQL，数据库结构由 Flyway 管理；生产认证默认使用 OIDC/JWT。
 
 ## 模块划分
 
@@ -10,10 +10,10 @@
 | `shared-kernel` | 统一响应、业务异常、参数校验错误结构、请求追踪过滤器 |
 | `iam` | OIDC/JWT 资源服务器、账号绑定、协会/企业数据域、RBAC 与安全错误响应 |
 | `member` | 会员档案、Excel 采集、审核、审计、可见范围及生态查询接口 |
-| `policy` | 政策标准列表与检索 |
-| `ecosystem` | 生态匹配列表、匹配请求、可解释规则评分 |
-| `collaboration` | 协作事项列表，后续承接受理、跟进、反馈闭环 |
-| `ai-adapter` | AI 能力端口与本地规则实现，后续可替换为独立 Python AI 服务 |
+| `policy` | 政策标准持久化、审核发布、协会数据域、影响分析入口与订阅关联 |
+| `ecosystem` | 产品/服务与需求目录、持久化匹配、双方确认、邀请、洽谈、反馈和成果归档 |
+| `collaboration` | 协作事项受理、指派、状态流转、关闭、恢复、历史与审计 |
+| `ai-adapter` | 文档解析、分段、Embedding 适配、引用检索、模型供应商门禁与降级 |
 
 依赖方向保持为 `bootstrap -> 业务模块 -> shared-kernel`；`ecosystem` 只通过 `member.api.MemberDirectory` 读取企业资料，通过 `AiTextService` 使用 AI 能力，避免直接访问其他模块的内部存储。
 
@@ -27,16 +27,17 @@ mvn clean verify
 mvn -pl bootstrap -am spring-boot:run
 ```
 
-应用启动时由 Flyway 按顺序执行 V1–V12，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除及知识向量持久化。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移；迁移使用幂等 DDL，并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+应用启动时由 Flyway 按顺序执行 V1–V15，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除、知识向量持久化、身份生命周期约束、政策协会归属约束及分协会通知订阅唯一键。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移；迁移使用幂等 DDL，并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
 
 生产默认 `GUANXIAN_SECURITY_MODE=jwt`。必须配置：
 
 - `GUANXIAN_JWT_ISSUER_URI`：令牌 `iss` 的精确值。
 - `GUANXIAN_JWT_JWK_SET_URI`：身份提供方公开密钥地址。
 - `GUANXIAN_JWT_PRINCIPAL_CLAIM`：默认 `preferred_username`。
+- `GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS`：可选、逗号分隔的精确 IdP `sub` 白名单；默认空并拒绝所有未绑定系统管理员，仅用于首次建号。
 - JWT 的 `roles`、`realm_access.roles` 或 `permissions` 声明；后端只接受平台白名单角色和权限。
 
-开发或自动化测试必须显式设置 `GUANXIAN_SECURITY_MODE=demo` 和 `GUANXIAN_MEMBER_REPOSITORY=memory`。演示模式在 `prod` / `production` Profile 下会拒绝启动；默认配置和 Compose 均使用 PostgreSQL + JWT。
+纯单元测试可显式使用 `GUANXIAN_SECURITY_MODE=demo` 和 `GUANXIAN_MEMBER_REPOSITORY=memory`；PostgreSQL 集成测试使用 demo 身份配合真实 PostgreSQL Testcontainers。演示模式在 `prod` / `production` Profile 下会拒绝启动；默认配置和 Compose 均使用 PostgreSQL + JWT。
 
 默认监听 `http://localhost:8080`，公开健康检查：
 
@@ -58,7 +59,9 @@ curl http://localhost:8080/api/v1/health
 | POST | `/api/v1/members/imports/preview` | `MEMBER_IMPORT`，XLSX 预检 |
 | GET/POST | `/api/v1/members/imports/{batchId}` / `.../commit` | 查看预检 / 提交合法行 |
 | GET | `/api/v1/audit-logs` | `AUDIT_READ`，按协会数据域过滤 |
-| GET/POST | `/api/v1/access-bindings` | JWT 模式系统管理员绑定 OIDC 身份 |
+| GET/POST | `/api/v1/access-bindings` | JWT 模式系统管理员查询/绑定 OIDC 身份；修改既有账号必须携带 `If-Match` |
+| PUT | `/api/v1/access-bindings/{id}/disable` / `.../restore` | 显式停用/恢复账号绑定，必须携带 `If-Match` |
+| DELETE | `/api/v1/access-bindings/{id}` | 解绑 OIDC `sub` 并冻结账号，必须携带 `If-Match` |
 | 同上 | `/api/v1/enterprises/**` | 企业 CRUD 兼容别名 |
 | GET | `/api/v1/policies` | `POLICY_READ` |
 | GET/POST | `/api/v1/matches` | `MATCH_REQUEST` |
@@ -95,7 +98,7 @@ curl -u enterprise-admin:enterprise123 \
 
 生产 Profile 会将控制台日志输出为 Logstash JSON，每行带应用名和 MDC 中的 `requestId`；请由部署环境的日志代理转送到集中日志系统。Micrometer Prometheus 指标已启用 HTTP 请求直方图，`/actuator/prometheus` 必须使用拥有 `OBSERVABILITY_READ` 的短期 OIDC 服务令牌读取，不能把它暴露给公网或匿名抓取器。
 
-会员企业状态只接受 `ACTIVE`、`PENDING_REVIEW`、`INCOMPLETE`、`DISABLED`（忽略大小写及首尾空白）。协会管理员或系统管理员手工新增时空值按 `ACTIVE` 处理；协会运营人员新增、企业自助修改和 Excel 导入统一进入 `PENDING_REVIEW`，由协会管理员审核。统一社会信用代码入库前会去除首尾空白并转为大写，唯一性判断使用规范化后的值。
+会员企业状态只接受 `ACTIVE`、`PENDING_REVIEW`、`INCOMPLETE`、`DISABLED`（忽略大小写及首尾空白）。协会管理员或已选定协会上下文的系统管理员手工新增时空值按 `ACTIVE` 处理；请求体中的归属不能覆盖系统管理员当前上下文。协会运营人员新增、企业自助修改和 Excel 导入统一进入 `PENDING_REVIEW`，由协会管理员审核。统一社会信用代码入库前会去除首尾空白并转为大写，唯一性判断使用规范化后的值。
 
 会员应用服务通过模块内部 `MemberRepository` 端口访问数据。默认 `PostgresMemberRepository` 使用 JDBC 映射 JSONB 列，并由数据库唯一索引和版本条件语句保证跨实例一致性；`InMemoryMemberRepository` 只在测试配置中创建。
 
@@ -104,7 +107,11 @@ curl -u enterprise-admin:enterprise123 \
 `capabilities`、`products` 和 `cooperationNeeds` 每个列表最多 50 项，元素仍执行各自长度限制，避免单个企业档案形成无界集合。
 ### 身份绑定、数据范围与审计
 
-JWT 模式以令牌 `sub` 精确绑定 `user_account.external_subject`。协会身份必须绑定 `association_id`，企业身份还必须绑定 `enterprise_id`；缺失时分别返回 `IDENTITY_NOT_BOUND` 或 `IDENTITY_SCOPE_INCOMPLETE`。系统管理员保留不绑定企业的引导身份，用于首次建立账号绑定；该身份应只由受控的 IdP 管理员角色签发。
+JWT 模式以令牌 `sub` 精确绑定 `user_account.external_subject`。账号必须处于 `ACTIVE`，所属协会也必须处于 `ACTIVE`；企业账号在企业为 `DISABLED`、`DELETED` 或已有删除时间时立即失去数据范围。`DRAFT`、`INCOMPLETE`、`PENDING_REVIEW` 企业仍可登录补充并提交资料。协会身份必须绑定 `association_id`，企业身份还必须绑定 `enterprise_id`；缺失时分别返回 `IDENTITY_NOT_BOUND` 或 `IDENTITY_SCOPE_INCOMPLETE`，组织被冻结时返回 `IDENTITY_SCOPE_INACTIVE`。系统管理员也必须绑定一个 `ACTIVE` 账号；唯一例外是 `GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS` 中精确列出的未绑定 `sub`，用于首次建立账号绑定。空配置或非名单主体一律返回 `IDENTITY_NOT_BOUND`，已停用或已撤销主体即使仍在白名单也不能进入。
+
+账号状态与企业状态相互独立：恢复企业不会自动恢复曾被人工停用的账号。账号停用、恢复和解绑均使用强 ETag 乐观锁并写入审计；解绑会清除 `external_subject` 并将账号置为 `INACTIVE`，因此旧令牌中的 `sub` 无法继续解析。重新绑定一个已停用/已解绑账号不会隐式激活，必须由系统管理员再次显式恢复。
+
+系统管理员通过 `X-Guanxian-Association-Id` 和可选的 `X-Guanxian-Enterprise-Id` 进入代管上下文。未选择协会时只允许全平台读取，所有业务写入均拒绝；选择协会后读写范围收窄到该协会；继续选择企业后，企业级资源与匹配参与数据进一步收窄到该企业。路径、查询参数和请求体中的协会或企业标识只能与请求头上下文一致，不能临时扩权。
 
 企业管理员只能修改其绑定企业；协会工作人员只能操作本协会数据，且只有协会管理员可以审核或删除。可见范围为 `PRIVATE`、`ASSOCIATION`、`PARTNERS`、`MEMBERS`、`PUBLIC`：友好协会访问由 `association_relationship` 的启用关系控制。创建、修改、审核、删除、导入预检/提交和账号绑定均写审计日志，并携带操作主体、协会、企业和 `X-Request-Id`。
 
@@ -141,7 +148,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-当前可读取基线（2026-08-29）：Maven reactor 共生成 45 份 Surefire 报告，173 项测试全部通过，失败、错误和跳过均为 0；其中 `bootstrap` 模块 110 项。真实 PostgreSQL/Testcontainers 共 5 类、10 项，均未跳过。PIT 分数只能引用与当前提交对应的 `bootstrap/target/pit-reports/` 产物，历史分数不得冒充当前结果。
+2026-08-30 普通全量回归基线为 57 个 Surefire 测试套件、225 项测试，失败/错误/跳过均为 0；其中 10 个 PostgreSQL 16 Testcontainers 测试类共执行 16 项真实数据库测试，Flyway V1–V15 空库迁移及 V12→V15 存量升级均通过。PIT 分数只能引用与当前提交对应的 `bootstrap/target/pit-reports/` 产物，历史分数不得冒充当前结果。
 
 ## Docker
 
@@ -151,10 +158,10 @@ docker build -t guanxian-server:dev .
 docker run --rm -p 8080:8080 guanxian-server:dev
 ```
 
-## 下一阶段
+## Phase 2 上线闸门
 
-1. 将系统管理员的账号绑定接口接入管理页面，并补充绑定停用、离职回收与双人复核。
-2. 在实际 PostgreSQL/Docker 环境复验 V1–V12 迁移、备份恢复和批量导入功能合同。
-3. 为会员资料增加附件对象存储、病毒扫描、数据质量评分和导入批次撤销策略。
-4. 将 `ai-adapter` 的规则实现替换为 AI 服务 HTTP 客户端，加入超时、重试、熔断与人工确认。
-5. 将协作事项升级为需求受理、推荐确认、沟通跟进、结果反馈的状态机。
+1. 将系统管理员账号绑定、停用、恢复、解绑和代管上下文接入管理页面，并落实高权限操作双人复核。
+2. 使用正式 IdP 完成真实浏览器 OIDC/PKCE 登录与各身份权限验收，关闭全部演示身份。
+3. 在生产数据隔离副本完成 V12→V15 升级、备份恢复和回滚兼容演练。
+4. 为会员附件补齐病毒扫描、数据质量评分和导入批次撤销策略。
+5. 配置合规的真实模型与 Embedding 供应商，使用协会真实语料完成出处、效果、费用和数据出境验收；通过前继续使用“管理协作平台”名称。

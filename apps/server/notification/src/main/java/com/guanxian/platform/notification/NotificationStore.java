@@ -8,18 +8,19 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface NotificationStore {
-    List<SubscriptionView> subscriptions(UUID userId);
-    Optional<SubscriptionView> subscription(UUID id, UUID userId);
+    List<SubscriptionView> subscriptions(UUID userId, UUID associationId);
+    Optional<SubscriptionView> subscription(UUID id, UUID userId, UUID associationId);
     SubscriptionView createSubscription(UUID userId, UUID associationId, SubscriptionRequest request);
     Optional<SubscriptionView> updateSubscription(
-            UUID id, UUID userId, long expectedVersion, SubscriptionRequest request);
+            UUID id, UUID userId, UUID associationId, long expectedVersion, SubscriptionRequest request);
     Optional<SubscriptionView> changeSubscriptionStatus(
-            UUID id, UUID userId, long expectedVersion, String status);
-    boolean deleteSubscription(UUID id, UUID userId, long expectedVersion);
-    List<NotificationMessageView> messages(UUID userId, boolean unreadOnly, int offset, int limit);
-    long countMessages(UUID userId, boolean unreadOnly);
-    Optional<NotificationMessageView> message(UUID id, UUID userId);
-    Optional<NotificationMessageView> markRead(UUID id, UUID userId);
+            UUID id, UUID userId, UUID associationId, long expectedVersion, String status);
+    boolean deleteSubscription(UUID id, UUID userId, UUID associationId, long expectedVersion);
+    List<NotificationMessageView> messages(
+            UUID userId, UUID associationId, boolean unreadOnly, int offset, int limit);
+    long countMessages(UUID userId, UUID associationId, boolean unreadOnly);
+    Optional<NotificationMessageView> message(UUID id, UUID userId, UUID associationId);
+    Optional<NotificationMessageView> markRead(UUID id, UUID userId, UUID associationId);
     boolean policyBelongsToAssociation(UUID policyId, UUID associationId);
     PolicyNotificationResult publishPolicy(
             UUID associationId, PolicyNotificationRequest request, ActorScope actor);

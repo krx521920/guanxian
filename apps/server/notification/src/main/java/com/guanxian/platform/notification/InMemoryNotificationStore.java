@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -21,24 +22,28 @@ import java.util.UUID;
 class InMemoryNotificationStore implements NotificationStore {
     private final Map<UUID, SubscriptionView> subscriptions = new LinkedHashMap<>();
     private final Map<UUID, NotificationMessageView> messages = new LinkedHashMap<>();
+    private final Map<UUID, PolicyState> policies = new LinkedHashMap<>();
     private final Set<String> outboxKeys = new HashSet<>();
     private final List<Map<String, Object>> audits = new ArrayList<>();
 
     @Override
-    public synchronized List<SubscriptionView> subscriptions(UUID userId) {
+    public synchronized List<SubscriptionView> subscriptions(UUID userId, UUID associationId) {
         return subscriptions.values().stream().filter(value -> userId.equals(value.userId()))
+                .filter(value -> associationId == null || associationId.equals(value.associationId()))
                 .sorted(Comparator.comparing(SubscriptionView::updatedAt).reversed()).toList();
     }
 
     @Override
-    public synchronized Optional<SubscriptionView> subscription(UUID id, UUID userId) {
-        return Optional.ofNullable(subscriptions.get(id)).filter(value -> userId.equals(value.userId()));
+    public synchronized Optional<SubscriptionView> subscription(UUID id, UUID userId, UUID associationId) {
+        return Optional.ofNullable(subscriptions.get(id)).filter(value -> userId.equals(value.userId()))
+                .filter(value -> associationId == null || associationId.equals(value.associationId()));
     }
 
     @Override
     public synchronized SubscriptionView createSubscription(
             UUID userId, UUID associationId, SubscriptionRequest request) {
         if (subscriptions.values().stream().anyMatch(value -> userId.equals(value.userId())
+                && java.util.Objects.equals(associationId, value.associationId())
                 && request.subscriptionType().equals(value.subscriptionType()))) {
             throw new org.springframework.dao.DuplicateKeyException("duplicate subscription type");
         }
@@ -51,14 +56,16 @@ class InMemoryNotificationStore implements NotificationStore {
 
     @Override
     public synchronized Optional<SubscriptionView> updateSubscription(
-            UUID id, UUID userId, long expectedVersion, SubscriptionRequest request) {
-        Optional<SubscriptionView> found = subscription(id, userId)
+            UUID id, UUID userId, UUID associationId, long expectedVersion, SubscriptionRequest request) {
+        Optional<SubscriptionView> found = subscription(id, userId, associationId)
                 .filter(value -> value.version() == expectedVersion);
         if (found.isEmpty()) {
             return Optional.empty();
         }
         if (subscriptions.values().stream().anyMatch(value -> !id.equals(value.id())
-                && userId.equals(value.userId()) && request.subscriptionType().equals(value.subscriptionType()))) {
+                && userId.equals(value.userId())
+                && java.util.Objects.equals(associationId, value.associationId())
+                && request.subscriptionType().equals(value.subscriptionType()))) {
             throw new org.springframework.dao.DuplicateKeyException("duplicate subscription type");
         }
         SubscriptionView current = found.get();
@@ -71,8 +78,8 @@ class InMemoryNotificationStore implements NotificationStore {
 
     @Override
     public synchronized Optional<SubscriptionView> changeSubscriptionStatus(
-            UUID id, UUID userId, long expectedVersion, String status) {
-        Optional<SubscriptionView> found = subscription(id, userId)
+            UUID id, UUID userId, UUID associationId, long expectedVersion, String status) {
+        Optional<SubscriptionView> found = subscription(id, userId, associationId)
                 .filter(value -> value.version() == expectedVersion);
         if (found.isEmpty()) {
             return Optional.empty();
@@ -86,15 +93,17 @@ class InMemoryNotificationStore implements NotificationStore {
     }
 
     @Override
-    public synchronized boolean deleteSubscription(UUID id, UUID userId, long expectedVersion) {
-        return subscription(id, userId).filter(value -> value.version() == expectedVersion)
+    public synchronized boolean deleteSubscription(
+            UUID id, UUID userId, UUID associationId, long expectedVersion) {
+        return subscription(id, userId, associationId).filter(value -> value.version() == expectedVersion)
                 .map(value -> subscriptions.remove(id, value)).orElse(false);
     }
 
     @Override
     public synchronized List<NotificationMessageView> messages(
-            UUID userId, boolean unreadOnly, int offset, int limit) {
+            UUID userId, UUID associationId, boolean unreadOnly, int offset, int limit) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
+                .filter(value -> associationId == null || associationId.equals(value.associationId()))
                 .filter(value -> !unreadOnly || value.readAt() == null)
                 .sorted(Comparator.comparing(NotificationMessageView::createdAt).reversed()
                         .thenComparing(NotificationMessageView::id))
@@ -102,19 +111,22 @@ class InMemoryNotificationStore implements NotificationStore {
     }
 
     @Override
-    public synchronized long countMessages(UUID userId, boolean unreadOnly) {
+    public synchronized long countMessages(UUID userId, UUID associationId, boolean unreadOnly) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
+                .filter(value -> associationId == null || associationId.equals(value.associationId()))
                 .filter(value -> !unreadOnly || value.readAt() == null).count();
     }
 
     @Override
-    public synchronized Optional<NotificationMessageView> message(UUID id, UUID userId) {
-        return Optional.ofNullable(messages.get(id)).filter(value -> userId.equals(value.userId()));
+    public synchronized Optional<NotificationMessageView> message(UUID id, UUID userId, UUID associationId) {
+        return Optional.ofNullable(messages.get(id)).filter(value -> userId.equals(value.userId()))
+                .filter(value -> associationId == null || associationId.equals(value.associationId()));
     }
 
     @Override
-    public synchronized Optional<NotificationMessageView> markRead(UUID id, UUID userId) {
-        Optional<NotificationMessageView> found = message(id, userId);
+    public synchronized Optional<NotificationMessageView> markRead(
+            UUID id, UUID userId, UUID associationId) {
+        Optional<NotificationMessageView> found = message(id, userId, associationId);
         if (found.isEmpty()) {
             return Optional.empty();
         }
@@ -128,8 +140,13 @@ class InMemoryNotificationStore implements NotificationStore {
     }
 
     @Override
-    public boolean policyBelongsToAssociation(UUID policyId, UUID associationId) {
-        return policyId != null && associationId != null;
+    public synchronized boolean policyBelongsToAssociation(UUID policyId, UUID associationId) {
+        PolicyState policy = policies.get(policyId);
+        return policy != null
+                && policy.associationId().equals(associationId)
+                && "PUBLISHED".equals(policy.status())
+                && !policy.disabled()
+                && !policy.deleted();
     }
 
     @Override
@@ -177,5 +194,23 @@ class InMemoryNotificationStore implements NotificationStore {
 
     synchronized int outboxCount() {
         return outboxKeys.size();
+    }
+
+    synchronized void registerPolicy(
+            UUID policyId,
+            UUID associationId,
+            String status,
+            boolean disabled,
+            boolean deleted) {
+        policies.put(
+                Objects.requireNonNull(policyId, "policyId"),
+                new PolicyState(
+                        Objects.requireNonNull(associationId, "associationId"),
+                        Objects.requireNonNull(status, "status"),
+                        disabled,
+                        deleted));
+    }
+
+    private record PolicyState(UUID associationId, String status, boolean disabled, boolean deleted) {
     }
 }

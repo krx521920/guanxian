@@ -71,7 +71,8 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    AND policy.status = 'PUBLISHED'
                    AND policy.disabled_at IS NULL
                    AND policy.deleted_at IS NULL
-                   AND enterprise.status NOT IN ('DISABLED', 'DELETED')
+                   AND enterprise.status = 'ACTIVE'
+                   AND enterprise.deleted_at IS NULL
                 """, params, (rs, row) -> new AnalysisSourceHeader(
                 rs.getObject("policy_id", UUID.class), rs.getString("policy_title"), rs.getString("source_url"),
                 rs.getObject("enterprise_id", UUID.class), rs.getString("enterprise_name"),
@@ -144,6 +145,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
 
     @Override
     public PolicyImpactAnalysisView create(AnalysisDraft draft) {
+        requireOperational(draft.enterpriseId());
         try {
             return jdbc.query("""
                     INSERT INTO policy_impact_analysis (
@@ -175,6 +177,11 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                        reviewed_by_subject = NULL, reviewed_at = NULL,
                        version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :version
+                   AND EXISTS (
+                       SELECT 1 FROM enterprise write_enterprise
+                        WHERE write_enterprise.id=policy_impact_analysis.enterprise_id
+                          AND write_enterprise.status='ACTIVE'
+                          AND write_enterprise.deleted_at IS NULL)
                  RETURNING id
                 """, params, (rs, row) -> rs.getObject("id", UUID.class)).stream()
                 .findFirst().flatMap(this::find);
@@ -191,6 +198,11 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    SET status = :status, reviewed_by_subject = :reviewerSubject,
                        reviewed_at = now(), version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :version
+                   AND EXISTS (
+                       SELECT 1 FROM enterprise write_enterprise
+                        WHERE write_enterprise.id=policy_impact_analysis.enterprise_id
+                          AND write_enterprise.status='ACTIVE'
+                          AND write_enterprise.deleted_at IS NULL)
                  RETURNING id
                 """, params, (rs, row) -> rs.getObject("id", UUID.class)).stream()
                 .findFirst().flatMap(this::find);
@@ -276,7 +288,18 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
     private static String where(
             ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId) {
         List<String> clauses = new ArrayList<>();
-        if (!scope.systemAdmin()) {
+        if (!scope.systemAdmin() && !scope.associationStaff()) {
+            clauses.add("enterprise.status = 'ACTIVE'");
+            clauses.add("enterprise.deleted_at IS NULL");
+        }
+        if (scope.systemAdmin()) {
+            if (scope.enterpriseId() != null) {
+                clauses.add("analysis.enterprise_id = :scopeEnterpriseId");
+            }
+            if (scope.associationId() != null) {
+                clauses.add("enterprise.association_id = :associationId");
+            }
+        } else {
             if (scope.enterpriseId() != null) {
                 clauses.add("analysis.enterprise_id = :scopeEnterpriseId");
             } else if (scope.associationStaff() && scope.associationId() != null) {
@@ -305,6 +328,21 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
         if (value.reviewedBySubject() != null) snapshot.put("reviewedBySubject", value.reviewedBySubject());
         if (comment != null && !comment.isBlank()) snapshot.put("comment", comment.trim());
         return Map.copyOf(snapshot);
+    }
+
+    private void requireOperational(UUID enterpriseId) {
+        Boolean operational = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM enterprise
+                     WHERE id=:enterpriseId
+                       AND status='ACTIVE'
+                       AND deleted_at IS NULL)
+                """, new MapSqlParameterSource("enterpriseId", enterpriseId), Boolean.class);
+        if (!Boolean.TRUE.equals(operational)) {
+            throw new PolicyImpactException(
+                    PolicyImpactException.Reason.PRECONDITION_FAILED,
+                    "enterprise must be active before policy impact analysis");
+        }
     }
 
     private String writeJson(Object value) {

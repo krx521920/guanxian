@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,8 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                        requested_by_subject, requested_at)
                     VALUES (:id, :source, :target, :reason, 'PENDING', :subject, :now)
                     """, params("id", id).addValue("source", source).addValue("target", target)
-                    .addValue("reason", reason).addValue("subject", actor.subject()).addValue("now", now));
+                    .addValue("reason", reason).addValue("subject", actor.subject())
+                    .addValue("now", sqlTimestamp(now)));
         } catch (DataIntegrityViolationException exception) {
             throw new ConflictException("a pending access request already exists between these associations");
         }
@@ -70,7 +72,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                 SET status=:status, reviewed_by_subject=:subject, review_comment=:comment, reviewed_at=:now
                 WHERE id=:id AND status='PENDING'
                 """, params("id", id).addValue("status", status).addValue("subject", actor.subject())
-                .addValue("comment", comment).addValue("now", now));
+                .addValue("comment", comment).addValue("now", sqlTimestamp(now)));
         if (changed != 1) throw new ConflictException("access request is no longer pending");
         return accessRequest(id).orElseThrow();
     }
@@ -102,7 +104,8 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                            expires_at, version, created_at, updated_at)
                         VALUES (:source, :target, 'ACTIVE', :allow, :expiresAt, 0, :now, :now)
                         """, params("source", source).addValue("target", target).addValue("allow", allowMemberData)
-                        .addValue("expiresAt", expiresAt).addValue("now", now));
+                        .addValue("expiresAt", sqlTimestamp(expiresAt))
+                        .addValue("now", sqlTimestamp(now)));
             } catch (DataIntegrityViolationException exception) {
                 throw new ConflictException("association relationship was established concurrently");
             }
@@ -115,7 +118,8 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                         version=version+1, updated_at=:now
                     WHERE source_association_id=:source AND target_association_id=:target
                     """, params("source", old.sourceAssociationId()).addValue("target", old.targetAssociationId())
-                    .addValue("allow", allowMemberData).addValue("expiresAt", expiresAt).addValue("now", now));
+                    .addValue("allow", allowMemberData).addValue("expiresAt", sqlTimestamp(expiresAt))
+                    .addValue("now", sqlTimestamp(now)));
             source = old.sourceAssociationId();
             target = old.targetAssociationId();
         }
@@ -138,11 +142,14 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                     version=version+1, updated_at=:now
                 WHERE source_association_id=:source AND target_association_id=:target AND version=:version
                 """, params("source", old.sourceAssociationId()).addValue("target", old.targetAssociationId())
-                .addValue("version", expectedVersion).addValue("status", status).addValue("expiresAt", expiresAt)
-                .addValue("suspendedAt", suspendedAt)
+                .addValue("version", expectedVersion).addValue("status", status)
+                .addValue("expiresAt", sqlTimestamp(expiresAt))
+                .addValue("suspendedAt", sqlTimestamp(suspendedAt))
                 .addValue("suspendedByAssociationId", suspendedByAssociationId)
-                .addValue("suspendedBySubject", suspendedBySubject).addValue("revokedAt", revokedAt)
-                .addValue("subject", actor.subject()).addValue("reason", reason).addValue("now", now));
+                .addValue("suspendedBySubject", suspendedBySubject)
+                .addValue("revokedAt", sqlTimestamp(revokedAt))
+                .addValue("subject", actor.subject()).addValue("reason", reason)
+                .addValue("now", sqlTimestamp(now)));
         requireUpdated(changed);
         return relationship(old.sourceAssociationId(), old.targetAssociationId()).orElseThrow();
     }
@@ -221,7 +228,8 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                 .addValue("target", request.targetAssociationId())
                 .addValue("resourceType", request.resourceType().trim().toUpperCase())
                 .addValue("resourceId", request.resourceId()).addValue("subject", actor.subject())
-                .addValue("expiresAt", request.expiresAt()).addValue("now", now));
+                .addValue("expiresAt", sqlTimestamp(request.expiresAt()))
+                .addValue("now", sqlTimestamp(now)));
         return consent(id).orElseThrow();
     }
 
@@ -230,7 +238,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
         int changed = jdbc.update("""
                 UPDATE enterprise_share_consent SET status='REVOKED', revoked_at=:now
                 WHERE id=:id AND status='ACTIVE'
-                """, params("id", id).addValue("now", now));
+                """, params("id", id).addValue("now", sqlTimestamp(now)));
         if (changed != 1) throw new ConflictException("share consent is no longer active");
         return consent(id).orElseThrow();
     }
@@ -260,7 +268,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                 """, params("id", id).addValue("source", source).addValue("target", request.targetAssociationId())
                 .addValue("demandId", request.demandId()).addValue("matchId", request.matchId())
                 .addValue("summary", request.summary().trim()).addValue("subject", actor.subject())
-                .addValue("now", now));
+                .addValue("now", sqlTimestamp(now)));
         return recommendation(id).orElseThrow();
     }
 
@@ -273,7 +281,8 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                     reviewed_at=:now, version=version+1
                 WHERE id=:id AND version=:version AND status='PENDING_REVIEW'
                 """, params("id", id).addValue("version", expectedVersion).addValue("status", status)
-                .addValue("subject", actor.subject()).addValue("comment", comment).addValue("now", now));
+                .addValue("subject", actor.subject()).addValue("comment", comment)
+                .addValue("now", sqlTimestamp(now)));
         requireUpdated(changed);
         return recommendation(id).orElseThrow();
     }
@@ -375,8 +384,9 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
             UUID id, UUID source, CrossAssociationDtos.SharePolicyUpsert request, ActorScope actor, Instant now) {
         return params("id", id).addValue("source", source).addValue("target", request.targetAssociationId())
                 .addValue("resourceType", request.resourceType()).addValue("visibleFields", writeJson(request.visibleFields()))
-                .addValue("status", request.status()).addValue("validFrom", request.validFrom())
-                .addValue("expiresAt", request.expiresAt()).addValue("subject", actor.subject()).addValue("now", now);
+                .addValue("status", request.status()).addValue("validFrom", sqlTimestamp(request.validFrom()))
+                .addValue("expiresAt", sqlTimestamp(request.expiresAt())).addValue("subject", actor.subject())
+                .addValue("now", sqlTimestamp(now));
     }
 
     private CrossAssociationDtos.AccessRequestView accessRequest(ResultSet rs) throws SQLException {
@@ -440,6 +450,10 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
     private static Instant instant(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, java.time.OffsetDateTime.class) == null
                 ? null : rs.getObject(column, java.time.OffsetDateTime.class).toInstant();
+    }
+
+    private static Timestamp sqlTimestamp(Instant value) {
+        return value == null ? null : Timestamp.from(value);
     }
 
     private static MapSqlParameterSource params(String name, Object value) {

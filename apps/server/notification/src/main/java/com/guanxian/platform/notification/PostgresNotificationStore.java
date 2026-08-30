@@ -45,16 +45,18 @@ class PostgresNotificationStore implements NotificationStore {
     }
 
     @Override
-    public List<SubscriptionView> subscriptions(UUID userId) {
+    public List<SubscriptionView> subscriptions(UUID userId, UUID associationId) {
         return jdbc.query(SUBSCRIPTION_SELECT
-                        + " WHERE user_id = :userId ORDER BY updated_at DESC, id",
-                new MapSqlParameterSource("userId", userId), subscriptionMapper);
+                        + " WHERE user_id = :userId" + readAssociationClause(associationId)
+                        + " ORDER BY updated_at DESC, id",
+                ids(null, userId, associationId), subscriptionMapper);
     }
 
     @Override
-    public Optional<SubscriptionView> subscription(UUID id, UUID userId) {
-        return jdbc.query(SUBSCRIPTION_SELECT + " WHERE id = :id AND user_id = :userId",
-                ids(id, userId), subscriptionMapper).stream().findFirst();
+    public Optional<SubscriptionView> subscription(UUID id, UUID userId, UUID associationId) {
+        return jdbc.query(SUBSCRIPTION_SELECT + " WHERE id = :id AND user_id = :userId"
+                        + readAssociationClause(associationId),
+                ids(id, userId, associationId), subscriptionMapper).stream().findFirst();
     }
 
     @Override
@@ -72,73 +74,81 @@ class PostgresNotificationStore implements NotificationStore {
 
     @Override
     public Optional<SubscriptionView> updateSubscription(
-            UUID id, UUID userId, long expectedVersion, SubscriptionRequest request) {
+            UUID id, UUID userId, UUID associationId, long expectedVersion, SubscriptionRequest request) {
         return jdbc.query("""
                 UPDATE notification_subscription
                    SET subscription_type = :type, filters = CAST(:filters AS jsonb),
                        channels = CAST(:channels AS jsonb), updated_at = now(), version = version + 1
-                 WHERE id = :id AND user_id = :userId AND version = :version
+                 WHERE id = :id AND user_id = :userId AND association_id = :associationId
+                   AND version = :version
                 RETURNING id, user_id, association_id, subscription_type, filters::text AS filters,
                           channels::text AS channels, status, version, created_at, updated_at
-                """, requestParams(userId, null, request).addValue("id", id)
+                """, requestParams(userId, associationId, request).addValue("id", id)
                 .addValue("version", expectedVersion), subscriptionMapper).stream().findFirst();
     }
 
     @Override
     public Optional<SubscriptionView> changeSubscriptionStatus(
-            UUID id, UUID userId, long expectedVersion, String status) {
+            UUID id, UUID userId, UUID associationId, long expectedVersion, String status) {
         return jdbc.query("""
                 UPDATE notification_subscription
                    SET status = :status, updated_at = now(), version = version + 1
-                 WHERE id = :id AND user_id = :userId AND version = :version
+                 WHERE id = :id AND user_id = :userId AND association_id = :associationId
+                   AND version = :version
                 RETURNING id, user_id, association_id, subscription_type, filters::text AS filters,
                           channels::text AS channels, status, version, created_at, updated_at
-                """, ids(id, userId).addValue("version", expectedVersion).addValue("status", status),
+                """, ids(id, userId, associationId).addValue("version", expectedVersion)
+                .addValue("status", status),
                 subscriptionMapper).stream().findFirst();
     }
 
     @Override
-    public boolean deleteSubscription(UUID id, UUID userId, long expectedVersion) {
+    public boolean deleteSubscription(UUID id, UUID userId, UUID associationId, long expectedVersion) {
         return jdbc.update("""
                 DELETE FROM notification_subscription
-                 WHERE id = :id AND user_id = :userId AND version = :version
-                """, ids(id, userId).addValue("version", expectedVersion)) == 1;
+                 WHERE id = :id AND user_id = :userId AND association_id = :associationId
+                   AND version = :version
+                """, ids(id, userId, associationId).addValue("version", expectedVersion)) == 1;
     }
 
     @Override
     public List<NotificationMessageView> messages(
-            UUID userId, boolean unreadOnly, int offset, int limit) {
+            UUID userId, UUID associationId, boolean unreadOnly, int offset, int limit) {
         MapSqlParameterSource params = new MapSqlParameterSource("userId", userId)
+                .addValue("associationId", associationId)
                 .addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(MESSAGE_SELECT + " WHERE user_id = :userId"
+                        + readAssociationClause(associationId)
                         + (unreadOnly ? " AND read_at IS NULL" : "")
                         + " ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset",
                 params, messageMapper);
     }
 
     @Override
-    public long countMessages(UUID userId, boolean unreadOnly) {
+    public long countMessages(UUID userId, UUID associationId, boolean unreadOnly) {
         Long count = jdbc.queryForObject("SELECT count(*) FROM notification_message WHERE user_id = :userId"
+                        + readAssociationClause(associationId)
                         + (unreadOnly ? " AND read_at IS NULL" : ""),
-                new MapSqlParameterSource("userId", userId), Long.class);
+                new MapSqlParameterSource("userId", userId).addValue("associationId", associationId), Long.class);
         return count == null ? 0 : count;
     }
 
     @Override
-    public Optional<NotificationMessageView> message(UUID id, UUID userId) {
-        return jdbc.query(MESSAGE_SELECT + " WHERE id = :id AND user_id = :userId",
-                ids(id, userId), messageMapper).stream().findFirst();
+    public Optional<NotificationMessageView> message(UUID id, UUID userId, UUID associationId) {
+        return jdbc.query(MESSAGE_SELECT
+                        + " WHERE id = :id AND user_id = :userId AND association_id = :associationId",
+                ids(id, userId, associationId), messageMapper).stream().findFirst();
     }
 
     @Override
-    public Optional<NotificationMessageView> markRead(UUID id, UUID userId) {
+    public Optional<NotificationMessageView> markRead(UUID id, UUID userId, UUID associationId) {
         return jdbc.query("""
                 UPDATE notification_message
                    SET read_at = COALESCE(read_at, now()), status = 'READ'
-                 WHERE id = :id AND user_id = :userId
+                 WHERE id = :id AND user_id = :userId AND association_id = :associationId
                 RETURNING id, user_id, association_id, notification_type, title, body, resource_type,
                           resource_id, status, read_at, created_at, delivered_at
-                """, ids(id, userId), messageMapper).stream().findFirst();
+                """, ids(id, userId, associationId), messageMapper).stream().findFirst();
     }
 
     @Override
@@ -231,8 +241,13 @@ class PostgresNotificationStore implements NotificationStore {
                 .addValue("filters", json(request.filters())).addValue("channels", json(request.channels()));
     }
 
-    private static MapSqlParameterSource ids(UUID id, UUID userId) {
-        return new MapSqlParameterSource("id", id).addValue("userId", userId);
+    private static MapSqlParameterSource ids(UUID id, UUID userId, UUID associationId) {
+        return new MapSqlParameterSource("id", id).addValue("userId", userId)
+                .addValue("associationId", associationId);
+    }
+
+    private static String readAssociationClause(UUID associationId) {
+        return associationId == null ? "" : " AND association_id = :associationId";
     }
 
     private SubscriptionView mapSubscription(ResultSet rs, int row) throws SQLException {

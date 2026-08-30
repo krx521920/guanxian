@@ -8,6 +8,8 @@
 
 当前已形成可运行的首期工程基线，模块边界、OIDC 数据域、会员审核审计和 Excel 调查采集闭环已经接通。企业调查表作为 106 家会员冷启动入口，经过逐行预检、协会审核后进入企业、产品、需求与场景库。
 
+当前处于 Phase 2 权限与持久化收口阶段：代码级身份生命周期、系统管理员代管上下文和主要业务数据域已经形成闭环；正式 IdP 浏览器验收、完整依赖环境 E2E、备份恢复演练及真实模型验收仍是上线闸门。
+
 ## 工程结构
 
 ```text
@@ -69,4 +71,4 @@ docker compose --profile app up --build -d
 
 快速入口和当前可复验基线见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，手动质量检查执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
 
-> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、执行 V1–V12 迁移/恢复演练，并用协会真实语料完成效果和费用验收。
+> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、执行 V1–V15 迁移/恢复演练，并用协会真实语料完成效果和费用验收。

@@ -8,7 +8,10 @@ final class MemberAccessPolicy {
     }
 
     static boolean canRead(ActorScope actor, MemberProfile member) {
-        if (actor.isSystemAdmin() || member.id().equals(actor.enterpriseId())) {
+        if (actor.isSystemAdmin()) {
+            return withinSelectedSystemContext(actor, member);
+        }
+        if (member.id().equals(actor.enterpriseId())) {
             return true;
         }
         boolean sameAssociation = member.associationId().equals(actor.associationId());
@@ -25,12 +28,15 @@ final class MemberAccessPolicy {
     }
 
     static boolean canCreate(ActorScope actor) {
-        return actor.isSystemAdmin() || actor.isAssociationStaff();
+        if (actor.isSystemAdmin()) {
+            return actor.associationId() != null && actor.enterpriseId() == null;
+        }
+        return actor.isAssociationStaff() && actor.enterpriseId() == null;
     }
 
     static boolean canUpdate(ActorScope actor, MemberProfile member) {
         if (actor.isSystemAdmin()) {
-            return true;
+            return actor.associationId() != null && withinSelectedSystemContext(actor, member);
         }
         if (actor.isAssociationStaff() && member.associationId().equals(actor.associationId())) {
             return true;
@@ -39,11 +45,20 @@ final class MemberAccessPolicy {
     }
 
     static boolean canReview(ActorScope actor, MemberProfile member) {
-        return actor.isSystemAdmin()
+        return (actor.isSystemAdmin()
+                && actor.associationId() != null
+                && withinSelectedSystemContext(actor, member))
                 || (actor.isAssociationReviewer() && member.associationId().equals(actor.associationId()));
     }
 
     static boolean canDelete(ActorScope actor, MemberProfile member) {
         return canReview(actor, member);
+    }
+
+    private static boolean withinSelectedSystemContext(ActorScope actor, MemberProfile member) {
+        if (actor.enterpriseId() != null && !actor.enterpriseId().equals(member.id())) {
+            return false;
+        }
+        return actor.associationId() == null || actor.associationId().equals(member.associationId());
     }
 }

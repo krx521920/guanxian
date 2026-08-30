@@ -99,6 +99,7 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     int modelExecutionCount() { return modelExecutions.size(); }
 
     private boolean visibleTo(RetrievalScope scope, MemoryDocument document) {
+        if (scope.associationId() == null && scope.privileged()) return true;
         if ("PUBLIC".equals(document.visibility())) return true;
         if (scope.associationId() == null || !scope.associationId().equals(document.associationId())) return false;
         if ("ASSOCIATION".equals(document.visibility())) return true;

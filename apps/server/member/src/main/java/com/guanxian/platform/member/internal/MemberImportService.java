@@ -155,21 +155,11 @@ public class MemberImportService {
     }
 
     private UUID targetAssociation(UUID requestedAssociationId, ActorScope actor) {
-        if (!MemberAccessPolicy.canCreate(actor)) {
-            throw scopeDenied();
+        if (actor.isSystemAdmin() && actor.associationId() == null) {
+            throw associationContextRequired();
         }
-        if (actor.isSystemAdmin()) {
-            UUID selected = requestedAssociationId != null
-                    ? requestedAssociationId : actor.associationId();
-            if (selected == null) {
-                throw new com.guanxian.platform.shared.error.ApiException(
-                        "ASSOCIATION_CONTEXT_REQUIRED",
-                        "system administrators must select an association context",
-                        org.springframework.http.HttpStatus.BAD_REQUEST);
-            }
-            return selected;
-        }
-        if (actor.associationId() == null
+        if (!MemberAccessPolicy.canCreate(actor)
+                || actor.associationId() == null
                 || requestedAssociationId != null && !actor.associationId().equals(requestedAssociationId)) {
             throw scopeDenied();
         }
@@ -177,10 +167,21 @@ public class MemberImportService {
     }
 
     private static void ensureBatchScope(MemberImportBatch batch, ActorScope actor) {
-        if (!actor.isSystemAdmin()
-                && (!actor.isAssociationStaff() || !batch.associationId().equals(actor.associationId()))) {
+        if (actor.isSystemAdmin() && actor.associationId() == null) {
+            throw associationContextRequired();
+        }
+        if (!MemberAccessPolicy.canCreate(actor)
+                || actor.associationId() == null
+                || !batch.associationId().equals(actor.associationId())) {
             throw scopeDenied();
         }
+    }
+
+    private static com.guanxian.platform.shared.error.ApiException associationContextRequired() {
+        return new com.guanxian.platform.shared.error.ApiException(
+                "ASSOCIATION_CONTEXT_REQUIRED",
+                "system administrators must select an association context",
+                org.springframework.http.HttpStatus.BAD_REQUEST);
     }
 
     private static MemberImportPreview view(MemberImportBatch batch) {

@@ -1,5 +1,6 @@
 package com.guanxian.platform.ecosystem;
 
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -11,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -43,6 +45,18 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
             UUID senderEnterpriseId,
             MatchInvitationRequest request,
             ActorScope actor) {
+        requireAssociationArgument(associationId, actor);
+        requireMatchWrite(matchId, actor);
+        if (!Objects.equals(senderEnterpriseId, actor.enterpriseId())) {
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "invitation sender is outside the selected enterprise context");
+        }
+        if (!isCandidate(matchId, request.recipientEnterpriseId())) {
+            throw new ForbiddenException(
+                    "MATCH_SCOPE_VIOLATION",
+                    "invitation recipient must be the candidate enterprise of the match");
+        }
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("matchId", matchId)
                 .addValue("associationId", associationId)
@@ -50,7 +64,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 .addValue("recipientEnterpriseId", request.recipientEnterpriseId())
                 .addValue("invitationType", request.invitationType())
                 .addValue("message", clean(request.message()))
-                .addValue("expiresAt", request.expiresAt())
+                .addValue("expiresAt", timestamp(request.expiresAt()))
                 .addValue("subject", actor.subject());
         UUID id = jdbc.queryForObject("""
                 INSERT INTO match_invitation (
@@ -80,7 +94,8 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
-    public void expirePendingInvitations(UUID matchId) {
+    public void expirePendingInvitations(UUID matchId, ActorScope actor) {
+        requireMatchWrite(matchId, actor);
         jdbc.update("""
                 UPDATE match_invitation
                    SET status='EXPIRED', version=version+1, updated_at=now()
@@ -92,7 +107,10 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
-    public boolean hasPendingInvitation(UUID matchId) {
+    public boolean hasPendingInvitation(UUID matchId, ActorScope actor) {
+        if (!canReadMatch(matchId, actor)) {
+            return false;
+        }
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (
                     SELECT 1 FROM match_invitation
@@ -109,6 +127,13 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
             boolean accepted,
             String comment,
             ActorScope actor) {
+        MatchInvitationView existing = findInvitation(invitationId, actor).orElse(null);
+        if (existing == null
+                || actor.enterpriseId() == null
+                || !actor.enterpriseId().equals(existing.recipientEnterpriseId())) {
+            return Optional.empty();
+        }
+        requireMatchWrite(existing.matchId(), actor);
         int updated = jdbc.update("""
                 UPDATE match_invitation
                    SET status=:status,
@@ -136,6 +161,9 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
             UUID enterpriseId,
             NegotiationRequest request,
             ActorScope actor) {
+        requireAssociationArgument(associationId, actor);
+        requireMatchWrite(matchId, actor);
+        requireSelectedEnterprise(enterpriseId, actor);
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("matchId", matchId)
                 .addValue("associationId", associationId)
@@ -143,7 +171,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 .addValue("stage", request.stage().trim())
                 .addValue("summary", request.summary().trim())
                 .addValue("nextAction", clean(request.nextAction()))
-                .addValue("nextActionAt", request.nextActionAt())
+                .addValue("nextActionAt", timestamp(request.nextActionAt()))
                 .addValue("subject", actor.subject());
         UUID id = jdbc.queryForObject("""
                 INSERT INTO negotiation_record (
@@ -184,6 +212,8 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     @Override
     public MatchFeedbackView upsertFeedback(
             UUID matchId, UUID enterpriseId, MatchFeedbackRequest request, ActorScope actor) {
+        requireMatchWrite(matchId, actor);
+        requireSelectedEnterprise(enterpriseId, actor);
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("matchId", matchId)
                 .addValue("enterpriseId", enterpriseId)
@@ -234,6 +264,8 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     @Override
     public OutcomeArchiveView archive(
             UUID matchId, UUID associationId, OutcomeArchiveRequest request, ActorScope actor) {
+        requireAssociationArgument(associationId, actor);
+        requireMatchWrite(matchId, actor);
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("matchId", matchId)
                 .addValue("associationId", associationId)
@@ -276,31 +308,89 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     private String scope(ActorScope actor) {
-        if (actor.isSystemAdmin()) {
-            return " WHERE TRUE";
-        }
-        if (actor.isAssociationStaff()) {
-            return " WHERE de.association_id=:associationId";
-        }
-        if (actor.enterpriseId() != null) {
-            return " WHERE (d.enterprise_id=:enterpriseId"
-                    + " OR m.candidate_enterprise_id=:enterpriseId"
-                    + " OR i.recipient_enterprise_id=:enterpriseId)";
-        }
-        return " WHERE FALSE";
+        return matchScope(actor);
     }
 
     private String matchScope(ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return " WHERE TRUE";
+            if (actor.associationId() == null) {
+                return actor.enterpriseId() == null ? " WHERE TRUE" : " WHERE FALSE";
+            }
+            if (actor.enterpriseId() != null) {
+                return " WHERE de.association_id=:associationId"
+                        + " AND (d.enterprise_id=:enterpriseId"
+                        + " OR m.candidate_enterprise_id=:enterpriseId)";
+            }
+            return " WHERE de.association_id=:associationId";
         }
         if (actor.isAssociationStaff()) {
             return " WHERE de.association_id=:associationId";
         }
         if (actor.enterpriseId() != null) {
-            return " WHERE (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
+            return " WHERE (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)"
+                    + " AND d.deleted_at IS NULL"
+                    + " AND de.status='ACTIVE' AND de.deleted_at IS NULL"
+                    + " AND EXISTS (SELECT 1 FROM enterprise read_candidate"
+                    + " WHERE read_candidate.id=m.candidate_enterprise_id"
+                    + " AND read_candidate.status='ACTIVE' AND read_candidate.deleted_at IS NULL)";
         }
         return " WHERE FALSE";
+    }
+
+    private boolean canReadMatch(UUID matchId, ActorScope actor) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                      JOIN enterprise de ON de.id=d.enterprise_id
+                      JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                """ + matchScope(actor)
+                + " AND m.id=:matchId AND m.deleted_at IS NULL"
+                + " AND d.deleted_at IS NULL"
+                + " AND de.status='ACTIVE' AND de.deleted_at IS NULL"
+                + " AND ce.status='ACTIVE' AND ce.deleted_at IS NULL)",
+                scopeParams(actor).addValue("matchId", matchId), Boolean.class));
+    }
+
+    private void requireMatchWrite(UUID matchId, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
+        if (!canReadMatch(matchId, actor)) {
+            throw new ForbiddenException(
+                    "MATCH_SCOPE_VIOLATION",
+                    "workflow record is outside the authenticated data scope");
+        }
+    }
+
+    private boolean isCandidate(UUID matchId, UUID enterpriseId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match
+                     WHERE id=:matchId
+                       AND candidate_enterprise_id=:enterpriseId)
+                """, new MapSqlParameterSource()
+                .addValue("matchId", matchId)
+                .addValue("enterpriseId", enterpriseId), Boolean.class));
+    }
+
+    private static void requireAssociationArgument(UUID associationId, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
+        if (actor.associationId() == null
+                || !Objects.equals(actor.associationId(), associationId)) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION",
+                    "workflow association is outside the authenticated data scope");
+        }
+    }
+
+    private static void requireSelectedEnterprise(UUID enterpriseId, ActorScope actor) {
+        if (actor.enterpriseId() == null
+                || !actor.enterpriseId().equals(enterpriseId)) {
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "workflow enterprise is outside the authenticated data scope");
+        }
     }
 
     private static MapSqlParameterSource scopeParams(ActorScope actor) {
@@ -371,6 +461,10 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
 
     private static Instant instant(Timestamp value) {
         return value == null ? null : value.toInstant();
+    }
+
+    private static Timestamp timestamp(Instant value) {
+        return value == null ? null : Timestamp.from(value);
     }
 
     private static String clean(String value) {

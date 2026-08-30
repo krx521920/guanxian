@@ -37,16 +37,19 @@ public class AttachmentService {
     private final ObjectStorage objects;
     private final AttachmentRateLimiter rateLimiter;
     private final StorageProperties properties;
+    private final AttachmentEnterpriseScope enterpriseScope;
 
     public AttachmentService(
             AttachmentMetadataStore metadata,
             ObjectStorage objects,
             AttachmentRateLimiter rateLimiter,
-            StorageProperties properties) {
+            StorageProperties properties,
+            AttachmentEnterpriseScope enterpriseScope) {
         this.metadata = metadata;
         this.objects = objects;
         this.rateLimiter = rateLimiter;
         this.properties = properties;
+        this.enterpriseScope = enterpriseScope;
     }
 
     public AttachmentView upload(
@@ -88,17 +91,18 @@ public class AttachmentService {
             ActorScope actor, UUID enterpriseId, boolean includeDeleted, int page, int size) {
         int boundedPage = Math.max(0, page);
         int boundedSize = Math.max(1, Math.min(size, 100));
-        if (enterpriseId != null && actor.isEnterpriseAdmin()
-                && !enterpriseId.equals(actor.enterpriseId())) {
+        UUID visibleEnterpriseId = visibleEnterpriseFilter(actor, enterpriseId);
+        if (visibleEnterpriseId != null && actor.isEnterpriseAdmin()
+                && !visibleEnterpriseId.equals(actor.enterpriseId())) {
             throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
                     "enterprise administrators may only list their own attachments");
         }
         return new AttachmentPage(
-                metadata.listVisible(actor, enterpriseId, includeDeleted,
+                metadata.listVisible(actor, visibleEnterpriseId, includeDeleted,
                         boundedPage * boundedSize, boundedSize),
                 boundedPage,
                 boundedSize,
-                metadata.countVisible(actor, enterpriseId, includeDeleted));
+                metadata.countVisible(actor, visibleEnterpriseId, includeDeleted));
     }
 
     public AttachmentView get(UUID id, ActorScope actor, boolean includeDeleted) {
@@ -119,6 +123,7 @@ public class AttachmentService {
     }
 
     public AttachmentView delete(UUID id, long expectedVersion, ActorScope actor) {
+        requireSystemWriteContext(actor);
         rateLimiter.check(actor, "delete");
         AttachmentView current = get(id, actor, true);
         requireVersion(current, expectedVersion);
@@ -130,6 +135,7 @@ public class AttachmentService {
     }
 
     public AttachmentView restore(UUID id, long expectedVersion, ActorScope actor) {
+        requireSystemWriteContext(actor);
         rateLimiter.check(actor, "restore");
         AttachmentView current = get(id, actor, true);
         requireVersion(current, expectedVersion);
@@ -142,13 +148,16 @@ public class AttachmentService {
 
     private Scope writableScope(ActorScope actor, UUID associationId, UUID enterpriseId) {
         if (actor.isSystemAdmin()) {
-            UUID selectedAssociation = associationId != null ? associationId : actor.associationId();
-            UUID selectedEnterprise = enterpriseId != null ? enterpriseId : actor.enterpriseId();
-            if (selectedAssociation == null) {
-                throw new ApiException("ASSOCIATION_REQUIRED",
-                        "system administrators must select an association", HttpStatus.BAD_REQUEST);
+            requireSystemWriteContext(actor);
+            if (associationId != null && !associationId.equals(actor.associationId())) {
+                throw new ForbiddenException("ASSOCIATION_SCOPE_VIOLATION",
+                        "request association cannot override the selected system context");
             }
-            return new Scope(selectedAssociation, selectedEnterprise);
+            if (enterpriseId != null && !enterpriseId.equals(actor.enterpriseId())) {
+                throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
+                        "request enterprise cannot override the selected system context");
+            }
+            return checkedScope(actor, actor.associationId(), actor.enterpriseId());
         }
         if (actor.associationId() == null) {
             throw new ForbiddenException("ASSOCIATION_SCOPE_REQUIRED", "actor has no association scope");
@@ -158,17 +167,43 @@ public class AttachmentService {
                     "actor cannot upload into another association");
         }
         if (actor.isAssociationStaff()) {
-            return new Scope(actor.associationId(), enterpriseId);
+            return checkedScope(actor, actor.associationId(), enterpriseId);
         }
         if (actor.isEnterpriseAdmin() && actor.enterpriseId() != null) {
             if (enterpriseId != null && !actor.enterpriseId().equals(enterpriseId)) {
                 throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
                         "enterprise administrators may only upload for their own enterprise");
             }
-            return new Scope(actor.associationId(), actor.enterpriseId());
+            return checkedScope(actor, actor.associationId(), actor.enterpriseId());
         }
         throw new ForbiddenException("ATTACHMENT_WRITE_FORBIDDEN",
                 "actor is not allowed to manage attachments");
+    }
+
+    private Scope checkedScope(ActorScope actor, UUID associationId, UUID enterpriseId) {
+        if (enterpriseId != null && !enterpriseScope.contains(associationId, enterpriseId, actor)) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "target enterprise does not belong to the selected association");
+        }
+        return new Scope(associationId, enterpriseId);
+    }
+
+    private static UUID visibleEnterpriseFilter(ActorScope actor, UUID requestedEnterpriseId) {
+        if (actor.isSystemAdmin() && actor.enterpriseId() != null) {
+            if (requestedEnterpriseId != null && !actor.enterpriseId().equals(requestedEnterpriseId)) {
+                throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
+                        "request enterprise cannot override the selected system context");
+            }
+            return actor.enterpriseId();
+        }
+        return requestedEnterpriseId;
+    }
+
+    private static void requireSystemWriteContext(ActorScope actor) {
+        if (actor.isSystemAdmin() && actor.associationId() == null) {
+            throw new ForbiddenException("ASSOCIATION_CONTEXT_REQUIRED",
+                    "system administrators must select an association before writing attachments");
+        }
     }
 
     private ValidatedFile validate(MultipartFile file) {

@@ -5,6 +5,7 @@ import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.AnalysisSource;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.ImpactActor;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.ReadScope;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.SourceChunk;
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,15 +30,18 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
     private final Map<UUID, PolicyImpactAnalysisView> values = new LinkedHashMap<>();
     private final Map<UUID, List<PolicyImpactHistoryView>> histories = new LinkedHashMap<>();
     private final Map<SourceKey, AnalysisSource> sources = new LinkedHashMap<>();
+    private final EnterpriseLifecycle enterpriseLifecycle;
 
     public MemoryPolicyImpactAnalysisStore() {
-        this(false);
+        this(false, enterpriseId -> true);
     }
 
     @Autowired
     public MemoryPolicyImpactAnalysisStore(
             @Value("${guanxian.business.seed-demo-data:${guanxian.member.seed-demo-data:false}}")
-            boolean seedDemoData) {
+            boolean seedDemoData,
+            EnterpriseLifecycle enterpriseLifecycle) {
+        this.enterpriseLifecycle = enterpriseLifecycle;
         if (!seedDemoData) {
             return;
         }
@@ -55,13 +59,19 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
                                 "燃气和供热管线的数据应按标准汇交，并保存完整的监测记录。"))));
     }
 
+    public MemoryPolicyImpactAnalysisStore(boolean seedDemoData) {
+        this(seedDemoData, enterpriseId -> true);
+    }
+
     void putSource(AnalysisSource source) {
         sources.put(new SourceKey(source.policyDocumentId(), source.enterpriseId()), source);
     }
 
     @Override
     public synchronized Optional<AnalysisSource> loadSource(UUID policyDocumentId, UUID enterpriseId) {
-        return Optional.ofNullable(sources.get(new SourceKey(policyDocumentId, enterpriseId)));
+        return enterpriseLifecycle.isOperational(enterpriseId)
+                ? Optional.ofNullable(sources.get(new SourceKey(policyDocumentId, enterpriseId)))
+                : Optional.empty();
     }
 
     @Override
@@ -94,6 +104,7 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
 
     @Override
     public synchronized PolicyImpactAnalysisView create(AnalysisDraft draft) {
+        requireOperational(draft.enterpriseId());
         if (findByPair(draft.policyDocumentId(), draft.enterpriseId()).isPresent()) {
             throw new PolicyImpactException(
                     PolicyImpactException.Reason.CONFLICT,
@@ -110,7 +121,8 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
     public synchronized Optional<PolicyImpactAnalysisView> reanalyze(
             UUID id, long expectedVersion, AnalysisDraft draft) {
         PolicyImpactAnalysisView current = values.get(id);
-        if (current == null || current.version() != expectedVersion) {
+        if (current == null || !enterpriseLifecycle.isOperational(current.enterpriseId())
+                || current.version() != expectedVersion) {
             return Optional.empty();
         }
         PolicyImpactAnalysisView updated = view(id, draft, "PENDING_REVIEW", null, null,
@@ -123,7 +135,8 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
     public synchronized Optional<PolicyImpactAnalysisView> review(
             UUID id, long expectedVersion, String targetStatus, String reviewerSubject) {
         PolicyImpactAnalysisView current = values.get(id);
-        if (current == null || current.version() != expectedVersion) {
+        if (current == null || !enterpriseLifecycle.isOperational(current.enterpriseId())
+                || current.version() != expectedVersion) {
             return Optional.empty();
         }
         Instant now = Instant.now();
@@ -157,6 +170,8 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
     private List<PolicyImpactAnalysisView> filtered(
             ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId) {
         return values.values().stream()
+                .filter(value -> scope.systemAdmin() || scope.associationStaff()
+                        || enterpriseLifecycle.isOperational(value.enterpriseId()))
                 .filter(value -> canRead(scope, value))
                 .filter(value -> status == null || status.equals(value.status()))
                 .filter(value -> policyDocumentId == null || policyDocumentId.equals(value.policyDocumentId()))
@@ -168,13 +183,24 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
 
     private static boolean canRead(ReadScope scope, PolicyImpactAnalysisView value) {
         if (scope.systemAdmin()) {
-            return true;
+            if (scope.enterpriseId() != null && !scope.enterpriseId().equals(value.enterpriseId())) {
+                return false;
+            }
+            return scope.associationId() == null || scope.associationId().equals(value.associationId());
         }
         if (scope.enterpriseId() != null) {
             return scope.enterpriseId().equals(value.enterpriseId());
         }
         return scope.associationStaff() && scope.associationId() != null
                 && scope.associationId().equals(value.associationId());
+    }
+
+    private void requireOperational(UUID enterpriseId) {
+        if (!enterpriseLifecycle.isOperational(enterpriseId)) {
+            throw new PolicyImpactException(
+                    PolicyImpactException.Reason.PRECONDITION_FAILED,
+                    "enterprise must be active before policy impact analysis");
+        }
     }
 
     private static PolicyImpactAnalysisView view(

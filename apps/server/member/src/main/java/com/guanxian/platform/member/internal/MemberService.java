@@ -1,6 +1,7 @@
 package com.guanxian.platform.member.internal;
 
 import com.guanxian.platform.member.api.MemberDirectory;
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import com.guanxian.platform.member.api.MemberProfile;
 import com.guanxian.platform.member.web.MemberReviewRequest;
 import com.guanxian.platform.member.web.MemberUpsertRequest;
@@ -25,7 +26,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-public class MemberService implements MemberDirectory {
+public class MemberService implements MemberDirectory, EnterpriseLifecycle {
     public static final UUID DEMO_PRIMARY_ENTERPRISE_ID =
             UUID.fromString("00000000-0000-0000-0000-000000000201");
     public static final UUID DEMO_SECONDARY_ENTERPRISE_ID =
@@ -112,6 +113,17 @@ public class MemberService implements MemberDirectory {
         return findById(id, actor, false);
     }
 
+    @Override
+    public boolean isOperational(UUID enterpriseId) {
+        if (enterpriseId == null) {
+            return false;
+        }
+        return repository.findById(enterpriseId)
+                .filter(member -> !member.deleted())
+                .filter(member -> "ACTIVE".equals(member.status()))
+                .isPresent();
+    }
+
     public Optional<MemberProfile> findById(UUID id, ActorScope actor, boolean includeDeleted) {
         boolean allowDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationReviewer());
         return repository.findById(id)
@@ -133,18 +145,7 @@ public class MemberService implements MemberDirectory {
 
     @Transactional
     public synchronized MemberProfile create(MemberUpsertRequest request, ActorScope actor) {
-        if (!MemberAccessPolicy.canCreate(actor)) {
-            throw scopeDenied();
-        }
-        UUID associationId = actor.isSystemAdmin()
-                ? request.associationId() != null ? request.associationId() : actor.associationId()
-                : actor.associationId();
-        if (associationId == null) {
-            throw new com.guanxian.platform.shared.error.ApiException(
-                    "ASSOCIATION_CONTEXT_REQUIRED",
-                    "system administrators must select an association context",
-                    org.springframework.http.HttpStatus.BAD_REQUEST);
-        }
+        UUID associationId = targetAssociation(request.associationId(), actor);
         String status = actor.isSystemAdmin() || actor.isAssociationReviewer()
                 ? normalizeStatus(request.status(), "ACTIVE")
                 : "PENDING_REVIEW";
@@ -167,12 +168,12 @@ public class MemberService implements MemberDirectory {
     @Transactional
     public synchronized MemberProfile createImported(
             MemberUpsertRequest request, UUID associationId, ActorScope actor) {
-        if (!MemberAccessPolicy.canCreate(actor)
-                || !actor.isSystemAdmin() && !associationId.equals(actor.associationId())) {
+        UUID scopedAssociationId = targetAssociation(associationId, actor);
+        if (request.associationId() != null && !request.associationId().equals(scopedAssociationId)) {
             throw scopeDenied();
         }
         MemberProfile member = createInternal(
-                UUID.randomUUID(), associationId, request, "PENDING_REVIEW");
+                UUID.randomUUID(), scopedAssociationId, request, "PENDING_REVIEW");
         auditTrail.record(actor, "MEMBER_IMPORT_CREATE", "ENTERPRISE", member.id().toString(),
                 member.associationId(), member.id(), auditDetails(null, member));
         return member;
@@ -182,10 +183,10 @@ public class MemberService implements MemberDirectory {
     public synchronized MemberProfile update(
             UUID id, long expectedVersion, MemberUpsertRequest request, ActorScope actor) {
         MemberProfile existing = getUnscoped(id);
-        ensureNotDeleted(existing);
         if (!MemberAccessPolicy.canUpdate(actor, existing)) {
             throw scopeDenied();
         }
+        ensureNotDeleted(existing);
         ensureVersion(existing, expectedVersion);
         ensureUnique(existing.associationId(), request.name(), normalizeCreditCode(request.unifiedSocialCreditCode()), id);
         if (existing.version() == Long.MAX_VALUE) {
@@ -210,17 +211,17 @@ public class MemberService implements MemberDirectory {
     }
 
     public synchronized MemberProfile update(UUID id, long expectedVersion, MemberUpsertRequest request) {
-        return update(id, expectedVersion, request, SYSTEM_ACTOR);
+        return update(id, expectedVersion, request, internalActorFor(getUnscoped(id)));
     }
 
     @Transactional
     public synchronized MemberProfile review(
             UUID id, long expectedVersion, MemberReviewRequest request, ActorScope actor) {
         MemberProfile existing = getUnscoped(id);
-        ensureNotDeleted(existing);
         if (!MemberAccessPolicy.canReview(actor, existing)) {
             throw scopeDenied();
         }
+        ensureNotDeleted(existing);
         ensureVersion(existing, expectedVersion);
         MemberProfile reviewed = copyWithStatus(existing, request.decision(), Instant.now());
         if (!repository.update(reviewed, expectedVersion)) {
@@ -254,7 +255,7 @@ public class MemberService implements MemberDirectory {
     }
 
     public synchronized MemberProfile delete(UUID id, long expectedVersion) {
-        return delete(id, expectedVersion, SYSTEM_ACTOR);
+        return delete(id, expectedVersion, internalActorFor(getUnscoped(id)));
     }
 
     @Transactional
@@ -347,6 +348,24 @@ public class MemberService implements MemberDirectory {
         return repository.findById(id).orElseThrow(() -> new NotFoundException("member", id));
     }
 
+    private static UUID targetAssociation(UUID requestedAssociationId, ActorScope actor) {
+        if (actor.isSystemAdmin() && actor.associationId() == null) {
+            throw associationContextRequired();
+        }
+        if (!MemberAccessPolicy.canCreate(actor)
+                || actor.associationId() == null
+                || requestedAssociationId != null && !requestedAssociationId.equals(actor.associationId())) {
+            throw scopeDenied();
+        }
+        return actor.associationId();
+    }
+
+    private static ActorScope internalActorFor(MemberProfile member) {
+        return new ActorScope(
+                null, SYSTEM_ACTOR.subject(), SYSTEM_ACTOR.username(), member.associationId(), null,
+                SYSTEM_ACTOR.roles(), SYSTEM_ACTOR.partnerAssociationIds());
+    }
+
     private static void ensureVersion(MemberProfile existing, long expectedVersion) {
         if (existing.version() != expectedVersion) {
             throw versionMismatch();
@@ -372,6 +391,13 @@ public class MemberService implements MemberDirectory {
 
     private static ForbiddenException scopeDenied() {
         return new ForbiddenException("DATA_SCOPE_DENIED", "member is outside the authenticated data scope");
+    }
+
+    private static com.guanxian.platform.shared.error.ApiException associationContextRequired() {
+        return new com.guanxian.platform.shared.error.ApiException(
+                "ASSOCIATION_CONTEXT_REQUIRED",
+                "system administrators must select an association context",
+                org.springframework.http.HttpStatus.BAD_REQUEST);
     }
 
     private static List<String> immutable(List<String> values) {

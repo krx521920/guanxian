@@ -25,7 +25,7 @@ class CrossAssociationService {
 
     List<CrossAssociationDtos.AccessRequestView> accessRequests(ActorScope actor) {
         requireManagementReader(actor);
-        return store.accessRequests().stream().filter(item -> actor.isSystemAdmin()
+        return store.accessRequests().stream().filter(item -> hasGlobalRead(actor)
                 || item.applicantAssociationId().equals(actor.associationId())
                 || item.targetAssociationId().equals(actor.associationId())).toList();
     }
@@ -87,7 +87,7 @@ class CrossAssociationService {
 
     List<CrossAssociationDtos.RelationshipView> relationships(ActorScope actor) {
         requireManagementReader(actor);
-        return store.relationships().stream().filter(item -> actor.isSystemAdmin()
+        return store.relationships().stream().filter(item -> hasGlobalRead(actor)
                 || item.sourceAssociationId().equals(actor.associationId())
                 || item.targetAssociationId().equals(actor.associationId())).toList();
     }
@@ -114,9 +114,9 @@ class CrossAssociationService {
                     throw new ConflictException("an expired relationship requires a new approved access request");
                 }
                 requireCurrent(existing.status(), "SUSPENDED");
-                if (!actor.isSystemAdmin()
-                        && (existing.suspendedByAssociationId() == null
-                        || !existing.suspendedByAssociationId().equals(actor.associationId()))) {
+                if ((existing.suspendedByAssociationId() == null && !actor.isSystemAdmin())
+                        || (existing.suspendedByAssociationId() != null
+                        && !existing.suspendedByAssociationId().equals(actor.associationId()))) {
                     throw forbidden("only the association that suspended the relationship may reactivate it");
                 }
                 if (expiresAt != null && !expiresAt.isAfter(now)) {
@@ -131,7 +131,7 @@ class CrossAssociationService {
                 requireCurrent(existing.status(), "ACTIVE");
                 status = "SUSPENDED";
                 suspendedAt = now;
-                suspendedByAssociationId = actor.isSystemAdmin() ? null : actor.associationId();
+                suspendedByAssociationId = actor.associationId();
                 suspendedBySubject = actor.subject();
             }
             case REVOKE -> {
@@ -161,7 +161,7 @@ class CrossAssociationService {
 
     List<CrossAssociationDtos.SharePolicyView> sharePolicies(ActorScope actor) {
         requireManagementReader(actor);
-        return store.sharePolicies().stream().filter(item -> actor.isSystemAdmin()
+        return store.sharePolicies().stream().filter(item -> hasGlobalRead(actor)
                 || item.sourceAssociationId().equals(actor.associationId())
                 || item.targetAssociationId().equals(actor.associationId())).toList();
     }
@@ -197,17 +197,17 @@ class CrossAssociationService {
     }
 
     List<CrossAssociationDtos.ConsentView> consents(ActorScope actor) {
-        if (actor.isSystemAdmin()) return store.consents();
-        if (actor.isAssociationStaff()) {
+        if (hasGlobalRead(actor)) return store.consents();
+        if (actor.enterpriseId() != null) {
+            return store.consents().stream()
+                    .filter(item -> item.enterpriseId().equals(actor.enterpriseId())).toList();
+        }
+        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
             requireBoundAssociation(actor);
             return store.consents().stream().filter(item ->
                     item.targetAssociationId().equals(actor.associationId())
                     || store.enterpriseAssociation(item.enterpriseId())
                     .filter(actor.associationId()::equals).isPresent()).toList();
-        }
-        if (actor.enterpriseId() != null) {
-            return store.consents().stream()
-                    .filter(item -> item.enterpriseId().equals(actor.enterpriseId())).toList();
         }
         throw forbidden("cross-association consent visibility is restricted");
     }
@@ -230,7 +230,7 @@ class CrossAssociationService {
         }
         Instant now = Instant.now();
         var normalizedRequest = new CrossAssociationDtos.ConsentCreate(
-                request.enterpriseId(), request.targetAssociationId(), resourceType, request.resourceId(), request.expiresAt());
+                enterpriseId, request.targetAssociationId(), resourceType, request.resourceId(), request.expiresAt());
         var created = store.insertConsent(enterpriseId, normalizedRequest, actor, now);
         store.audit(actor, source, enterpriseId, "ENTERPRISE_SHARE_CONSENT_GRANT", "ENTERPRISE_SHARE_CONSENT",
                 created.id(), created);
@@ -253,16 +253,16 @@ class CrossAssociationService {
     }
 
     List<CrossAssociationDtos.RecommendationView> recommendations(ActorScope actor) {
-        if (actor.isSystemAdmin()) return store.recommendations();
-        if (actor.isAssociationStaff()) {
+        if (hasGlobalRead(actor)) return store.recommendations();
+        if (actor.enterpriseId() != null) {
+            return store.recommendations().stream()
+                    .filter(item -> recommendationBelongsToEnterprise(item, actor.enterpriseId())).toList();
+        }
+        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
             requireBoundAssociation(actor);
             return store.recommendations().stream().filter(item ->
                     item.sourceAssociationId().equals(actor.associationId())
                     || item.targetAssociationId().equals(actor.associationId())).toList();
-        }
-        if (actor.enterpriseId() != null) {
-            return store.recommendations().stream()
-                    .filter(item -> recommendationBelongsToEnterprise(item, actor.enterpriseId())).toList();
         }
         throw forbidden("cross-association recommendation visibility is restricted");
     }
@@ -321,7 +321,7 @@ class CrossAssociationService {
         if (!sourceAssociationId.equals(demandAssociationId)) {
             throw forbidden("recommendation resource does not belong to the source association");
         }
-        if (actor.isEnterpriseAdmin() && !actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
+        if (actor.enterpriseId() != null) {
             boolean ownsDemand = demand == null || actor.enterpriseId().equals(demand.enterpriseId());
             boolean ownsMatch = match == null || match.belongsToEnterprise(actor.enterpriseId());
             if (!ownsDemand || !ownsMatch) {
@@ -387,11 +387,12 @@ class CrossAssociationService {
 
     private UUID ownedAssociation(ActorScope actor, UUID requested) {
         if (actor.isSystemAdmin()) {
-            if (requested == null) {
-                throw invalid("source association is required for a system administrator");
+            UUID selected = requireWriteAssociation(actor);
+            if (requested != null && !requested.equals(selected)) {
+                throw forbidden("cannot act outside the selected association context");
             }
-            requireAssociation(requested);
-            return requested;
+            requireAssociation(selected);
+            return selected;
         }
         if (actor.associationId() == null) {
             throw forbidden("identity is not bound to an association");
@@ -404,10 +405,20 @@ class CrossAssociationService {
 
     private UUID ownedEnterprise(ActorScope actor, UUID requested) {
         if (actor.isSystemAdmin()) {
-            if (requested == null) {
-                throw invalid("enterpriseId is required for a system administrator");
+            UUID selectedAssociation = requireWriteAssociation(actor);
+            UUID selectedEnterprise = actor.enterpriseId();
+            if (selectedEnterprise == null) {
+                throw forbidden("system administrators must select an enterprise for enterprise-level writes");
             }
-            return requested;
+            if (requested != null && !requested.equals(selectedEnterprise)) {
+                throw forbidden("cannot act outside the selected enterprise context");
+            }
+            UUID enterpriseAssociation = store.enterpriseAssociation(selectedEnterprise)
+                    .orElseThrow(() -> new NotFoundException("enterprise", selectedEnterprise));
+            if (!selectedAssociation.equals(enterpriseAssociation)) {
+                throw forbidden("selected enterprise does not belong to the selected association");
+            }
+            return selectedEnterprise;
         }
         if (!actor.isEnterpriseAdmin() || actor.enterpriseId() == null) {
             throw forbidden("only the bound enterprise administrator may manage consent");
@@ -447,24 +458,39 @@ class CrossAssociationService {
         if (!actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
             throw forbidden("association reviewer permission is required");
         }
+        requireWriteAssociation(actor);
     }
 
     private static void requireSourceAssociation(ActorScope actor, UUID source) {
-        if (!actor.isSystemAdmin() && !source.equals(actor.associationId())) {
+        requireWriteAssociation(actor);
+        if (!source.equals(actor.associationId())) {
             throw forbidden("only the source association may change this resource");
         }
     }
 
     private static void requireTargetAssociation(ActorScope actor, UUID target) {
-        if (!actor.isSystemAdmin() && !target.equals(actor.associationId())) {
+        requireWriteAssociation(actor);
+        if (!target.equals(actor.associationId())) {
             throw forbidden("only the target association may review this resource");
         }
     }
 
     private static void requireParticipantAssociation(ActorScope actor, UUID source, UUID target) {
-        if (!actor.isSystemAdmin() && !source.equals(actor.associationId()) && !target.equals(actor.associationId())) {
+        requireWriteAssociation(actor);
+        if (!source.equals(actor.associationId()) && !target.equals(actor.associationId())) {
             throw forbidden("only a relationship participant may change it");
         }
+    }
+
+    private static boolean hasGlobalRead(ActorScope actor) {
+        return actor.isSystemAdmin() && actor.associationId() == null;
+    }
+
+    private static UUID requireWriteAssociation(ActorScope actor) {
+        if (actor.associationId() == null) {
+            throw forbidden("an association context is required for this write operation");
+        }
+        return actor.associationId();
     }
 
     private static void requireCurrent(String actual, String required) {

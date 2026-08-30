@@ -1,6 +1,8 @@
 package com.guanxian.platform.policy;
 
+import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.Test;
@@ -85,8 +87,42 @@ class PolicyServiceTest {
         assertThat(restored.version()).isEqualTo(2);
     }
 
+    @Test
+    void systemAdministratorMustUseTheSelectedAssociationContext() {
+        ActorScope globalAdministrator = systemAdmin(null);
+        assertThatThrownBy(() -> service.create(request("无归属政策", "PRIVATE"), globalAdministrator))
+                .isInstanceOfSatisfying(ApiException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("ASSOCIATION_CONTEXT_REQUIRED"));
+
+        ActorScope associationAContext = systemAdmin(ASSOCIATION_A);
+        PolicyView associationAPolicy = service.create(request("甲协会政策", "PRIVATE"), associationAContext);
+        PolicyView associationBPolicy = service.create(request("乙协会政策", "PRIVATE"),
+                associationAdmin(ASSOCIATION_B));
+
+        assertThat(associationAPolicy.associationId()).isEqualTo(ASSOCIATION_A);
+        assertThatThrownBy(() -> service.update(
+                UUID.fromString(associationBPolicy.id()), 0,
+                request("无上下文修改", "PRIVATE"), globalAdministrator))
+                .isInstanceOfSatisfying(ApiException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("ASSOCIATION_CONTEXT_REQUIRED"));
+        assertThat(service.findAll(null, associationAContext))
+                .extracting(PolicyView::associationId)
+                .containsOnly(ASSOCIATION_A);
+        assertThatThrownBy(() -> service.get(
+                UUID.fromString(associationBPolicy.id()), associationAContext, false))
+                .isInstanceOf(NotFoundException.class);
+        assertThatThrownBy(() -> service.create(
+                request(ASSOCIATION_B, "伪造归属政策", "PRIVATE"), associationAContext))
+                .isInstanceOfSatisfying(ForbiddenException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("POLICY_SCOPE_VIOLATION"));
+    }
+
     private static PolicyUpsertRequest request(String title, String visibility) {
-        return new PolicyUpsertRequest(null, title, "北京地下管线协会", "京管协〔2026〕1号",
+        return request(null, title, visibility);
+    }
+
+    private static PolicyUpsertRequest request(UUID associationId, String title, String visibility) {
+        return new PolicyUpsertRequest(associationId, title, "北京地下管线协会", "京管协〔2026〕1号",
                 "行业协会", "信息管理", LocalDate.of(2026, 8, 20),
                 LocalDate.of(2026, 8, 21), "https://example.test/policy", "经核验的摘要",
                 List.of("地下管线", "信息管理"), visibility);
@@ -94,6 +130,10 @@ class PolicyServiceTest {
 
     private static ActorScope associationAdmin(UUID associationId) {
         return actor(associationId, Set.of("ASSOCIATION_ADMIN"), Set.of());
+    }
+
+    private static ActorScope systemAdmin(UUID associationId) {
+        return actor(associationId, Set.of("SYSTEM_ADMIN"), Set.of());
     }
 
     private static ActorScope actor(UUID associationId, Set<String> roles, Set<UUID> partners) {

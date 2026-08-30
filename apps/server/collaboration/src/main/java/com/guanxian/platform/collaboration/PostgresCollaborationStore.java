@@ -78,9 +78,12 @@ class PostgresCollaborationStore implements CollaborationStore {
                       FROM ecosystem_match m
                       JOIN cooperation_demand d ON d.id=m.demand_id
                       JOIN enterprise de ON de.id=d.enterprise_id
+                      JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
                      WHERE m.id=:matchId
                        AND m.deleted_at IS NULL
                        AND d.deleted_at IS NULL
+                       AND de.status='ACTIVE' AND de.deleted_at IS NULL
+                       AND ce.status='ACTIVE' AND ce.deleted_at IS NULL
                        AND de.association_id=:associationId
                        AND (:enterpriseId IS NULL
                             OR d.enterprise_id=:enterpriseId
@@ -258,7 +261,14 @@ class PostgresCollaborationStore implements CollaborationStore {
     private String where(ActorScope actor, String query, boolean includeDeleted) {
         StringBuilder sql = new StringBuilder(" WHERE ");
         if (actor.isSystemAdmin()) {
-            sql.append("TRUE");
+            if (actor.associationId() == null) {
+                sql.append("TRUE");
+            } else {
+                sql.append("c.association_id=:associationId");
+                if (actor.enterpriseId() != null) {
+                    sql.append(" AND c.enterprise_id=:enterpriseId");
+                }
+            }
         } else if (actor.isAssociationStaff()) {
             sql.append("c.association_id=:associationId");
         } else if (actor.associationId() != null) {
@@ -276,6 +286,19 @@ class PostgresCollaborationStore implements CollaborationStore {
         }
         if (!includeDeleted) {
             sql.append(" AND c.deleted_at IS NULL");
+        }
+        if (!actor.isSystemAdmin() && !actor.isAssociationStaff()) {
+            sql.append(" AND (c.enterprise_id IS NULL OR EXISTS (")
+                    .append("SELECT 1 FROM enterprise oe WHERE oe.id=c.enterprise_id ")
+                    .append("AND oe.status='ACTIVE' AND oe.deleted_at IS NULL))")
+                    .append(" AND (c.match_id IS NULL OR EXISTS (")
+                    .append("SELECT 1 FROM ecosystem_match lm ")
+                    .append("JOIN cooperation_demand ld ON ld.id=lm.demand_id ")
+                    .append("JOIN enterprise lde ON lde.id=ld.enterprise_id ")
+                    .append("JOIN enterprise lce ON lce.id=lm.candidate_enterprise_id ")
+                    .append("WHERE lm.id=c.match_id AND lm.deleted_at IS NULL AND ld.deleted_at IS NULL ")
+                    .append("AND lde.status='ACTIVE' AND lde.deleted_at IS NULL ")
+                    .append("AND lce.status='ACTIVE' AND lce.deleted_at IS NULL))");
         }
         if (query != null && !query.isBlank()) {
             sql.append(" AND (lower(c.title) LIKE :query")

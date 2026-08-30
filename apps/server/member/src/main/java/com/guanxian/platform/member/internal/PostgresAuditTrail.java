@@ -3,6 +3,7 @@ package com.guanxian.platform.member.internal;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -79,11 +80,19 @@ class PostgresAuditTrail implements AuditTrail {
 
     @Override
     public List<AuditRecord> findVisible(ActorScope actor, UUID enterpriseId, int limit) {
-        String scope = actor.isSystemAdmin() ? "" : " AND association_id = :associationId";
-        String enterprise = enterpriseId == null ? "" : " AND enterprise_id = :enterpriseId";
+        UUID scopedEnterpriseId = scopedEnterprise(actor, enterpriseId);
+        boolean globalSystemRead = actor.isSystemAdmin()
+                && actor.associationId() == null
+                && actor.enterpriseId() == null;
+        String scope = globalSystemRead
+                ? ""
+                : actor.associationId() == null
+                ? " AND FALSE"
+                : " AND association_id = :associationId";
+        String enterprise = scopedEnterpriseId == null ? "" : " AND enterprise_id = :enterpriseId";
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("associationId", actor.associationId())
-                .addValue("enterpriseId", enterpriseId)
+                .addValue("enterpriseId", scopedEnterpriseId)
                 .addValue("limit", limit);
         return jdbc.query("""
                 SELECT id, actor_subject, actor_username, association_id, enterprise_id,
@@ -99,6 +108,19 @@ class PostgresAuditTrail implements AuditTrail {
                         rs.getObject("resource_version", Long.class), rs.getString("outcome"),
                         readDetails(rs.getString("details")), rs.getString("request_id"),
                         rs.getTimestamp("occurred_at").toInstant()));
+    }
+
+    private static UUID scopedEnterprise(ActorScope actor, UUID requestedEnterpriseId) {
+        if (actor.enterpriseId() != null) {
+            if (requestedEnterpriseId != null
+                    && !actor.enterpriseId().equals(requestedEnterpriseId)) {
+                throw new ForbiddenException(
+                        "AUDIT_SCOPE_VIOLATION",
+                        "requested enterprise is outside the selected system context");
+            }
+            return actor.enterpriseId();
+        }
+        return requestedEnterpriseId;
     }
 
     private Map<String, Object> readDetails(String json) throws SQLException {

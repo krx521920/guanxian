@@ -6,6 +6,7 @@
     <artifactId>collaboration</artifactId>
     <dependencies>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>shared-kernel</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.guanxian.platform</groupId><artifactId>member</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>org.springframework</groupId><artifactId>spring-context</artifactId></dependency>
         <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-core</artifactId></dependency>
         <dependency><groupId>org.springframework</groupId><artifactId>spring-jdbc</artifactId></dependency>

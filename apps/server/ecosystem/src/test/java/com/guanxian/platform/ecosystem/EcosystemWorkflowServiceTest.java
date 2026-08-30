@@ -1,5 +1,8 @@
 package com.guanxian.platform.ecosystem;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.Test;
@@ -8,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,21 +25,26 @@ class EcosystemWorkflowServiceTest {
     void invitationNegotiationFeedbackAndOutcomeAreDurableWorkflowSteps() {
         ActorScope owner = enterprise(DEMAND_ENTERPRISE);
         ActorScope supplier = enterprise(SUPPLIER_ENTERPRISE);
+        ActorScope reviewer = reviewer();
+        Set<UUID> operational = ConcurrentHashMap.newKeySet();
+        operational.addAll(Set.of(DEMAND_ENTERPRISE, SUPPLIER_ENTERPRISE));
+        EnterpriseLifecycle lifecycle = operational::contains;
         DemandView demand = new DemandView(
                 UUID.randomUUID(), DEMAND_ENTERPRISE, "需求企业", "阀门采购", "零泄漏阀门",
                 List.of("燃气管网"), List.of("阀门"), "MEMBERS",
                 null, null, Instant.now().plusSeconds(86400), "OPEN", null,
                 0, false, Instant.now());
 
-        InMemoryEcosystemMatchStore matchStore = new InMemoryEcosystemMatchStore();
+        InMemoryEcosystemMatchStore matchStore = new InMemoryEcosystemMatchStore(lifecycle);
         PersistedMatchView match = matchStore.upsert(
                 demand,
                 List.of(new MatchCandidateDraft(
                         SUPPLIER_ENTERPRISE, "供应企业", "零泄漏球阀", 92, List.of("能力匹配"))),
                 owner).getFirst();
         InMemoryEcosystemCatalogStore catalogStore = new InMemoryEcosystemCatalogStore();
+        InMemoryEcosystemWorkflowStore workflowStore = new InMemoryEcosystemWorkflowStore(lifecycle);
         EcosystemWorkflowService service = new EcosystemWorkflowService(
-                matchStore, new InMemoryEcosystemWorkflowStore(), catalogStore);
+                matchStore, workflowStore, catalogStore, lifecycle);
 
         assertThrows(PreconditionFailedException.class, () -> service.invite(
                 match.id(), match.version(),
@@ -110,7 +119,23 @@ class EcosystemWorkflowServiceTest {
                 owner);
         assertEquals(1, service.outcomes(match.id(), supplier).size());
         assertEquals("阀门供应合作", outcome.title());
-        assertEquals("ARCHIVED", matchStore.find(match.id(), owner).orElseThrow().state());
+        PersistedMatchView archived = matchStore.find(match.id(), owner).orElseThrow();
+        assertEquals("ARCHIVED", archived.state());
+
+        operational.remove(SUPPLIER_ENTERPRISE);
+        assertEquals(1, service.outcomes(match.id(), reviewer).size());
+        assertEquals(5, service.negotiations(match.id(), reviewer).size());
+        assertEquals(List.of(), workflowStore.outcomes(match.id(), owner));
+        assertEquals(1, workflowStore.outcomes(match.id(), reviewer).size());
+        assertThrows(NotFoundException.class, () -> service.outcomes(match.id(), owner));
+        assertThrows(ForbiddenException.class,
+                () -> workflowStore.expirePendingInvitations(match.id(), reviewer));
+        assertThrows(PreconditionFailedException.class, () -> service.invite(
+                match.id(), archived.version(),
+                new MatchInvitationRequest(
+                        SUPPLIER_ENTERPRISE, "ASSOCIATION_RECOMMENDATION", "历史记录不可续写",
+                        Instant.now().plusSeconds(3600)),
+                reviewer));
     }
 
     private static void advance(
@@ -130,5 +155,11 @@ class EcosystemWorkflowServiceTest {
         return new ActorScope(
                 UUID.randomUUID(), "subject-" + enterpriseId, "enterprise",
                 ASSOCIATION_ID, enterpriseId, Set.of("ENTERPRISE_ADMIN"), Set.of());
+    }
+
+    private static ActorScope reviewer() {
+        return new ActorScope(
+                UUID.randomUUID(), "reviewer", "reviewer",
+                ASSOCIATION_ID, null, Set.of("ASSOCIATION_ADMIN"), Set.of());
     }
 }

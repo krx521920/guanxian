@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CrossAssociationServiceTest {
     private static final UUID SOURCE = UUID.fromString("00000000-0000-0000-0000-000000000106");
     private static final UUID TARGET = UUID.fromString("00000000-0000-0000-0000-000000000107");
+    private static final UUID OUTSIDER = UUID.fromString("00000000-0000-0000-0000-000000000108");
     private static final UUID ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-000000000201");
     private static final UUID OTHER_ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-000000000202");
     private static final UUID PRODUCT = UUID.fromString("00000000-0000-0000-0000-000000000301");
@@ -178,6 +179,64 @@ class CrossAssociationServiceTest {
     }
 
     @Test
+    void systemAdministratorGlobalReadsAreAllowedButEveryWriteRequiresSelectedAssociation() {
+        ActorScope global = systemAdministrator(null, null);
+        assertTrue(service.accessRequests(global).isEmpty());
+        assertThrows(ForbiddenException.class, () -> service.createAccessRequest(
+                new CrossAssociationDtos.AccessRequestCreate(SOURCE, TARGET, "global write"), global));
+
+        ActorScope sourceContext = systemAdministrator(SOURCE, null);
+        var created = service.createAccessRequest(
+                new CrossAssociationDtos.AccessRequestCreate(null, TARGET, "selected source"), sourceContext);
+
+        assertEquals(1, service.accessRequests(global).size());
+        assertEquals(1, service.accessRequests(sourceContext).size());
+        assertEquals(1, service.accessRequests(systemAdministrator(TARGET, null)).size());
+        assertTrue(service.accessRequests(systemAdministrator(OUTSIDER, null)).isEmpty());
+        assertThrows(ForbiddenException.class, () -> service.createAccessRequest(
+                new CrossAssociationDtos.AccessRequestCreate(OUTSIDER, TARGET, "body override"), sourceContext));
+        assertThrows(ForbiddenException.class, () -> service.reviewAccessRequest(
+                created.id(), new CrossAssociationDtos.AccessRequestReview(
+                        CrossAssociationDtos.AccessDecision.REJECT, null, null, null), global));
+        assertThrows(ForbiddenException.class, () -> service.reviewAccessRequest(
+                created.id(), new CrossAssociationDtos.AccessRequestReview(
+                        CrossAssociationDtos.AccessDecision.REJECT, null, null, null), sourceContext));
+
+        var reviewed = service.reviewAccessRequest(
+                created.id(), new CrossAssociationDtos.AccessRequestReview(
+                        CrossAssociationDtos.AccessDecision.REJECT, null, null, null),
+                systemAdministrator(TARGET, null));
+        assertEquals("REJECTED", reviewed.status());
+    }
+
+    @Test
+    void selectedSystemEnterpriseBoundsConsentAndRecommendationData() {
+        establishRelationship();
+        ActorScope selectedEnterprise = systemAdministrator(SOURCE, ENTERPRISE);
+        ActorScope selectedOtherEnterprise = systemAdministrator(SOURCE, OTHER_ENTERPRISE);
+        ActorScope global = systemAdministrator(null, null);
+
+        var consent = service.grantConsent(new CrossAssociationDtos.ConsentCreate(
+                null, TARGET, "PRODUCT", PRODUCT, null), selectedEnterprise);
+        assertEquals(ENTERPRISE, consent.enterpriseId());
+        assertEquals(1, service.consents(selectedEnterprise).size());
+        assertTrue(service.consents(selectedOtherEnterprise).isEmpty());
+        assertEquals(1, service.consents(global).size());
+        assertThrows(ForbiddenException.class, () -> service.grantConsent(
+                new CrossAssociationDtos.ConsentCreate(
+                        OTHER_ENTERPRISE, TARGET, "PRODUCT", OTHER_PRODUCT, null), selectedEnterprise));
+
+        var recommendation = service.createRecommendation(new CrossAssociationDtos.RecommendationCreate(
+                null, TARGET, DEMAND, null, "selected enterprise demand"), selectedEnterprise);
+        assertEquals(DEMAND, recommendation.demandId());
+        assertEquals(1, service.recommendations(selectedEnterprise).size());
+        assertTrue(service.recommendations(selectedOtherEnterprise).isEmpty());
+        assertThrows(ForbiddenException.class, () -> service.createRecommendation(
+                new CrossAssociationDtos.RecommendationCreate(
+                        null, TARGET, OTHER_DEMAND, null, "foreign enterprise demand"), selectedEnterprise));
+    }
+
+    @Test
     void recommendationReviewIsTargetScopedAndVersioned() {
         establishRelationship();
         var created = service.createRecommendation(new CrossAssociationDtos.RecommendationCreate(
@@ -218,5 +277,10 @@ class CrossAssociationServiceTest {
     private static ActorScope observer() {
         return new ActorScope(UUID.randomUUID(), "observer", "observer", SOURCE,
                 null, Set.of("OBSERVER"), Set.of());
+    }
+
+    private static ActorScope systemAdministrator(UUID associationId, UUID enterpriseId) {
+        return new ActorScope(UUID.randomUUID(), "system", "system", associationId,
+                enterpriseId, Set.of("SYSTEM_ADMIN"), Set.of());
     }
 }

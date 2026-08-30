@@ -1,5 +1,7 @@
 package com.guanxian.platform.collaboration;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,19 +30,23 @@ class InMemoryCollaborationStore implements CollaborationStore {
             UUID.fromString("00000000-0000-0000-0000-000000000106");
 
     private final ConcurrentMap<UUID, CollaborationView> items = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, MatchScope> matchScopes = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, List<CollaborationActivityView>> activities = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, List<CollaborationHistoryView>> histories = new ConcurrentHashMap<>();
     private final AtomicLong activitySequence = new AtomicLong();
     private final AtomicLong historySequence = new AtomicLong();
+    private final EnterpriseLifecycle enterpriseLifecycle;
 
     InMemoryCollaborationStore() {
-        this(false);
+        this(false, enterpriseId -> true);
     }
 
     @Autowired
     InMemoryCollaborationStore(
             @Value("${guanxian.business.seed-demo-data:${guanxian.member.seed-demo-data:false}}")
-            boolean seedDemoData) {
+            boolean seedDemoData,
+            EnterpriseLifecycle enterpriseLifecycle) {
+        this.enterpriseLifecycle = enterpriseLifecycle;
         if (!seedDemoData) {
             return;
         }
@@ -61,6 +68,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
     public List<CollaborationView> list(
             ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
         return items.values().stream()
+                .filter(item -> canReadEnterpriseHistory(actor, item))
                 .filter(item -> includeDeleted || !item.deleted())
                 .filter(item -> canRead(actor, item))
                 .filter(item -> matches(query, item))
@@ -74,6 +82,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
     @Override
     public long count(ActorScope actor, String query, boolean includeDeleted) {
         return items.values().stream()
+                .filter(item -> canReadEnterpriseHistory(actor, item))
                 .filter(item -> includeDeleted || !item.deleted())
                 .filter(item -> canRead(actor, item))
                 .filter(item -> matches(query, item))
@@ -83,7 +92,8 @@ class InMemoryCollaborationStore implements CollaborationStore {
     @Override
     public Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted) {
         CollaborationView item = items.get(id);
-        if (item == null || (!includeDeleted && item.deleted()) || !canRead(actor, item)) {
+        if (item == null || !canReadEnterpriseHistory(actor, item)
+                || (!includeDeleted && item.deleted()) || !canRead(actor, item)) {
             return Optional.empty();
         }
         return Optional.of(item);
@@ -91,9 +101,19 @@ class InMemoryCollaborationStore implements CollaborationStore {
 
     @Override
     public boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
-        // The memory adapter has no durable ecosystem catalog and is only enabled explicitly
-        // for isolated tests. PostgreSQL performs the authoritative scope check.
-        return true;
+        if (matchId == null) {
+            return true;
+        }
+        MatchScope scope = matchScopes.get(matchId);
+        if (scope == null
+                || !scope.associationId().equals(associationId)
+                || !enterpriseLifecycle.isOperational(scope.demandEnterpriseId())
+                || !enterpriseLifecycle.isOperational(scope.candidateEnterpriseId())) {
+            return false;
+        }
+        return enterpriseId == null
+                || enterpriseId.equals(scope.demandEnterpriseId())
+                || enterpriseId.equals(scope.candidateEnterpriseId());
     }
 
     @Override
@@ -231,6 +251,23 @@ class InMemoryCollaborationStore implements CollaborationStore {
         }
     }
 
+    InMemoryCollaborationStore(boolean seedDemoData) {
+        this(seedDemoData, enterpriseId -> true);
+    }
+
+    void registerMatchScope(
+            UUID matchId,
+            UUID associationId,
+            UUID demandEnterpriseId,
+            UUID candidateEnterpriseId) {
+        matchScopes.put(
+                Objects.requireNonNull(matchId, "matchId"),
+                new MatchScope(
+                        Objects.requireNonNull(associationId, "associationId"),
+                        Objects.requireNonNull(demandEnterpriseId, "demandEnterpriseId"),
+                        Objects.requireNonNull(candidateEnterpriseId, "candidateEnterpriseId")));
+    }
+
     private void seed(
             String id,
             String title,
@@ -247,9 +284,14 @@ class InMemoryCollaborationStore implements CollaborationStore {
         items.put(item.id(), item);
     }
 
-    private static boolean canRead(ActorScope actor, CollaborationView value) {
+    private boolean canRead(ActorScope actor, CollaborationView value) {
         if (actor.isSystemAdmin()) {
-            return true;
+            if (actor.associationId() != null
+                    && !actor.associationId().equals(value.associationId())) {
+                return false;
+            }
+            return actor.enterpriseId() == null
+                    || actor.enterpriseId().equals(value.enterpriseId());
         }
         if (actor.associationId() == null || !actor.associationId().equals(value.associationId())) {
             return false;
@@ -257,7 +299,32 @@ class InMemoryCollaborationStore implements CollaborationStore {
         if (actor.isAssociationStaff()) {
             return true;
         }
-        return value.enterpriseId() == null || value.enterpriseId().equals(actor.enterpriseId());
+        if (value.enterpriseId() != null) {
+            return value.enterpriseId().equals(actor.enterpriseId());
+        }
+        if (value.matchId() == null) {
+            return true;
+        }
+        return actor.enterpriseId() != null
+                && canLinkMatch(value.matchId(), value.associationId(), actor.enterpriseId());
+    }
+
+    private boolean enterpriseOperational(CollaborationView value) {
+        if (value.enterpriseId() != null && !enterpriseLifecycle.isOperational(value.enterpriseId())) {
+            return false;
+        }
+        if (value.matchId() == null) {
+            return true;
+        }
+        MatchScope scope = matchScopes.get(value.matchId());
+        return scope != null
+                && scope.associationId().equals(value.associationId())
+                && enterpriseLifecycle.isOperational(scope.demandEnterpriseId())
+                && enterpriseLifecycle.isOperational(scope.candidateEnterpriseId());
+    }
+
+    private boolean canReadEnterpriseHistory(ActorScope actor, CollaborationView value) {
+        return actor.isSystemAdmin() || actor.isAssociationStaff() || enterpriseOperational(value);
     }
 
     private static boolean matches(String query, CollaborationView value) {
@@ -327,5 +394,11 @@ class InMemoryCollaborationStore implements CollaborationStore {
 
     private static String clean(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private record MatchScope(
+            UUID associationId,
+            UUID demandEnterpriseId,
+            UUID candidateEnterpriseId) {
     }
 }

@@ -2,11 +2,13 @@ package com.guanxian.platform.ecosystem;
 
 import com.guanxian.platform.ai.AiTextService;
 import com.guanxian.platform.member.api.MemberDirectory;
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import com.guanxian.platform.member.api.MemberProfile;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,18 +30,32 @@ public class EcosystemMatchService {
     private final EcosystemCatalogService catalogService;
     private final EcosystemMatchStore matchStore;
     private final EcosystemCatalogStore catalogStore;
+    private final EnterpriseLifecycle enterpriseLifecycle;
 
+    @Autowired
     public EcosystemMatchService(
             MemberDirectory memberDirectory,
             AiTextService aiTextService,
             EcosystemCatalogService catalogService,
             EcosystemMatchStore matchStore,
-            EcosystemCatalogStore catalogStore) {
+            EcosystemCatalogStore catalogStore,
+            EnterpriseLifecycle enterpriseLifecycle) {
         this.memberDirectory = memberDirectory;
         this.aiTextService = aiTextService;
         this.catalogService = catalogService;
         this.matchStore = matchStore;
         this.catalogStore = catalogStore;
+        this.enterpriseLifecycle = enterpriseLifecycle;
+    }
+
+    EcosystemMatchService(
+            MemberDirectory memberDirectory,
+            AiTextService aiTextService,
+            EcosystemCatalogService catalogService,
+            EcosystemMatchStore matchStore,
+            EcosystemCatalogStore catalogStore) {
+        this(memberDirectory, aiTextService, catalogService, matchStore, catalogStore,
+                enterpriseId -> true);
     }
 
     @Transactional(readOnly = true)
@@ -48,10 +64,12 @@ public class EcosystemMatchService {
     }
 
     public List<EcosystemMatch> match(MatchRequest request, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
         int limit = request.limit() == null ? 5 : request.limit();
         String context = String.join(" ", request.demandTitle(), request.scene(), nullToEmpty(request.requirements()));
         List<String> tags = aiTextService.extractTags(context);
         return memberDirectory.findAll(null, actor).stream()
+                .filter(member -> enterpriseLifecycle.isOperational(member.id()))
                 .filter(member -> !member.name().equalsIgnoreCase(request.demandCompany()))
                 .map(member -> score(member, request, tags))
                 .sorted(Comparator.comparingInt(EcosystemMatch::score).reversed()
@@ -63,6 +81,7 @@ public class EcosystemMatchService {
 
     @Transactional
     public List<PersistedMatchView> generate(UUID demandId, Integer requestedLimit, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
         DemandView demand = catalogService.demand(demandId, actor, false);
         if (!"OPEN".equals(demand.status())) {
             throw new PreconditionFailedException("matches can only be generated for an OPEN demand");
@@ -80,6 +99,7 @@ public class EcosystemMatchService {
                 requirements,
                 limit);
         Map<UUID, MemberProfile> memberProfiles = memberDirectory.findAll(null, actor).stream()
+                .filter(member -> enterpriseLifecycle.isOperational(member.id()))
                 .collect(Collectors.toMap(MemberProfile::id, Function.identity(), (left, right) -> left));
         Map<UUID, MatchCandidateDraft> bestByEnterprise = new LinkedHashMap<>();
         visibleActiveOfferings(actor).stream()
@@ -104,17 +124,18 @@ public class EcosystemMatchService {
 
     @Transactional(readOnly = true)
     public List<PersistedMatchView> persisted(UUID demandId, ActorScope actor) {
-        catalogService.demand(demandId, actor, false);
         return matchStore.list(demandId, actor).stream().filter(value -> canReadMatch(value, actor)).toList();
     }
 
     @Transactional
     public PersistedMatchView recommend(UUID id, long expectedVersion, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
         if (!actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
             throw new ForbiddenException("MATCH_REVIEWER_REQUIRED", "association reviewer identity is required");
         }
         PersistedMatchView current = find(id, actor);
-        requireOwningAssociation(current.demandEnterpriseId(), actor);
+        requireOperationalMatch(current);
+        requireOwningAssociation(current, actor);
         MatchLifecycle.requireRecommendationAllowed(current);
         if (current.version() != expectedVersion) {
             throw stale();
@@ -129,7 +150,9 @@ public class EcosystemMatchService {
 
     @Transactional
     public PersistedMatchView confirm(UUID id, long expectedVersion, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
         PersistedMatchView current = find(id, actor);
+        requireOperationalMatch(current);
         if (actor.enterpriseId() == null
                 || (!actor.enterpriseId().equals(current.demandEnterpriseId())
                 && !actor.enterpriseId().equals(current.candidateEnterpriseId()))) {
@@ -160,12 +183,21 @@ public class EcosystemMatchService {
     @Transactional
     public PersistedMatchView close(
             UUID id, long expectedVersion, MatchCloseRequest request, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
         PersistedMatchView current = find(id, actor);
+        requireOperationalMatch(current);
         boolean owningAssociation = actor.isAssociationStaff()
                 && catalogStore.enterpriseBelongsToAssociation(
                 current.demandEnterpriseId(), actor.associationId());
-        if (!actor.isSystemAdmin() && !owningAssociation
-                && !current.demandEnterpriseId().equals(actor.enterpriseId())) {
+        boolean allowed;
+        if (actor.isSystemAdmin()) {
+            EcosystemScopeGuard.requireSystemMatchWrite(actor, current, catalogStore);
+            allowed = actor.enterpriseId() == null
+                    || current.demandEnterpriseId().equals(actor.enterpriseId());
+        } else {
+            allowed = owningAssociation || current.demandEnterpriseId().equals(actor.enterpriseId());
+        }
+        if (!allowed) {
             throw new ForbiddenException(
                     "MATCH_CLOSE_FORBIDDEN", "only the demand owner or association can close the match");
         }
@@ -201,28 +233,47 @@ public class EcosystemMatchService {
     private void requireDemandOwnerOrAssociation(DemandView demand, ActorScope actor) {
         boolean owningAssociation = actor.isAssociationStaff()
                 && catalogStore.enterpriseBelongsToAssociation(demand.enterpriseId(), actor.associationId());
-        if (actor.isSystemAdmin() || owningAssociation || demand.enterpriseId().equals(actor.enterpriseId())) {
+        if (actor.isSystemAdmin()) {
+            EcosystemScopeGuard.requireSystemEnterpriseWrite(actor, demand.enterpriseId(), catalogStore);
+            if (actor.enterpriseId() == null || demand.enterpriseId().equals(actor.enterpriseId())) {
+                return;
+            }
+        } else if (owningAssociation || demand.enterpriseId().equals(actor.enterpriseId())) {
             return;
         }
         throw new ForbiddenException(
                 "DEMAND_SCOPE_VIOLATION", "only the demand owner or association can generate matches");
     }
 
-    private void requireOwningAssociation(UUID enterpriseId, ActorScope actor) {
-        if (!actor.isSystemAdmin()
-                && (!actor.isAssociationStaff()
-                || !catalogStore.enterpriseBelongsToAssociation(enterpriseId, actor.associationId()))) {
+    private void requireOwningAssociation(PersistedMatchView match, ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            EcosystemScopeGuard.requireSystemMatchWrite(actor, match, catalogStore);
+            return;
+        }
+        if (!actor.isAssociationStaff()
+                || !catalogStore.enterpriseBelongsToAssociation(
+                match.demandEnterpriseId(), actor.associationId())) {
             throw new ForbiddenException(
                     "ASSOCIATION_SCOPE_VIOLATION", "association can only manage matches owned by its members");
         }
     }
 
     private boolean canReadMatch(PersistedMatchView value, ActorScope actor) {
-        return actor.isSystemAdmin()
-                || value.demandEnterpriseId().equals(actor.enterpriseId())
-                || value.candidateEnterpriseId().equals(actor.enterpriseId())
-                || actor.isAssociationStaff() && catalogStore.enterpriseBelongsToAssociation(
-                value.demandEnterpriseId(), actor.associationId());
+        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
+            return true;
+        }
+        return enterpriseLifecycle.isOperational(value.demandEnterpriseId())
+                && enterpriseLifecycle.isOperational(value.candidateEnterpriseId())
+                && (value.demandEnterpriseId().equals(actor.enterpriseId())
+                || value.candidateEnterpriseId().equals(actor.enterpriseId()));
+    }
+
+    private void requireOperationalMatch(PersistedMatchView value) {
+        if (!enterpriseLifecycle.isOperational(value.demandEnterpriseId())
+                || !enterpriseLifecycle.isOperational(value.candidateEnterpriseId())) {
+            throw new PreconditionFailedException(
+                    "both enterprises must be active before participating in ecosystem workflows");
+        }
     }
 
     private static PreconditionFailedException stale() {

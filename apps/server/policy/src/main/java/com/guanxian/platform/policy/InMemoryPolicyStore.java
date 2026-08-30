@@ -183,7 +183,7 @@ class InMemoryPolicyStore implements PolicyStore {
 
     private static boolean canRead(ActorScope actor, PolicyView policy) {
         if (actor.isSystemAdmin()) {
-            return true;
+            return actor.associationId() == null || actor.associationId().equals(policy.associationId());
         }
         boolean ownAssociation = actor.associationId() != null
                 && actor.associationId().equals(policy.associationId());

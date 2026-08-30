@@ -5,6 +5,8 @@ import com.guanxian.platform.ai.rag.PolicyRagService.RagQuestion;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -55,6 +57,33 @@ class PolicyRagServiceTest {
         assertEquals("NO_EVIDENCE", answer.mode());
         assertTrue(answer.citations().isEmpty());
         assertTrue(answer.answer().contains("无法形成"));
+    }
+
+    @Test
+    void privilegedGlobalScopeReadsAllAssociationsWhileSelectedAssociationRemainsNarrow() {
+        RagProperties properties = new RagProperties();
+        MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
+        KnowledgeIngestionService ingestion = new KnowledgeIngestionService(repository, properties);
+        UUID associationA = UUID.randomUUID();
+        UUID associationB = UUID.randomUUID();
+        ingestion.ingest(new KnowledgeTextDocument(
+                null, associationA, "甲协会巡检规则", "POLICY", "MANUAL", null,
+                "PRIVATE", "PUBLISHED", "author-a", "天穹校验标记要求甲协会每周巡检。"));
+        ingestion.ingest(new KnowledgeTextDocument(
+                null, associationB, "乙协会巡检规则", "POLICY", "MANUAL", null,
+                "PRIVATE", "PUBLISHED", "author-b", "天穹校验标记要求乙协会每日巡检。"));
+
+        var global = repository.retrieve(
+                new KnowledgeRepository.RetrievalScope(null, "system-admin", true),
+                "天穹校验标记巡检", 10);
+        var associationOnly = repository.retrieve(
+                new KnowledgeRepository.RetrievalScope(associationA, "system-admin", true),
+                "天穹校验标记巡检", 10);
+
+        assertEquals(Set.of("甲协会巡检规则", "乙协会巡检规则"), global.stream()
+                .map(KnowledgeRepository.RetrievedChunk::documentTitle).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(List.of("甲协会巡检规则"), associationOnly.stream()
+                .map(KnowledgeRepository.RetrievedChunk::documentTitle).distinct().toList());
     }
 
     @Test

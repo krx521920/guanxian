@@ -26,12 +26,16 @@ class MemberAccessPolicyTest {
         ActorScope enterpriseAdmin = actor(ASSOCIATION, ENTERPRISE, "ENTERPRISE_ADMIN", Set.of());
         ActorScope operator = actor(ASSOCIATION, null, "ASSOCIATION_OPERATOR", Set.of());
         ActorScope associationAdmin = actor(ASSOCIATION, null, "ASSOCIATION_ADMIN", Set.of());
-        ActorScope systemAdmin = actor(null, null, "SYSTEM_ADMIN", Set.of());
+        ActorScope globalSystemAdmin = actor(null, null, "SYSTEM_ADMIN", Set.of());
+        ActorScope associationSystemAdmin = actor(ASSOCIATION, null, "SYSTEM_ADMIN", Set.of());
+        ActorScope enterpriseSystemAdmin = actor(ASSOCIATION, ENTERPRISE, "SYSTEM_ADMIN", Set.of());
 
         assertFalse(MemberAccessPolicy.canCreate(enterpriseAdmin));
         assertTrue(MemberAccessPolicy.canCreate(operator));
         assertTrue(MemberAccessPolicy.canCreate(associationAdmin));
-        assertTrue(MemberAccessPolicy.canCreate(systemAdmin));
+        assertFalse(MemberAccessPolicy.canCreate(globalSystemAdmin));
+        assertTrue(MemberAccessPolicy.canCreate(associationSystemAdmin));
+        assertFalse(MemberAccessPolicy.canCreate(enterpriseSystemAdmin));
 
         assertTrue(MemberAccessPolicy.canUpdate(enterpriseAdmin, ownMember));
         assertFalse(MemberAccessPolicy.canUpdate(enterpriseAdmin, otherMember));
@@ -46,8 +50,16 @@ class MemberAccessPolicyTest {
         assertTrue(MemberAccessPolicy.canDelete(associationAdmin, ownMember));
         assertFalse(MemberAccessPolicy.canReview(associationAdmin, foreignMember));
         assertFalse(MemberAccessPolicy.canDelete(associationAdmin, foreignMember));
-        assertTrue(MemberAccessPolicy.canReview(systemAdmin, foreignMember));
-        assertTrue(MemberAccessPolicy.canDelete(systemAdmin, foreignMember));
+        assertFalse(MemberAccessPolicy.canUpdate(globalSystemAdmin, ownMember));
+        assertTrue(MemberAccessPolicy.canUpdate(associationSystemAdmin, ownMember));
+        assertFalse(MemberAccessPolicy.canUpdate(associationSystemAdmin, foreignMember));
+        assertTrue(MemberAccessPolicy.canUpdate(enterpriseSystemAdmin, ownMember));
+        assertFalse(MemberAccessPolicy.canUpdate(enterpriseSystemAdmin, otherMember));
+        assertFalse(MemberAccessPolicy.canReview(globalSystemAdmin, ownMember));
+        assertTrue(MemberAccessPolicy.canReview(associationSystemAdmin, ownMember));
+        assertFalse(MemberAccessPolicy.canDelete(associationSystemAdmin, foreignMember));
+        assertTrue(MemberAccessPolicy.canDelete(enterpriseSystemAdmin, ownMember));
+        assertFalse(MemberAccessPolicy.canDelete(enterpriseSystemAdmin, otherMember));
     }
 
     @Test
@@ -57,6 +69,9 @@ class MemberAccessPolicyTest {
         ActorScope partner = actor(OTHER_ASSOCIATION, OTHER_ENTERPRISE, "ENTERPRISE_MEMBER", Set.of(ASSOCIATION));
         ActorScope unrelated = actor(OTHER_ASSOCIATION, OTHER_ENTERPRISE, "ENTERPRISE_MEMBER", Set.of());
         ActorScope staff = actor(ASSOCIATION, null, "ASSOCIATION_OPERATOR", Set.of());
+        ActorScope globalSystemAdmin = actor(null, null, "SYSTEM_ADMIN", Set.of());
+        ActorScope associationSystemAdmin = actor(ASSOCIATION, null, "SYSTEM_ADMIN", Set.of());
+        ActorScope enterpriseSystemAdmin = actor(ASSOCIATION, ENTERPRISE, "SYSTEM_ADMIN", Set.of());
 
         assertTrue(MemberAccessPolicy.canRead(ownEnterprise, member(ENTERPRISE, ASSOCIATION, "PRIVATE")));
         assertFalse(MemberAccessPolicy.canRead(sameAssociation, member(ENTERPRISE, ASSOCIATION, "PRIVATE")));
@@ -69,6 +84,16 @@ class MemberAccessPolicyTest {
         assertFalse(MemberAccessPolicy.canRead(actor(null, null, "ENTERPRISE_MEMBER", Set.of()),
                 member(ENTERPRISE, ASSOCIATION, "MEMBERS")));
         assertFalse(MemberAccessPolicy.canRead(unrelated, member(ENTERPRISE, ASSOCIATION, "UNKNOWN")));
+        assertTrue(MemberAccessPolicy.canRead(globalSystemAdmin,
+                member(OTHER_ENTERPRISE, OTHER_ASSOCIATION, "PRIVATE")));
+        assertTrue(MemberAccessPolicy.canRead(associationSystemAdmin,
+                member(ENTERPRISE, ASSOCIATION, "PRIVATE")));
+        assertFalse(MemberAccessPolicy.canRead(associationSystemAdmin,
+                member(OTHER_ENTERPRISE, OTHER_ASSOCIATION, "PUBLIC")));
+        assertTrue(MemberAccessPolicy.canRead(enterpriseSystemAdmin,
+                member(ENTERPRISE, ASSOCIATION, "PRIVATE")));
+        assertFalse(MemberAccessPolicy.canRead(enterpriseSystemAdmin,
+                member(OTHER_ENTERPRISE, ASSOCIATION, "PUBLIC")));
     }
 
     private static ActorScope actor(

@@ -2,6 +2,7 @@ package com.guanxian.platform.storage;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,15 +30,21 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final AttachmentEnterpriseScope enterpriseScope;
 
-    PostgresAttachmentMetadataStore(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper) {
+    PostgresAttachmentMetadataStore(
+            NamedParameterJdbcTemplate jdbc,
+            ObjectMapper objectMapper,
+            AttachmentEnterpriseScope enterpriseScope) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.enterpriseScope = enterpriseScope;
     }
 
     @Override
     @Transactional
     public AttachmentView create(AttachmentDraft draft, ActorScope actor) {
+        requireCreateScope(draft, actor);
         jdbc.update("""
                 INSERT INTO object_file (
                     id, association_id, enterprise_id, bucket_name, object_key, original_filename,
@@ -135,7 +142,12 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private String readScope(ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return "";
+            if (actor.associationId() == null) {
+                return "";
+            }
+            return actor.enterpriseId() == null
+                    ? " AND association_id = :actorAssociationId"
+                    : " AND association_id = :actorAssociationId AND enterprise_id = :actorEnterpriseId";
         }
         if (actor.isAssociationStaff()) {
             return " AND association_id = :actorAssociationId";
@@ -149,7 +161,12 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private String manageScope(ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return "";
+            if (actor.associationId() == null) {
+                return " AND FALSE";
+            }
+            return actor.enterpriseId() == null
+                    ? " AND association_id = :actorAssociationId"
+                    : " AND association_id = :actorAssociationId AND enterprise_id = :actorEnterpriseId";
         }
         if (actor.isAssociationStaff()) {
             return " AND association_id = :actorAssociationId";
@@ -164,6 +181,33 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
         return new MapSqlParameterSource()
                 .addValue("actorAssociationId", actor.associationId())
                 .addValue("actorEnterpriseId", actor.enterpriseId());
+    }
+
+    private void requireCreateScope(AttachmentDraft draft, ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null || !actor.associationId().equals(draft.associationId())
+                    || !java.util.Objects.equals(actor.enterpriseId(), draft.enterpriseId())) {
+                throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                        "attachment target is outside the selected system context");
+            }
+            requireEnterpriseAssociation(draft, actor);
+            return;
+        }
+        if (actor.associationId() == null || !actor.associationId().equals(draft.associationId())
+                || actor.isEnterpriseAdmin() && (actor.enterpriseId() == null
+                || !actor.enterpriseId().equals(draft.enterpriseId()))) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "attachment target is outside the actor scope");
+        }
+        requireEnterpriseAssociation(draft, actor);
+    }
+
+    private void requireEnterpriseAssociation(AttachmentDraft draft, ActorScope actor) {
+        if (draft.enterpriseId() != null && !enterpriseScope.contains(
+                draft.associationId(), draft.enterpriseId(), actor)) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "target enterprise does not belong to the attachment association");
+        }
     }
 
     private MapSqlParameterSource draftParameters(AttachmentDraft draft) {

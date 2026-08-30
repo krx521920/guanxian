@@ -1,10 +1,13 @@
 package com.guanxian.platform.collaboration;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.ActorScopeResolver;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -26,10 +29,20 @@ public class CollaborationService {
 
     private final CollaborationStore store;
     private final ActorScopeResolver actorScopeResolver;
+    private final EnterpriseLifecycle enterpriseLifecycle;
 
-    public CollaborationService(CollaborationStore store, ActorScopeResolver actorScopeResolver) {
+    @Autowired
+    public CollaborationService(
+            CollaborationStore store,
+            ActorScopeResolver actorScopeResolver,
+            EnterpriseLifecycle enterpriseLifecycle) {
         this.store = store;
         this.actorScopeResolver = actorScopeResolver;
+        this.enterpriseLifecycle = enterpriseLifecycle;
+    }
+
+    CollaborationService(CollaborationStore store, ActorScopeResolver actorScopeResolver) {
+        this(store, actorScopeResolver, enterpriseId -> true);
     }
 
     public List<CollaborationView> findAll() {
@@ -67,10 +80,16 @@ public class CollaborationService {
     public CollaborationView create(CollaborationUpsertRequest request, ActorScope actor) {
         UUID associationId = requireAssociation(actor);
         UUID enterpriseId;
-        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
+        if (actor.isSystemAdmin()) {
+            enterpriseId = actor.enterpriseId();
+            if (enterpriseId != null) {
+                requireOperational(enterpriseId);
+            }
+        } else if (actor.isAssociationStaff()) {
             enterpriseId = null;
         } else if (actor.isEnterpriseAdmin() && actor.enterpriseId() != null) {
             enterpriseId = actor.enterpriseId();
+            requireOperational(enterpriseId);
         } else {
             throw scopeViolation();
         }
@@ -110,6 +129,7 @@ public class CollaborationService {
             ActorScope actor) {
         requireReviewer(actor);
         CollaborationView current = get(id, actor, false);
+        requireOperationalParticipation(current);
         requireState(current.stage(), Set.of("PENDING_REVIEW"), "collaboration is not pending review");
         String target = request.approved() ? "OPEN" : "REJECTED";
         String action = request.approved() ? "APPROVE" : "REJECT";
@@ -207,6 +227,7 @@ public class CollaborationService {
             String action,
             String detail,
             ActorScope actor) {
+        requireOperationalParticipation(current);
         requireVersion(current.version(), expectedVersion);
         CollaborationView updated = store.transition(
                 current.id(), expectedVersion, stage, disabled, actor)
@@ -228,7 +249,14 @@ public class CollaborationService {
     }
 
     private void requireManager(ActorScope actor, CollaborationView item) {
+        requireOperationalParticipation(item);
         if (actor.isSystemAdmin()) {
+            UUID associationId = requireAssociation(actor);
+            if (!associationId.equals(item.associationId())
+                    || actor.enterpriseId() != null
+                    && !actor.enterpriseId().equals(item.enterpriseId())) {
+                throw scopeViolation();
+            }
             return;
         }
         if (actor.isAssociationStaff() && item.associationId().equals(actor.associationId())) {
@@ -244,6 +272,17 @@ public class CollaborationService {
         throw scopeViolation();
     }
 
+    private void requireOperationalParticipation(CollaborationView item) {
+        if (item.enterpriseId() != null) {
+            requireOperational(item.enterpriseId());
+        }
+        if (item.matchId() != null && !store.canLinkMatch(
+                item.matchId(), item.associationId(), item.enterpriseId())) {
+            throw new PreconditionFailedException(
+                    "linked match participants must be active before changing collaboration history");
+        }
+    }
+
     private void requireMatchLink(UUID matchId, UUID associationId, UUID enterpriseId) {
         if (matchId != null && !store.canLinkMatch(matchId, associationId, enterpriseId)) {
             throw new ForbiddenException(
@@ -252,8 +291,19 @@ public class CollaborationService {
         }
     }
 
+    private void requireOperational(UUID enterpriseId) {
+        if (enterpriseId == null || !enterpriseLifecycle.isOperational(enterpriseId)) {
+            throw new PreconditionFailedException(
+                    "enterprise must be active before participating in collaboration workflows");
+        }
+    }
+
     private static void requireReviewer(ActorScope actor) {
-        if (!actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
+        if (actor.isSystemAdmin()) {
+            requireAssociation(actor);
+            return;
+        }
+        if (!actor.isAssociationReviewer()) {
             throw new ForbiddenException(
                     "REVIEWER_REQUIRED", "association reviewer identity is required");
         }

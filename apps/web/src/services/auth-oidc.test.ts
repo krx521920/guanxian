@@ -29,6 +29,8 @@ interface Scenario {
   getUserError?: Error
   callbackError?: Error
   currentUser?: Record<string, unknown>
+  scopedCurrentUser?: Record<string, unknown>
+  systemContext?: { associationId: string | null; enterpriseId: string | null }
   session?: Storage
 }
 
@@ -85,7 +87,7 @@ async function loadOidc(scenario: Scenario = {}) {
     signoutRedirect = signoutRedirect
   }
 
-  const request = vi.fn().mockResolvedValue(scenario.currentUser ?? {
+  const currentUser = scenario.currentUser ?? {
     subject: 'subject-1',
     username: 'verified.user',
     displayName: '',
@@ -93,17 +95,30 @@ async function loadOidc(scenario: Scenario = {}) {
     title: '',
     roles: ['IGNORED_ROLE', 'ASSOCIATION_ADMIN'],
     permissions: ['member:read', 'member:write'],
-  })
+  }
+  const request = vi.fn().mockResolvedValue(currentUser)
+  if (scenario.scopedCurrentUser) {
+    request.mockResolvedValueOnce(currentUser).mockResolvedValueOnce(scenario.scopedCurrentUser)
+  }
   const setAccessToken = vi.fn()
   const setDemoRole = vi.fn()
   const setSystemContext = vi.fn()
+  const getSystemContext = vi.fn(() => scenario.systemContext ?? {
+    associationId: null,
+    enterpriseId: null,
+  })
 
   vi.doMock('oidc-client-ts', () => ({
     UserManager: MockUserManager,
     WebStorageStateStore: MockWebStorageStateStore,
   }))
   vi.doMock('./http', () => ({ request }))
-  vi.doMock('./token-store', () => ({ setAccessToken, setDemoRole, setSystemContext }))
+  vi.doMock('./token-store', () => ({
+    getSystemContext,
+    setAccessToken,
+    setDemoRole,
+    setSystemContext,
+  }))
 
   const module = await import('./auth')
   return {
@@ -112,6 +127,7 @@ async function loadOidc(scenario: Scenario = {}) {
     request,
     setAccessToken,
     setSystemContext,
+    getSystemContext,
     getUser,
     signinRedirectCallback,
     signinRedirect,
@@ -181,7 +197,67 @@ describe('OIDC authentication', () => {
 
     oidc.expire()
     expect(oidc.setAccessToken).toHaveBeenLastCalledWith(null)
+    expect(oidc.setSystemContext).toHaveBeenLastCalledWith(null, null)
     expect(oidc.auth.user.value).toBeNull()
+  })
+
+  it('restores a persisted system scope only after validating the base identity and scope', async () => {
+    const associationId = '11111111-1111-4111-8111-111111111111'
+    const enterpriseId = '22222222-2222-4222-8222-222222222222'
+    const oidc = await loadOidc({
+      user: { access_token: 'system-token', expired: false },
+      systemContext: { associationId, enterpriseId },
+      currentUser: {
+        subject: 'system-subject',
+        username: 'system.admin',
+        displayName: '平台管理员',
+        organization: '全平台',
+        title: '系统管理员',
+        roles: ['SYSTEM_ADMIN'],
+        permissions: ['system:context:read'],
+      },
+      scopedCurrentUser: {
+        subject: 'system-subject',
+        username: 'system.admin',
+        displayName: '平台管理员',
+        organization: '已验证协会',
+        title: '系统管理员',
+        roles: ['SYSTEM_ADMIN'],
+        permissions: ['system:context:read'],
+        associationId,
+        enterpriseId,
+      },
+    })
+
+    await oidc.auth.initialize()
+
+    expect(oidc.request).toHaveBeenCalledTimes(2)
+    expect(oidc.setSystemContext.mock.calls).toEqual([
+      [null, null],
+      [associationId, enterpriseId],
+    ])
+    expect(oidc.auth.user.value).toMatchObject({
+      role: 'SYSTEM_ADMIN',
+      organization: '已验证协会',
+      associationId,
+      enterpriseId,
+    })
+  })
+
+  it('does not restore a stored system scope after the account loses the system role', async () => {
+    const oidc = await loadOidc({
+      user: { access_token: 'downgraded-token', expired: false },
+      systemContext: {
+        associationId: '11111111-1111-4111-8111-111111111111',
+        enterpriseId: null,
+      },
+    })
+
+    await oidc.auth.initialize()
+
+    expect(oidc.request).toHaveBeenCalledTimes(1)
+    expect(oidc.setSystemContext.mock.calls).toEqual([[null, null]])
+    expect(oidc.auth.user.value?.role).toBe('ASSOCIATION_ADMIN')
   })
 
   it('handles every callback path through the OIDC callback validator', async () => {

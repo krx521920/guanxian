@@ -121,4 +121,34 @@ class KnowledgeApiIntegrationTest {
                 .andExpect(jsonPath("$.code").value("UNSAFE_KNOWLEDGE_INPUT"));
     }
 
+    @Test
+    void systemAdministratorCannotOverrideSelectedAssociationFromKnowledgeRequestBody() throws Exception {
+        String otherAssociation = "00000000-0000-0000-0000-000000000999";
+
+        mockMvc.perform(post("/api/v1/knowledge/documents/text")
+                        .with(httpBasic("system-admin", "system123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "associationId": "%s",
+                                  "title": "不得跨上下文写入",
+                                  "content": "请求体中的协会不能覆盖系统管理员已选上下文。"
+                                }
+                                """.formatted(otherAssociation)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SYSTEM_CONTEXT_FORBIDDEN"));
+
+        mockMvc.perform(post("/api/v1/knowledge/questions")
+                        .with(httpBasic("system-admin", "system123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "associationId": "%s",
+                                  "question": "请求体能否切换协会？"
+                                }
+                                """.formatted(otherAssociation)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SYSTEM_CONTEXT_FORBIDDEN"));
+    }
+
 }

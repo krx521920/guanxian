@@ -3,6 +3,9 @@ package com.guanxian.platform.iam;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ConflictException;
+import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.PreconditionFailedException;
+import com.guanxian.platform.shared.error.PreconditionRequiredException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,12 +17,15 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AccessBindingServiceTest {
     private static final UUID ASSOCIATION = UUID.fromString("00000000-0000-0000-0000-000000000100");
     private static final UUID OTHER_ASSOCIATION = UUID.fromString("00000000-0000-0000-0000-000000000101");
     private static final UUID ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-000000000201");
+    private static final UUID OTHER_ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-000000000202");
     private AccessBindingService service;
     private JdbcTemplate jdbc;
 
@@ -30,13 +36,20 @@ class AccessBindingServiceTest {
         jdbc = new JdbcTemplate(dataSource);
         jdbc.execute("CREATE DOMAIN IF NOT EXISTS JSONB AS JSON");
         jdbc.execute("CREATE TABLE association (id UUID PRIMARY KEY, name VARCHAR(200), status VARCHAR(32))");
-        jdbc.execute("CREATE TABLE enterprise (id UUID PRIMARY KEY, association_id UUID NOT NULL, name VARCHAR(200))");
+        jdbc.execute("CREATE TABLE enterprise (id UUID PRIMARY KEY, association_id UUID NOT NULL, name VARCHAR(200), status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE', deleted_at TIMESTAMP WITH TIME ZONE)");
         jdbc.execute("""
                 CREATE TABLE user_account (
                   id UUID PRIMARY KEY, association_id UUID, enterprise_id UUID,
                   external_subject VARCHAR(200), username VARCHAR(100) UNIQUE,
                   display_name VARCHAR(100), email VARCHAR(254), status VARCHAR(32),
+                  version BIGINT NOT NULL DEFAULT 0,
                   created_at TIMESTAMP WITH TIME ZONE, updated_at TIMESTAMP WITH TIME ZONE)
+                """);
+        jdbc.execute("""
+                CREATE TABLE revoked_identity_subject (
+                  external_subject VARCHAR(200) PRIMARY KEY, user_account_id UUID,
+                  revoked_by_subject VARCHAR(200), reason VARCHAR(100),
+                  revoked_at TIMESTAMP WITH TIME ZONE)
                 """);
         jdbc.execute("""
                 CREATE TABLE audit_log (
@@ -49,7 +62,10 @@ class AccessBindingServiceTest {
                 """);
         jdbc.update("INSERT INTO association(id, name, status) VALUES (?, '北京地下管线协会', 'ACTIVE'), (?, '友好协会', 'ACTIVE')",
                 ASSOCIATION, OTHER_ASSOCIATION);
-        jdbc.update("INSERT INTO enterprise(id, association_id, name) VALUES (?, ?, '绑定企业')", ENTERPRISE, ASSOCIATION);
+        jdbc.update("""
+                INSERT INTO enterprise(id, association_id, name)
+                VALUES (?, ?, '绑定企业'), (?, ?, '其他协会企业')
+                """, ENTERPRISE, ASSOCIATION, OTHER_ENTERPRISE, OTHER_ASSOCIATION);
         service = new AccessBindingService(new NamedParameterJdbcTemplate(dataSource), new ObjectMapper());
     }
 
@@ -62,23 +78,27 @@ class AccessBindingServiceTest {
                 """, localId);
 
         AccessBindingView created = service.upsert(new AccessBindingRequest(
-                "  oidc-subject-1  ", " local.user ", " 企业管理员 ", null, ENTERPRISE, " user@example.com "), systemActor());
+                "  oidc-subject-1  ", " local.user ", " 企业管理员 ", null, ENTERPRISE, " user@example.com "),
+                0L, systemActor());
 
         assertEquals(localId, created.id());
         assertEquals("oidc-subject-1", created.externalSubject());
         assertEquals(ASSOCIATION, created.associationId());
         assertEquals(ENTERPRISE, created.enterpriseId());
         assertEquals("企业管理员", created.displayName());
-        assertEquals(1, service.findAll().size());
+        assertEquals(1, created.version());
+        assertEquals(1, service.findAll(systemActor()).size());
         assertEquals("oidc-subject-1", jdbc.queryForObject(
                 "SELECT external_subject FROM user_account WHERE id = ?", String.class, localId));
         assertEquals("ACCESS_BINDING_UPSERT", jdbc.queryForObject(
-                "SELECT action FROM audit_log WHERE resource_id = 'oidc-subject-1'", String.class));
+                "SELECT action FROM audit_log WHERE resource_id = ?", String.class, localId.toString()));
 
         AccessBindingView updated = service.upsert(new AccessBindingRequest(
-                "oidc-subject-1", "local.user", "新名称", ASSOCIATION, ENTERPRISE, null), systemActor());
+                "oidc-subject-1", "local.user", "新名称", ASSOCIATION, ENTERPRISE, null),
+                1L, systemActor());
         assertEquals(localId, updated.id());
         assertEquals("新名称", updated.displayName());
+        assertEquals(2, updated.version());
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM audit_log", Integer.class));
     }
 
@@ -91,21 +111,184 @@ class AccessBindingServiceTest {
                 """, UUID.randomUUID(), UUID.randomUUID());
 
         assertThrows(ConflictException.class, () -> service.upsert(new AccessBindingRequest(
-                "wanted-subject", "same-name", "冲突", ASSOCIATION, null, null), systemActor()));
+                "wanted-subject", "same-name", "冲突", ASSOCIATION, null, null), null, systemActor()));
 
+        UUID missingAssociation = UUID.randomUUID();
         ApiException missing = assertThrows(ApiException.class, () -> service.upsert(new AccessBindingRequest(
-                "new-subject", "new-user", "新用户", UUID.randomUUID(), null, null), systemActor()));
+                "new-subject", "new-user", "新用户", missingAssociation, null, null),
+                null, systemActor(missingAssociation, null)));
         assertEquals("INVALID_ACCESS_BINDING", missing.code());
 
         ApiException mismatch = assertThrows(ApiException.class, () -> service.upsert(new AccessBindingRequest(
-                "new-subject", "new-user", "新用户", OTHER_ASSOCIATION, ENTERPRISE, null), systemActor()));
+                "new-subject", "new-user", "新用户", OTHER_ASSOCIATION, ENTERPRISE, null),
+                null, systemActor(OTHER_ASSOCIATION, null)));
         assertEquals("INVALID_ACCESS_BINDING", mismatch.code());
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM user_account", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM audit_log", Integer.class));
     }
 
-    private static ActorScope systemActor() {
-        return new ActorScope(null, "bootstrap-subject", "system-admin", null, null,
+    @Test
+    void requiresStrongOptimisticConcurrencyForExistingAccounts() {
+        UUID localId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO user_account(id, username, display_name, status, version, created_at, updated_at)
+                VALUES (?, 'existing.user', '既有账号', 'ACTIVE', 4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, localId);
+        AccessBindingRequest request = new AccessBindingRequest(
+                "existing-subject", "existing.user", "既有账号", ASSOCIATION, null, null);
+
+        assertThrows(PreconditionRequiredException.class,
+                () -> service.upsert(request, null, systemActor()));
+        assertThrows(PreconditionFailedException.class,
+                () -> service.upsert(request, 3L, systemActor()));
+
+        AccessBindingView updated = service.upsert(request, 4L, systemActor());
+        assertEquals(5, updated.version());
+        assertEquals("existing-subject", updated.externalSubject());
+    }
+
+    @Test
+    void disablesRestoresAndUnbindsOnlyThroughExplicitAuditedTransitions() {
+        AccessBindingView created = service.upsert(new AccessBindingRequest(
+                "lifecycle-subject", "lifecycle.user", "生命周期账号", null, ENTERPRISE, null),
+                null, systemActor());
+        assertEquals("ACTIVE", created.status());
+        assertEquals(0, created.version());
+
+        AccessBindingView disabled = service.disable(created.id(), 0, systemActor());
+        assertEquals("INACTIVE", disabled.status());
+        assertEquals(1, disabled.version());
+        assertThrows(PreconditionFailedException.class,
+                () -> service.restore(created.id(), 0, systemActor()));
+
+        AccessBindingView restored = service.restore(created.id(), 1, systemActor());
+        assertEquals("ACTIVE", restored.status());
+        assertEquals(2, restored.version());
+
+        AccessBindingView unbound = service.unbind(created.id(), 2, systemActor());
+        assertEquals("INACTIVE", unbound.status());
+        assertEquals(3, unbound.version());
+        assertNull(unbound.externalSubject());
+        assertFalse(unbound.bound());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM revoked_identity_subject WHERE external_subject='lifecycle-subject'",
+                Integer.class));
+        assertThrows(ApiException.class, () -> service.restore(created.id(), 3, systemActor()));
+
+        AccessBindingView reboundInactive = service.upsert(new AccessBindingRequest(
+                "replacement-subject", "lifecycle.user", "生命周期账号", null, ENTERPRISE, null),
+                3L, systemActor());
+        assertEquals("INACTIVE", reboundInactive.status());
+        assertEquals(4, reboundInactive.version());
+        AccessBindingView reboundActive = service.restore(created.id(), 4, systemActor());
+        assertEquals("ACTIVE", reboundActive.status());
+        assertEquals("replacement-subject", reboundActive.externalSubject());
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM revoked_identity_subject WHERE external_subject='lifecycle-subject'",
+                Integer.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM revoked_identity_subject WHERE external_subject='replacement-subject'",
+                Integer.class));
+
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE action='ACCESS_BINDING_DISABLE'", Integer.class));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE action='ACCESS_BINDING_RESTORE'", Integer.class));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM audit_log WHERE action='ACCESS_BINDING_UNBIND'", Integer.class));
+    }
+
+    @Test
+    void refusesToRestoreAnAccountWhoseEnterpriseWasDisabled() {
+        AccessBindingView created = service.upsert(new AccessBindingRequest(
+                "disabled-company-subject", "disabled.company", "停用企业账号", null, ENTERPRISE, null),
+                null, systemActor());
+        AccessBindingView disabled = service.disable(created.id(), 0, systemActor());
+        jdbc.update("UPDATE enterprise SET status='DISABLED' WHERE id=?", ENTERPRISE);
+
+        ApiException exception = assertThrows(ApiException.class,
+                () -> service.restore(created.id(), disabled.version(), systemActor()));
+
+        assertEquals("INVALID_ACCESS_BINDING", exception.code());
+        assertEquals("INACTIVE", jdbc.queryForObject(
+                "SELECT status FROM user_account WHERE id=?", String.class, created.id()));
+    }
+
+    @Test
+    void globalSystemReadIsAllowedButEveryWriteIsBoundToTheSelectedContext() {
+        UUID accountA = UUID.randomUUID();
+        UUID accountB = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO user_account(
+                    id, association_id, enterprise_id, external_subject, username,
+                    display_name, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'subject-a', 'user.a', '账号 A', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (?, ?, ?, 'subject-b', 'user.b', '账号 B', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, accountA, ASSOCIATION, ENTERPRISE,
+                accountB, OTHER_ASSOCIATION, OTHER_ENTERPRISE);
+
+        assertEquals(2, service.findAll(globalSystemActor()).size());
+        assertEquals(java.util.List.of(accountA),
+                service.findAll(systemActor()).stream().map(AccessBindingView::id).toList());
+        assertEquals(java.util.List.of(accountA),
+                service.findAll(systemActor(ASSOCIATION, ENTERPRISE)).stream()
+                        .map(AccessBindingView::id).toList());
+
+        assertThrows(ForbiddenException.class, () -> service.upsert(new AccessBindingRequest(
+                "new-global", "new.global", "无上下文写入", ASSOCIATION, null, null),
+                null, globalSystemActor()));
+        assertThrows(ForbiddenException.class,
+                () -> service.disable(accountB, 0, systemActor()));
+        assertThrows(ForbiddenException.class, () -> service.upsert(new AccessBindingRequest(
+                "cross-subject", "cross.user", "跨协会", OTHER_ASSOCIATION, null, null),
+                null, systemActor()));
+        assertThrows(ForbiddenException.class, () -> service.upsert(new AccessBindingRequest(
+                "association-level", "association.level", "越过企业上下文", ASSOCIATION, null, null),
+                null, systemActor(ASSOCIATION, ENTERPRISE)));
+    }
+
+    @Test
+    void currentAndBootstrapSystemIdentitiesCannotMutateTheirOwnBinding() {
+        UUID adminId = UUID.randomUUID();
+        UUID bootstrapLocalId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO user_account(
+                    id, association_id, external_subject, username, display_name,
+                    status, created_at, updated_at)
+                VALUES (?, ?, 'admin-subject', 'admin.user', '当前管理员',
+                        'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                       (?, ?, NULL, 'system-admin', '引导管理员本地账号',
+                        'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, adminId, ASSOCIATION, bootstrapLocalId, ASSOCIATION);
+        ActorScope currentAdmin = new ActorScope(
+                adminId, "admin-subject", "admin.user", ASSOCIATION, null,
                 Set.of("SYSTEM_ADMIN"), Set.of());
+
+        assertThrows(ForbiddenException.class,
+                () -> service.disable(adminId, 0, currentAdmin));
+        assertThrows(ForbiddenException.class, () -> service.upsert(new AccessBindingRequest(
+                "admin-subject", "admin.user", "修改自身", ASSOCIATION, null, null),
+                0L, currentAdmin));
+        assertThrows(ForbiddenException.class, () -> service.upsert(new AccessBindingRequest(
+                "bootstrap-subject", "bootstrap.user", "引导账号", ASSOCIATION, null, null),
+                null, systemActor()));
+        assertThrows(ForbiddenException.class,
+                () -> service.disable(bootstrapLocalId, 0, systemActor()));
+        assertThrows(ForbiddenException.class, () -> service.upsert(new AccessBindingRequest(
+                "replacement-bootstrap-subject", "system-admin", "引导账号", ASSOCIATION, null, null),
+                0L, systemActor()));
+    }
+
+    private static ActorScope systemActor() {
+        return systemActor(ASSOCIATION, null);
+    }
+
+    private static ActorScope systemActor(UUID associationId, UUID enterpriseId) {
+        return new ActorScope(null, "bootstrap-subject", "system-admin", associationId, enterpriseId,
+                Set.of("SYSTEM_ADMIN"), Set.of());
+    }
+
+    private static ActorScope globalSystemActor() {
+        return systemActor(null, null);
     }
 }

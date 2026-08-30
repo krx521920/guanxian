@@ -1,5 +1,6 @@
 package com.guanxian.platform.ecosystem;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
@@ -10,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -92,6 +94,67 @@ class EcosystemCatalogServiceTest {
         assertEquals(ENTERPRISE_A, page.items().getFirst().enterpriseId());
     }
 
+    @Test
+    void detailIncludeDeletedUsesTheSameAdministratorGateAsLists() {
+        ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
+        ActorScope otherEnterpriseAdmin = enterpriseAdmin(ENTERPRISE_B);
+        ActorScope reviewer = associationReviewer();
+
+        OfferingView offering = service.createOffering(new OfferingUpsertRequest(
+                "已下架阀门", "PRODUCT", null, List.of(), List.of(), "MEMBERS"), owner);
+        offering = service.submitOffering(offering.id(), offering.version(), owner);
+        offering = service.reviewOffering(
+                offering.id(), offering.version(), new ReviewDecisionRequest(true, null), reviewer);
+        assertEquals(offering.id(), service.offering(offering.id(), otherEnterpriseAdmin, false).id());
+        OfferingView deletedOffering = service.deleteOffering(offering.id(), offering.version(), owner);
+
+        DemandView demand = service.createDemand(new DemandUpsertRequest(
+                "已撤回采购", "历史需求", List.of("燃气管网"), List.of("阀门"),
+                "MEMBERS", null, null, Instant.now().plusSeconds(3600)), owner);
+        demand = service.submitDemand(demand.id(), demand.version(), owner);
+        demand = service.reviewDemand(
+                demand.id(), demand.version(), new ReviewDecisionRequest(true, null), reviewer);
+        DemandView deletedDemand = service.deleteDemand(demand.id(), demand.version(), owner);
+
+        assertThrows(NotFoundException.class,
+                () -> service.offering(deletedOffering.id(), otherEnterpriseAdmin, true));
+        assertThrows(NotFoundException.class,
+                () -> service.demand(deletedDemand.id(), otherEnterpriseAdmin, true));
+        assertEquals(0, service.offerings(otherEnterpriseAdmin, null, true, 0, 20).total());
+        assertEquals(0, service.demands(otherEnterpriseAdmin, null, true, 0, 20).total());
+        assertEquals(deletedOffering.id(), service.offering(deletedOffering.id(), owner, true).id());
+        assertEquals(deletedDemand.id(), service.demand(deletedDemand.id(), owner, true).id());
+        assertEquals(deletedOffering.id(), service.offering(deletedOffering.id(), reviewer, true).id());
+        assertEquals(deletedDemand.id(), service.demand(deletedDemand.id(), reviewer, true).id());
+    }
+
+    @Test
+    void inactiveEnterpriseCatalogIsHistoricalForAdministratorsButNotParticipants() {
+        AtomicBoolean active = new AtomicBoolean(true);
+        EnterpriseLifecycle lifecycle = ignored -> active.get();
+        InMemoryEcosystemCatalogStore store = new InMemoryEcosystemCatalogStore(lifecycle);
+        EcosystemCatalogService guarded = new EcosystemCatalogService(store, lifecycle);
+        ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
+        OfferingUpsertRequest request = new OfferingUpsertRequest(
+                "可恢复产品", "PRODUCT", null, List.of(), List.of(), "MEMBERS");
+
+        OfferingView created = guarded.createOffering(request, owner);
+        assertEquals(1, guarded.offerings(owner, null, false, 0, 20).total());
+
+        active.set(false);
+        assertEquals(0, guarded.offerings(owner, null, true, 0, 20).total());
+        assertThrows(NotFoundException.class, () -> guarded.offering(created.id(), owner, true));
+        assertEquals(created.id(), guarded.offering(created.id(), associationReviewer(), false).id());
+        assertEquals(created.id(), guarded.offering(created.id(), systemAdmin(), false).id());
+        assertEquals(1, guarded.offerings(associationReviewer(), null, false, 0, 20).total());
+        assertThrows(PreconditionFailedException.class,
+                () -> guarded.deleteOffering(created.id(), created.version(), associationReviewer()));
+        assertThrows(PreconditionFailedException.class, () -> guarded.createOffering(request, owner));
+
+        active.set(true);
+        assertEquals(created.id(), guarded.offering(created.id(), owner, false).id());
+    }
+
     private static ActorScope enterpriseAdmin(UUID enterpriseId) {
         return new ActorScope(
                 UUID.randomUUID(),
@@ -113,4 +176,11 @@ class EcosystemCatalogServiceTest {
                 Set.of("ASSOCIATION_ADMIN"),
                 Set.of());
     }
+
+    private static ActorScope systemAdmin() {
+        return new ActorScope(
+                UUID.randomUUID(), "system-admin", "system-admin",
+                ASSOCIATION_ID, null, Set.of("SYSTEM_ADMIN"), Set.of());
+    }
+
 }
