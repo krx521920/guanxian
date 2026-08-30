@@ -27,7 +27,6 @@ const profileMenuRef = ref<HTMLElement | null>(null)
 const notificationButtonRef = ref<HTMLElement | null>(null)
 const notificationPopoverRef = ref<HTMLElement | null>(null)
 const primaryTheme = ref('teal')
-const neutralTheme = ref('slate')
 const appearance = ref<'light' | 'dark'>('light')
 
 const primaryThemes = [
@@ -37,13 +36,6 @@ const primaryThemes = [
   { value: 'orange', label: '橙色', color: '#ea580c' },
   { value: 'rose', label: '玫红', color: '#e11d48' }
 ]
-const neutralThemes = [
-  { value: 'slate', label: '蓝灰', color: '#64748b' },
-  { value: 'gray', label: '灰色', color: '#6b7280' },
-  { value: 'zinc', label: '锌灰', color: '#71717a' },
-  { value: 'stone', label: '暖灰', color: '#78716c' }
-]
-
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
 const breadcrumbSection = computed(() => {
@@ -125,19 +117,13 @@ function closeNotification() {
 function applyPreferences() {
   const root = document.documentElement
   root.dataset.primary = primaryTheme.value
-  root.dataset.neutral = neutralTheme.value
+  delete root.dataset.neutral
   root.dataset.appearance = appearance.value
 }
 
 function setPrimaryTheme(value: string) {
   primaryTheme.value = value
   localStorage.setItem('guanxian-primary-theme', value)
-  applyPreferences()
-}
-
-function setNeutralTheme(value: string) {
-  neutralTheme.value = value
-  localStorage.setItem('guanxian-neutral-theme', value)
   applyPreferences()
 }
 
@@ -172,11 +158,10 @@ function handleDocumentKeyDown(event: KeyboardEvent) {
 
 onMounted(() => {
   const savedPrimary = localStorage.getItem('guanxian-primary-theme')
-  const savedNeutral = localStorage.getItem('guanxian-neutral-theme')
   const savedAppearance = localStorage.getItem('guanxian-appearance')
   if (primaryThemes.some((item) => item.value === savedPrimary)) primaryTheme.value = savedPrimary!
-  if (neutralThemes.some((item) => item.value === savedNeutral)) neutralTheme.value = savedNeutral!
   if (savedAppearance === 'light' || savedAppearance === 'dark') appearance.value = savedAppearance
+  localStorage.removeItem('guanxian-neutral-theme')
   applyPreferences()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   document.addEventListener('keydown', handleDocumentKeyDown)
@@ -301,37 +286,18 @@ async function logout() {
                 <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
               </button>
               <div v-if="themeMenuOpen" class="profile-submenu theme-submenu" role="menu">
-                <div class="theme-option-group">
-                  <span>主色</span>
-                  <div class="theme-swatches">
-                    <button
-                      v-for="item in primaryThemes"
-                      :key="item.value"
-                      class="theme-swatch"
-                      :class="{ active: primaryTheme === item.value }"
-                      type="button"
-                      :title="item.label"
-                      :aria-label="`主色：${item.label}`"
-                      :style="{ '--swatch': item.color }"
-                      @click="setPrimaryTheme(item.value)"
-                    />
-                  </div>
-                </div>
-                <div class="theme-option-group">
-                  <span>中性色</span>
-                  <div class="theme-swatches">
-                    <button
-                      v-for="item in neutralThemes"
-                      :key="item.value"
-                      class="theme-swatch"
-                      :class="{ active: neutralTheme === item.value }"
-                      type="button"
-                      :title="item.label"
-                      :aria-label="`中性色：${item.label}`"
-                      :style="{ '--swatch': item.color }"
-                      @click="setNeutralTheme(item.value)"
-                    />
-                  </div>
+                <div class="theme-swatches">
+                  <button
+                    v-for="item in primaryThemes"
+                    :key="item.value"
+                    class="theme-swatch"
+                    :class="{ active: primaryTheme === item.value }"
+                    type="button"
+                    :title="item.label"
+                    :aria-label="`主色：${item.label}`"
+                    :style="{ '--swatch': item.color }"
+                    @click="setPrimaryTheme(item.value)"
+                  />
                 </div>
               </div>
             </div>
