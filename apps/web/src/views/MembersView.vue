@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
-import { Columns3, Rows3 } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Columns3, Plus, Rows3, X } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
+import MemberCreateView from './MemberCreateView.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
@@ -19,6 +20,8 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const importPreview = ref<MemberImportPreview | null>(null)
 const importBusy = ref(false)
 const importMessage = ref<string | null>(null)
+const showCreatePanel = ref(false)
+const createDialog = ref<HTMLElement | null>(null)
 const density = ref<'comfortable' | 'compact'>('comfortable')
 const page = ref(1)
 const pageSize = ref(10)
@@ -45,10 +48,24 @@ function toggleColumn(key: string) {
     : [...visibleColumns.value, key]
 }
 
+async function openCreatePanel() {
+  showCreatePanel.value = true
+  await nextTick()
+  createDialog.value?.focus()
+}
+function closeCreatePanel() { showCreatePanel.value = false }
+async function handleCreated() {
+  closeCreatePanel()
+  importMessage.value = '企业资料创建成功，会员列表已刷新。'
+  await load()
+}
+
 watch([filtered, pageSize], () => {
   if (page.value > totalPages.value) page.value = totalPages.value
 })
 watch([keyword, status], () => { page.value = 1 })
+watch(showCreatePanel, (visible) => { document.body.style.overflow = visible ? 'hidden' : '' })
+onBeforeUnmount(() => { document.body.style.overflow = '' })
 
 function importError(reason: unknown): string {
   if (reason instanceof ApiRequestError) {
@@ -117,7 +134,7 @@ onMounted(load)
       <template v-if="canCollect">
         <button class="secondary-button" :disabled="importBusy" @click="downloadTemplate">下载调查模板</button>
         <button class="secondary-button" :disabled="importBusy" @click="chooseImportFile">批量导入</button>
-        <RouterLink class="primary-button" to="/members/new">+ 新增企业</RouterLink>
+        <button class="primary-button create-member-button" type="button" @click="openCreatePanel"><Plus aria-hidden="true" /><span>新增会员企业</span></button>
         <input ref="fileInput" class="visually-hidden" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="previewFile" />
       </template>
     </PageHeader>
@@ -148,5 +165,17 @@ onMounted(load)
       </tbody></table></div>
       <footer class="table-pagination"><span>第 {{ page }} / {{ totalPages }} 页</span><label>每页<select v-model="pageSize"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select>条</label><div><button type="button" :disabled="page <= 1" @click="page--">上一页</button><button type="button" :disabled="page >= totalPages" @click="page++">下一页</button></div></footer>
     </section>
+
+    <Teleport to="body">
+      <div v-if="showCreatePanel" class="dialog-backdrop" @click.self="closeCreatePanel" @keydown.esc="closeCreatePanel">
+        <section ref="createDialog" class="member-create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-member-title" tabindex="-1">
+          <header class="dialog-header">
+            <div><h2 id="create-member-title">新增会员企业</h2><p>新增资料将纳入协会数据域，并按账号权限进入审核流程</p></div>
+            <button class="dialog-close" type="button" aria-label="关闭新增企业面板" @click="closeCreatePanel"><X aria-hidden="true" /></button>
+          </header>
+          <div class="dialog-body"><MemberCreateView embedded @close="closeCreatePanel" @created="handleCreated" /></div>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>

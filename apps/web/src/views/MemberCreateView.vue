@@ -7,6 +7,8 @@ import { ApiRequestError } from '../services/http'
 import { platformApi } from '../services/platform-api'
 import type { MemberStatus, MemberUpsertPayload, MemberVisibility } from '../types/domain'
 
+const props = withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
+const emit = defineEmits<{ close: []; created: [memberId: string] }>()
 const router = useRouter()
 const auth = useAuth()
 const saving = ref(false)
@@ -39,7 +41,8 @@ async function submit() {
   message.value = null
   try {
     const result = await platformApi.createMember(payload())
-    await router.push(`/members/${result.member.id}/edit`)
+    if (props.embedded) emit('created', result.member.id)
+    else await router.push(`/members/${result.member.id}/edit`)
   } catch (reason) {
     message.value = reason instanceof ApiRequestError && reason.status === 409
       ? '新增失败：企业名称或统一社会信用代码已存在。'
@@ -49,8 +52,8 @@ async function submit() {
 </script>
 
 <template>
-  <div class="member-form-page member-create-page">
-    <PageHeader title="新增会员企业" description="新增资料将纳入协会数据域，并按账号权限进入审核流程">
+  <div class="member-form-page member-create-page" :class="{ 'member-create-embedded': embedded }">
+    <PageHeader v-if="!embedded" title="新增会员企业" description="新增资料将纳入协会数据域，并按账号权限进入审核流程">
       <RouterLink class="secondary-button" to="/members">返回会员列表</RouterLink>
     </PageHeader>
     <form class="panel member-edit-form" @submit.prevent="submit">
@@ -77,7 +80,7 @@ async function submit() {
         </div>
       </section>
       <div v-if="message" class="save-message conflict" aria-live="polite">{{ message }}</div>
-      <div class="form-actions"><RouterLink class="secondary-button" to="/members">取消</RouterLink><button class="primary-button" type="submit" :disabled="saving">{{ saving ? '正在保存…' : '创建企业资料' }}</button></div>
+      <div class="form-actions"><button v-if="embedded" class="secondary-button" type="button" @click="emit('close')">取消</button><RouterLink v-else class="secondary-button" to="/members">取消</RouterLink><button class="primary-button" type="submit" :disabled="saving">{{ saving ? '正在保存…' : '创建企业资料' }}</button></div>
     </form>
   </div>
 </template>

@@ -1,53 +1,84 @@
-# Notification popover design QA
+# Member creation dialog design QA
 
-- Source visual truth: `/var/folders/mg/ctd9153d5_g93y9n6w7tvmf80000gn/T/codex-clipboard-a26485df-f9ac-47c9-b727-33daa79d5366.png`
-- User issue reference: `/var/folders/mg/ctd9153d5_g93y9n6w7tvmf80000gn/T/codex-clipboard-33be6b01-7ae8-4d1c-8104-3d9b5e249af0.png`
-- Implementation screenshot: `/Users/yang/.codex/visualizations/2026/08/26/01a03c25-a22a-7ed2-9f16-90ad37b27ad3/notification-popover-redesign-2026-08-31/implementation-all.png`
-- Viewport: desktop, 1292 × 994 CSS px, light theme, expanded sidebar, notification popover open on “全部”.
-- Source pixels: 2518 × 1562. Implementation pixels: 1292 × 994. Comparison used the focused popover region because the source includes unrelated browser chrome and a dark demonstration canvas; no density-based pixel-perfect scaling was assumed.
+- Source visual truth: `/var/folders/mg/ctd9153d5_g93y9n6w7tvmf80000gn/T/codex-clipboard-1023e410-fa3d-4810-8c6b-9649f7c8fcbc.png`
+- Interaction reference: Pure Admin user-management `openDialog()` pattern in `pure-admin/vue-pure-admin/src/views/system/user/index.vue`
+- Implementation screenshot: `/Users/yang/Desktop/guanxian/design-qa-member-create-dialog.png`
+- Viewport: desktop, 1292 × 994 CSS px, light theme, expanded sidebar, member-create dialog open.
+- Source pixels: 2940 × 1602. Implementation pixels: 1292 × 994. The comparison uses normalized full-view composition rather than pixel-for-pixel density matching because the source shows the list state while the requested target adds an overlay state.
+- State: authenticated association administrator on `/members`; existing member list retained behind the dialog.
 
 **Full-view comparison evidence**
 
-- The implementation keeps the popover anchored to the sidebar bell and opens upward from the lower-left navigation area without covering the account trigger.
-- The frame is narrower and taller than the reported implementation, matching the reference’s vertical notification-feed character.
-- The source is dark while the product is currently in its light theme. Product color tokens were intentionally preserved instead of copying the demo’s black canvas.
+- The member list, sidebar, toolbar and table stay in their original positions while the creation form opens above them; the route remains `/members`.
+- The implementation follows the reference project’s table-toolbar action pattern: a compact icon-and-label primary action opens a functional dialog instead of navigating away.
+- The modal width is deliberately narrower than the full content canvas, with a dimmed backdrop and a bounded, internally scrolling body.
 
 **Focused region comparison evidence**
 
-- Tabs, active underline, divider, stacked notification rows, per-row icon, title, time, hover affordance and internal scrolling are all present.
-- The settings action visible in the source is intentionally omitted because the user previously requested no settings button.
-- Chinese, domain-specific notification content replaces the source placeholders while preserving the same information hierarchy.
+- Typography: dialog title, description, section headings, labels and controls retain the product’s existing font stack and hierarchy; no new font system was introduced.
+- Spacing/layout: 78px dialog header, 24–26px form section padding, two-column form grid and 14px outer radius align with the existing 8px spacing system.
+- Colors/tokens: the implementation reuses `--panel`, `--line`, `--ink`, `--muted` and `--primary`; the overlay adds elevation without changing the product palette.
+- Image and icon fidelity: the control uses the installed Lucide `Plus` and `X` icons; there are no raster assets or placeholder illustrations in this flow.
+- Copy/content: the awkward `+ 新增企业` string is replaced by `新增会员企业`; all form labels, options and submission copy are preserved.
 
 **Findings**
 
 - No actionable P0, P1 or P2 differences remain.
-- [P3] The source uses a darker, more neutral elevation treatment; the implementation keeps the existing product’s light panel and teal tokens for system consistency.
+- [P3] On short desktop viewports the lower capability fields require internal scrolling. This is intentional so the underlying member list remains visible and the dialog never exceeds the viewport.
 
 **Interaction verification**
 
-- “全部” loads a populated scrolling list.
-- “未读” contains two seeded unread notifications.
-- “已归档” contains two seeded archived notifications.
-- Selecting a policy notification routes to `/policies` and closes the popover.
-- Outside-click and Escape behavior remain owned by `AppShell` and were not changed.
+- Clicking `新增会员企业` opens the dialog without changing `/members`.
+- Cancel closes the dialog and preserves the member-list state.
+- The close icon closes the dialog.
+- Escape and backdrop-click handlers are present.
+- `/members/new` remains available as a compatible direct route.
+- The existing `platformApi.createMember` payload, role-based initial-status rule, duplicate-data error handling and post-create list refresh remain connected.
 
 **Comparison history**
 
-1. Earlier implementation: 360px-wide frame, 150px empty/error state, no first-open load, and backend identity errors replaced all content.
-2. Fixes: frame changed to 320px × 438px minimum, list height set to 380px, first-open loading made immediate, domain sample notifications added for all tab states, API-first fallback behavior added, and Lucide icons used for notification types.
-3. Post-fix evidence: `implementation-all.png` shows four visible rows with vertical scrolling; browser state checks confirmed unread and archived content and successful navigation.
+1. Earlier implementation: the primary action was a text-prefixed RouterLink (`+ 新增企业`) that replaced the list with a full-page create route.
+2. Fixes: replaced the link with a Lucide icon button, embedded the existing create form in a modal, preserved the direct route, added focus/scroll/body-lock behavior, and refreshes the list after creation.
+3. Post-fix evidence: `design-qa-member-create-dialog.png` shows the list retained behind a bounded dialog; browser checks confirmed URL preservation and both close paths.
 
 **Implementation checklist**
 
-- [x] Narrower, taller popover frame.
-- [x] Populated all, unread and archived states.
-- [x] Preserve live notification API and read acknowledgement attempts.
-- [x] Provide local fallback data only when the live result is unavailable or empty.
-- [x] Verify tab switching and resource navigation.
+- [x] Reuse the existing form and backend submission logic.
+- [x] Keep the member list mounted behind the overlay.
+- [x] Replace the awkward plus-prefixed copy with a standard icon button.
+- [x] Preserve direct-route compatibility and permissions.
+- [x] Verify open, cancel, close and route behavior.
 - [x] Run type checks, tests and production build.
 
 **Follow-up polish**
 
-- Optional P3: tune shadow opacity again after the surrounding sidebar palette is finalized.
+- Optional P3: add a dirty-form confirmation if users frequently close the dialog after entering substantial data.
+
+## Ecosystem overview refinement
+
+- Source visual truth: `/var/folders/mg/ctd9153d5_g93y9n6w7tvmf80000gn/T/codex-clipboard-305fb677-aa0c-4e20-9be2-82fdf9a5c9b6.png`
+- Implementation screenshots: `/Users/yang/Desktop/guanxian/design-qa-ecosystem-overview.png` and `/Users/yang/Desktop/guanxian/design-qa-ecosystem-matrix.png`
+- Viewport: desktop, 1292 × 994 CSS px, light theme, expanded sidebar. Source: 2940 × 1602 px; implementation: 1292 × 994 px.
+- Reference pattern: Pure Admin responsive card-list composition—bounded cards, compact status treatment, reusable icons and clear card hierarchy—adapted to the existing ecosystem data rather than copying Element Plus or rebuilding the page.
+
+**Comparison evidence**
+
+- The branded dark command-center hero, sector data, member pools, AI connector and existing grid interaction remain intact.
+- Sector and member cards now have stronger internal hierarchy, readable supporting text and individually bounded card surfaces.
+- The process flow now uses compact step tiles rather than loose text across an empty strip.
+- The matrix loses the decorative perspective distortion, gains a stable legend, and places the selected-grid detail in a bounded subpanel.
+- Four disconnected right-hand statistic cards are consolidated into one `试点运行概览` panel with Lucide icons, consistent dividers and semantic alert treatment.
+- Membership tiers reuse the reference card-list rhythm: circular identifier, compact status tag, clear title, icon-led feature list and consistent actions. The previous visually dominant dark first card is replaced by a restrained primary-tinted featured state.
+
+**Findings**
+
+- No actionable P0, P1 or P2 differences remain in the tested desktop state.
+- [P3] The matrix still contains 70 interactive cells, so very narrow phones require the existing responsive single-column layout rather than preserving desktop density.
+
+**Interaction verification**
+
+- Switching the selected grid updates the detail panel without route or data-model changes.
+- Trial-area tabs, intelligent-matching link and permission-detail actions remain in place.
+- Existing sector, member-pool, trial-area and tier data arrays are reused unchanged.
 
 final result: passed

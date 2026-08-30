@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { BadgeCheck, Building2, Check, Grid3X3, ShieldAlert } from '@lucide/vue'
 import PageHeader from '../components/PageHeader.vue'
 
 const sectors = [
@@ -86,7 +87,7 @@ const tiers = [
 
     <section class="pilot-grid-layout">
       <article class="matrix-panel panel">
-        <div class="panel-header"><div><h2>管线矩阵 Matrix</h2><p>点击网格查看街道级服务覆盖与活跃度</p></div><span class="live-badge"><i /> LIVE</span></div>
+        <div class="panel-header"><div><h2>管线矩阵 Matrix</h2><p>点击网格查看街道级服务覆盖与活跃度</p></div><div class="matrix-header-tools"><div class="matrix-legend"><span><i class="normal" />稳定</span><span><i class="warm" />关注</span><span><i class="hot" />活跃</span></div><span class="live-badge"><i /> LIVE</span></div></div>
         <div class="matrix-content">
           <div class="matrix-map">
             <button v-for="cell in gridCells" :key="cell.id" :class="['matrix-cell', cell.level, { selected: selectedCell === cell.id }]" :aria-label="`网格 ${cell.id + 1}`" @click="selectedCell = cell.id"><i v-if="cell.level !== 'normal'" /></button>
@@ -100,11 +101,12 @@ const tiers = [
         </div>
       </article>
 
-      <aside class="pilot-summary">
-        <article class="pilot-stat panel"><span>已接入单位</span><strong>{{ selectedArea.units }}</strong><small>辖区管线相关单位</small></article>
-        <article class="pilot-stat panel"><span>试点网格</span><strong>{{ selectedArea.grids }}</strong><small>{{ selectedArea.streets.join(' · ') }}</small></article>
-        <article class="pilot-stat panel"><span>服务认领率</span><strong>{{ selectedArea.claimed }}%</strong><div class="pilot-progress"><i :style="{ width: `${selectedArea.claimed}%` }" /></div></article>
-        <article class="pilot-stat alert-stat panel"><span>待核验漏点</span><strong>{{ selectedArea.alerts }}</strong><small>需辖区对接人协同确认</small></article>
+      <aside class="pilot-summary panel">
+        <div class="pilot-summary-head"><div><span class="eyebrow">PILOT STATUS</span><h3>试点运行概览</h3></div><span class="live-badge"><i /> 实时</span></div>
+        <article class="pilot-stat"><span class="pilot-stat-icon"><Building2 aria-hidden="true" /></span><div><span>已接入单位</span><strong>{{ selectedArea.units }}</strong><small>辖区管线相关单位</small></div></article>
+        <article class="pilot-stat"><span class="pilot-stat-icon"><Grid3X3 aria-hidden="true" /></span><div><span>试点网格</span><strong>{{ selectedArea.grids }}</strong><small>{{ selectedArea.streets.join(' · ') }}</small></div></article>
+        <article class="pilot-stat"><span class="pilot-stat-icon"><BadgeCheck aria-hidden="true" /></span><div><span>服务认领率</span><strong>{{ selectedArea.claimed }}%</strong><div class="pilot-progress"><i :style="{ width: `${selectedArea.claimed}%` }" /></div></div></article>
+        <article class="pilot-stat alert-stat"><span class="pilot-stat-icon"><ShieldAlert aria-hidden="true" /></span><div><span>待核验漏点</span><strong>{{ selectedArea.alerts }}</strong><small>需辖区对接人协同确认</small></div></article>
       </aside>
     </section>
 
@@ -112,7 +114,7 @@ const tiers = [
     <section class="tier-grid">
       <article v-for="(tier, index) in tiers" :key="tier.name" class="tier-card panel" :class="{ featured: index === 0 }">
         <div class="tier-top"><span>0{{ index + 1 }}</span><em>{{ tier.accent }}</em></div><small>{{ tier.level }}</small><h3>{{ tier.name }}</h3>
-        <ul><li v-for="feature in tier.features" :key="feature">✓ {{ feature }}</li></ul><button :class="index === 0 ? 'primary-button' : 'secondary-button'">查看权益详情</button>
+        <ul><li v-for="feature in tier.features" :key="feature"><Check aria-hidden="true" />{{ feature }}</li></ul><button :class="index === 0 ? 'primary-button' : 'secondary-button'">查看权益详情</button>
       </article>
     </section>
 
