@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router'
 import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
@@ -13,6 +13,8 @@ const mobileOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const profileOpen = ref(false)
 const roleMenuOpen = ref(false)
+const profileButtonRef = ref<HTMLElement | null>(null)
+const profileMenuRef = ref<HTMLElement | null>(null)
 
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
@@ -43,9 +45,34 @@ function toggleProfile() {
   if (!profileOpen.value) roleMenuOpen.value = false
 }
 
-async function logout() {
-  roleMenuOpen.value = false
+function closeProfile() {
   profileOpen.value = false
+  roleMenuOpen.value = false
+}
+
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!profileOpen.value) return
+  const target = event.target as Node
+  if (profileButtonRef.value?.contains(target) || profileMenuRef.value?.contains(target)) return
+  closeProfile()
+}
+
+function handleDocumentKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeProfile()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+  document.addEventListener('keydown', handleDocumentKeyDown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  document.removeEventListener('keydown', handleDocumentKeyDown)
+})
+
+async function logout() {
+  closeProfile()
   await auth.logout()
   if (auth.isDemoMode) await router.push('/login')
 }
@@ -70,6 +97,7 @@ async function logout() {
 
       <div class="sidebar-profile">
         <button
+          ref="profileButtonRef"
           class="profile-button"
           type="button"
           :aria-expanded="profileOpen"
@@ -82,19 +110,24 @@ async function logout() {
         <button class="icon-button notification-button" type="button" aria-label="消息通知">
           <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i />
         </button>
-        <div v-if="profileOpen" class="profile-menu">
+        <div v-if="profileOpen" ref="profileMenuRef" class="profile-menu">
           <div class="profile-menu-user">
             <span class="avatar">{{ initials }}</span>
             <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
           </div>
           <div class="profile-menu-group">
-            <div v-if="auth.isDemoMode" class="profile-menu-item-wrap">
+            <div
+              v-if="auth.isDemoMode"
+              class="profile-menu-item-wrap"
+              @mouseenter="roleMenuOpen = true"
+              @mouseleave="roleMenuOpen = false"
+            >
               <button
                 class="profile-menu-item"
                 type="button"
                 aria-haspopup="menu"
                 :aria-expanded="roleMenuOpen"
-                @click="roleMenuOpen = !roleMenuOpen"
+                @click="roleMenuOpen = true"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 <span>切换身份</span>
