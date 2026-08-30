@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus } from '@lucide/vue'
 import { onMounted } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import MetricCard from '../components/MetricCard.vue'
@@ -16,7 +17,7 @@ onMounted(load)
 <template>
   <div class="enterprise-page">
     <PageHeader title="企业工作台" :description="`${auth.user.value?.organization} · 管理能力资产，发现政策与合作机会`">
-      <button class="secondary-button">预览企业主页</button><button class="primary-button">+ 发布供需</button>
+      <button class="secondary-button">预览企业主页</button><button class="primary-button icon-label-button" type="button"><Plus aria-hidden="true" /><span>发布供需</span></button>
     </PageHeader>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="data">

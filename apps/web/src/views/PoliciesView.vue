@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -21,7 +22,7 @@ onMounted(load)
 <template>
   <div class="policies-page">
     <PageHeader title="政策标准" description="向上连接政策与标准，智能识别行业影响和企业机会">
-      <button class="secondary-button">政策订阅设置</button><button class="primary-button">+ 收录政策</button>
+      <button class="secondary-button">政策订阅设置</button><button class="primary-button icon-label-button" type="button"><Plus aria-hidden="true" /><span>收录政策</span></button>
     </PageHeader>
     <section class="policy-hero panel">
       <div class="ai-orb">AI</div><div><span class="eyebrow">本周政策洞察</span><h2>4 项政策可能影响 38 家会员企业</h2><p>重点涉及信息汇交、燃气安全监测和非开挖修复评价。AI 已按企业场景与产品能力生成影响清单。</p></div><button class="secondary-button">查看影响分析 →</button>

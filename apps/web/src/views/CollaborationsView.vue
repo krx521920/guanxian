@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -23,7 +24,7 @@ onMounted(load)
 <template>
   <div class="collaborations-page">
     <PageHeader title="协作事项" description="从智能推荐到人工确认、协同推进和结果反馈的完整闭环">
-      <button class="primary-button">+ 发起协作</button>
+      <button class="primary-button icon-label-button" type="button"><Plus aria-hidden="true" /><span>发起协作</span></button>
     </PageHeader>
     <section class="workflow-strip panel">
       <div><i>1</i><span><b>发现机会</b><small>AI 识别供需</small></span></div><em>→</em><div><i>2</i><span><b>人工确认</b><small>协会审核推荐</small></span></div><em>→</em><div class="active"><i>3</i><span><b>协同推进</b><small>多方沟通办理</small></span></div><em>→</em><div><i>4</i><span><b>结果反馈</b><small>沉淀合作成效</small></span></div>
