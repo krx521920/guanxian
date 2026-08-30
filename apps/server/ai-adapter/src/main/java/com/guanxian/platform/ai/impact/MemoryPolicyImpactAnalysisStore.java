@@ -89,7 +89,7 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
 
     @Override
     public synchronized List<PolicyImpactAnalysisView> list(
-            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, int offset, int limit) {
+            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, long offset, int limit) {
         return filtered(scope, status, policyDocumentId, enterpriseId).stream()
                 .skip(offset)
                 .limit(limit)

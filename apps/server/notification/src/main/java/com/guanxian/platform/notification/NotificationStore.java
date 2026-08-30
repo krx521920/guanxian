@@ -17,7 +17,7 @@ interface NotificationStore {
             UUID id, UUID userId, UUID associationId, long expectedVersion, String status);
     boolean deleteSubscription(UUID id, UUID userId, UUID associationId, long expectedVersion);
     List<NotificationMessageView> messages(
-            UUID userId, UUID associationId, boolean unreadOnly, int offset, int limit);
+            UUID userId, UUID associationId, boolean unreadOnly, long offset, int limit);
     long countMessages(UUID userId, UUID associationId, boolean unreadOnly);
     Optional<NotificationMessageView> message(UUID id, UUID userId, UUID associationId);
     Optional<NotificationMessageView> markRead(UUID id, UUID userId, UUID associationId);

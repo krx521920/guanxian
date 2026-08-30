@@ -101,7 +101,7 @@ class InMemoryNotificationStore implements NotificationStore {
 
     @Override
     public synchronized List<NotificationMessageView> messages(
-            UUID userId, UUID associationId, boolean unreadOnly, int offset, int limit) {
+            UUID userId, UUID associationId, boolean unreadOnly, long offset, int limit) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
                 .filter(value -> associationId == null || associationId.equals(value.associationId()))
                 .filter(value -> !unreadOnly || value.readAt() == null)

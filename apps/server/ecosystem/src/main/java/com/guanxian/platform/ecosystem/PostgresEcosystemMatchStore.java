@@ -216,15 +216,17 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
             if (actor.associationId() == null) {
                 actorScope = actor.enterpriseId() == null ? "TRUE" : "FALSE";
             } else if (actor.enterpriseId() != null) {
-                actorScope = "de.association_id=:associationId"
+                actorScope = "(de.association_id=:associationId OR ce.association_id=:associationId)"
                         + " AND (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
             } else {
-                actorScope = "de.association_id=:associationId";
+                actorScope = "(de.association_id=:associationId OR ce.association_id=:associationId)";
             }
         } else if (actor.isAssociationStaff()) {
-            actorScope = "de.association_id=:associationId";
+            actorScope = "((de.association_id=:associationId OR ce.association_id=:associationId)"
+                    + " OR " + authorizedPartnerMatchRead() + ")";
         } else if (actor.enterpriseId() != null) {
-            actorScope = "(d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
+            actorScope = "((d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)"
+                    + " OR " + authorizedPartnerMatchRead() + ")";
         } else {
             actorScope = "FALSE";
         }
@@ -234,6 +236,38 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 + " AND ce.status='ACTIVE' AND ce.deleted_at IS NULL"
                 + " AND d.deleted_at IS NULL";
         return " WHERE " + actorScope + lifecycleScope;
+    }
+
+    private static String authorizedPartnerMatchRead() {
+        return "(" + authorizedPartnerOwner("de", "d.enterprise_id")
+                + " AND (d.enterprise_id=m.candidate_enterprise_id OR "
+                + authorizedPartnerOwner("ce", "m.candidate_enterprise_id") + "))";
+    }
+
+    private static String authorizedPartnerOwner(String enterpriseAlias, String enterpriseIdExpression) {
+        return "(" + enterpriseAlias + ".association_id<>:associationId"
+                + " AND " + enterpriseAlias + ".status='ACTIVE'"
+                + " AND " + enterpriseAlias + ".deleted_at IS NULL"
+                + " AND d.deleted_at IS NULL"
+                + " AND EXISTS (SELECT 1 FROM association_relationship ar"
+                + " WHERE ar.status='ACTIVE' AND ar.allow_member_data=TRUE"
+                + " AND ar.suspended_at IS NULL AND ar.revoked_at IS NULL"
+                + " AND (ar.expires_at IS NULL OR ar.expires_at>now())"
+                + " AND ((ar.source_association_id=" + enterpriseAlias + ".association_id"
+                + " AND ar.target_association_id=:associationId)"
+                + " OR (ar.target_association_id=" + enterpriseAlias + ".association_id"
+                + " AND ar.source_association_id=:associationId)))"
+                + " AND EXISTS (SELECT 1 FROM association_share_policy sp"
+                + " WHERE sp.source_association_id=" + enterpriseAlias + ".association_id"
+                + " AND sp.target_association_id=:associationId"
+                + " AND sp.resource_type='MATCH' AND sp.status='ACTIVE'"
+                + " AND sp.valid_from<=now() AND (sp.expires_at IS NULL OR sp.expires_at>now()))"
+                + " AND EXISTS (SELECT 1 FROM enterprise_share_consent esc"
+                + " WHERE esc.enterprise_id=" + enterpriseIdExpression
+                + " AND esc.target_association_id=:associationId"
+                + " AND esc.resource_type='MATCH' AND esc.resource_id=m.id"
+                + " AND esc.status='ACTIVE' AND esc.revoked_at IS NULL"
+                + " AND (esc.expires_at IS NULL OR esc.expires_at>now())))";
     }
 
     private static MapSqlParameterSource scopeParams(ActorScope actor) {

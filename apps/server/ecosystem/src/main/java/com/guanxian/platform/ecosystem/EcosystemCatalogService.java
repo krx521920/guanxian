@@ -5,11 +5,15 @@ import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -19,27 +23,40 @@ public class EcosystemCatalogService {
     private static final Set<String> EDITABLE_DEMAND_STATES = Set.of("DRAFT", "REJECTED");
     private final EcosystemCatalogStore store;
     private final EnterpriseLifecycle enterpriseLifecycle;
+    private final PartnerFieldAuthorization partnerFields;
 
     @Autowired
     public EcosystemCatalogService(
             EcosystemCatalogStore store,
-            EnterpriseLifecycle enterpriseLifecycle) {
+            EnterpriseLifecycle enterpriseLifecycle,
+            PartnerFieldAuthorization partnerFields) {
         this.store = store;
         this.enterpriseLifecycle = enterpriseLifecycle;
+        this.partnerFields = partnerFields;
+    }
+
+    public EcosystemCatalogService(
+            EcosystemCatalogStore store,
+            EnterpriseLifecycle enterpriseLifecycle) {
+        this(store, enterpriseLifecycle, PartnerFieldAuthorization.allowAll());
     }
 
     EcosystemCatalogService(EcosystemCatalogStore store) {
         this(store, enterpriseId -> true);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public EcosystemPage<OfferingView> offerings(
             ActorScope actor, String query, boolean includeDeleted, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && canReadDeleted(actor);
         return new EcosystemPage<>(
-                store.listOfferings(actor, query, allowedDeleted, safePage * safeSize, safeSize),
+                store.listOfferings(actor, query, allowedDeleted, offset, safeSize).stream()
+                        .map(item -> authorizedOffering(item, actor))
+                        .flatMap(Optional::stream)
+                        .toList(),
                 store.countOfferings(actor, query, allowedDeleted),
                 safePage,
                 safeSize);
@@ -48,6 +65,7 @@ public class EcosystemCatalogService {
     @Transactional(readOnly = true)
     public OfferingView offering(UUID id, ActorScope actor, boolean includeDeleted) {
         return store.findOffering(id, actor, includeDeleted && canReadDeleted(actor))
+                .flatMap(item -> authorizedOffering(item, actor))
                 .orElseThrow(() -> new NotFoundException("offering", id));
     }
 
@@ -90,6 +108,7 @@ public class EcosystemCatalogService {
         EcosystemScopeGuard.requireWriteContext(actor);
         requireReviewer(actor);
         OfferingView current = offering(id, actor, false);
+        requireReviewAssociation(actor, current.enterpriseId());
         requireState(current.status(), Set.of("PENDING_REVIEW"), "offering is not pending review");
         return transitionOffering(
                 current, expectedVersion, decision.approved() ? "ACTIVE" : "REJECTED",
@@ -133,14 +152,18 @@ public class EcosystemCatalogService {
         return restored;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public EcosystemPage<DemandView> demands(
             ActorScope actor, String query, boolean includeDeleted, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && canReadDeleted(actor);
         return new EcosystemPage<>(
-                store.listDemands(actor, query, allowedDeleted, safePage * safeSize, safeSize),
+                store.listDemands(actor, query, allowedDeleted, offset, safeSize).stream()
+                        .map(item -> authorizedDemand(item, actor))
+                        .flatMap(Optional::stream)
+                        .toList(),
                 store.countDemands(actor, query, allowedDeleted),
                 safePage,
                 safeSize);
@@ -149,6 +172,7 @@ public class EcosystemCatalogService {
     @Transactional(readOnly = true)
     public DemandView demand(UUID id, ActorScope actor, boolean includeDeleted) {
         return store.findDemand(id, actor, includeDeleted && canReadDeleted(actor))
+                .flatMap(item -> authorizedDemand(item, actor))
                 .orElseThrow(() -> new NotFoundException("demand", id));
     }
 
@@ -194,6 +218,7 @@ public class EcosystemCatalogService {
         EcosystemScopeGuard.requireWriteContext(actor);
         requireReviewer(actor);
         DemandView current = demand(id, actor, false);
+        requireReviewAssociation(actor, current.enterpriseId());
         requireState(current.status(), Set.of("PENDING_REVIEW"), "demand is not pending review");
         return transitionDemand(
                 current, expectedVersion, decision.approved() ? "OPEN" : "REJECTED",
@@ -320,6 +345,18 @@ public class EcosystemCatalogService {
         }
     }
 
+    private void requireReviewAssociation(ActorScope actor, UUID enterpriseId) {
+        if (actor.associationId() == null
+                || !store.enterpriseBelongsToAssociation(enterpriseId, actor.associationId())) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION",
+                    "association can only review resources owned by its members");
+        }
+        if (actor.isSystemAdmin()) {
+            EcosystemScopeGuard.requireSystemEnterpriseWrite(actor, enterpriseId, store);
+        }
+    }
+
     private static boolean canReadDeleted(ActorScope actor) {
         return actor.isSystemAdmin() || actor.isAssociationStaff() || actor.isEnterpriseAdmin();
     }
@@ -329,6 +366,47 @@ public class EcosystemCatalogService {
             throw new PreconditionFailedException(
                     "enterprise must be active before participating in ecosystem workflows");
         }
+    }
+
+    Optional<OfferingView> authorizedOffering(OfferingView value, ActorScope actor) {
+        if (!isCrossAssociationRead(value.enterpriseId(), actor)) {
+            return Optional.of(value);
+        }
+        return partnerFields.authorizedFields(actor, value.enterpriseId(), value.kind(), value.id())
+                .map(fields -> new OfferingView(
+                        value.id(), value.enterpriseId(), visible(fields, "enterpriseName") ? value.enterpriseName() : null,
+                        visible(fields, "name") ? value.name() : null, value.kind(),
+                        visible(fields, "description") ? value.description() : null,
+                        visible(fields, "scenarios") ? value.scenarios() : List.of(),
+                        visible(fields, "qualifications") ? value.qualifications() : List.of(),
+                        value.visibility(), value.status(), value.version(), value.disabled(), value.updatedAt()));
+    }
+
+    Optional<DemandView> authorizedDemand(DemandView value, ActorScope actor) {
+        if (!isCrossAssociationRead(value.enterpriseId(), actor)) {
+            return Optional.of(value);
+        }
+        return partnerFields.authorizedFields(actor, value.enterpriseId(), "DEMAND", value.id())
+                .map(fields -> new DemandView(
+                        value.id(), value.enterpriseId(), visible(fields, "enterpriseName") ? value.enterpriseName() : null,
+                        visible(fields, "title") ? value.title() : null,
+                        visible(fields, "description") ? value.description() : null,
+                        visible(fields, "scenarios") ? value.scenarios() : List.of(),
+                        visible(fields, "requiredCapabilities") ? value.requiredCapabilities() : List.of(),
+                        value.visibility(), visible(fields, "budgetMin") ? value.budgetMin() : null,
+                        visible(fields, "budgetMax") ? value.budgetMax() : null,
+                        visible(fields, "responseDeadline") ? value.responseDeadline() : null,
+                        value.status(), null, value.version(), value.disabled(), value.updatedAt()));
+    }
+
+    private boolean isCrossAssociationRead(UUID enterpriseId, ActorScope actor) {
+        return !actor.isSystemAdmin()
+                && (actor.associationId() == null
+                || !store.enterpriseBelongsToAssociation(enterpriseId, actor.associationId()));
+    }
+
+    private static boolean visible(Set<String> fields, String field) {
+        return fields.contains(field);
     }
 
     private static void requireState(String actual, Set<String> expected, String message) {

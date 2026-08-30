@@ -17,15 +17,15 @@
 
 ## 2. 可追溯基线
 
-当前仓库包含 Flyway `V1` 至 `V15` 共 15 个版本化迁移。Java 普通全量回归包含 57 个 Surefire 测试套件、225 项测试；其中 10 个 PostgreSQL 16 Testcontainers 测试类共执行 16 项真实数据库测试。
+当前仓库包含 Flyway `V1` 至 `V17` 共 17 个版本化迁移。Java 普通全量回归包含 62 个 Surefire 测试套件、279 项测试，失败、错误和跳过均为 0。
 
 2026-08-30 本地常规验证基线：
 
-- Web：12 个 Vitest 文件、141 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
-- Java：225 项测试通过，失败、错误和跳过均为 0；Flyway V1–V15 空库迁移及 V12→V15 存量升级通过。
+- Web：14 个 Vitest 文件、154 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
+- Java：62 个 Surefire 测试套件、279 项测试通过，失败、错误和跳过均为 0；Flyway V1–V17 空库迁移、V15→V17 政策影响升级和 V16→V17 跨协会完整性升级通过。
 - AI：默认批准范围收集 46 项测试；`stress` 与 `fuzz` 标记均不进入默认执行。
 - 运维配置：`tests/operations` 28 项、`tests/config` 10 项，CI 分目录执行，共 38 项。
-- 真实依赖检查：PostgreSQL 16 Testcontainers 已验证 Flyway V1–V15 空库迁移和 V12→V15 存量升级；Redis、Keycloak、MinIO 仍需在第五阶段完整浏览器 E2E 中联合复验。
+- 真实依赖检查：PostgreSQL 16 Testcontainers 已验证 Flyway V1–V17 空库迁移、V15→V17 与 V16→V17 干净数据升级路径、脏数据迁移失败事务回滚及并发重复授权阻断；Redis、Keycloak、MinIO 仍需在第五阶段完整浏览器 E2E 中联合复验。
 
 测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V3、89 项、125 项或 47 项基线。
 
@@ -65,12 +65,16 @@ python -m unittest discover -s tests/config -p "test_*.py" -v
 - `PostgresCrossTenantAuthorizationIntegrationTest`：跨协会关系、共享策略、企业授权和匹配状态机。
 - `PostgresKnowledgeIsolationIntegrationTest`：知识入库、引用轨迹、向量持久化和跨协会隔离。
 - `PostgresIdentityPolicyNotificationUpgradeIntegrationTest`：V12→V15 身份、政策归属和通知订阅升级合同。
+- `PostgresPolicyImpactAssociationMigrationIntegrationTest`：V15→V17 政策影响同协会回填、复合外键与不一致脏数据失败回滚。
+- `PostgresCrossAssociationIntegrityMigrationIntegrationTest`：V16→V17 跨协会授权/推荐/策略约束、脏数据失败回滚、到期授权原子物化及双事务唯一授权。
 - `PostgresSystemContextScopeIntegrationTest` 与 `PostgresEcosystemSystemContextIntegrationTest`：系统管理员全局/协会/企业上下文及写入边界。
 - `PostgresEnterpriseLifecycleIsolationIntegrationTest`：企业停用/删除后的历史只读与写入阻断。
 - `PostgresCollaborationSystemContextIntegrationTest`：协作事项系统上下文与跨租户隔离。
 - `PostgresPolicyLifecycleIntegrationTest` 与 `PostgresPolicyImpactIntegrationTest`：政策生命周期、数据域和影响分析落库。
 
 Docker 不可用时，Testcontainers 未执行不能视为通过；应由标准 Ubuntu CI Runner 完成。
+
+V16、V17 的升级测试明确验证“先检查、后约束”：无法无歧义处理的历史数据必须让迁移失败并保留 V15/V16 版本，运维人员根据异常的 `DETAIL` 和 `HINT` 审核修正后再执行。测试不会把迁移中的静默业务数据清洗视为可接受行为。
 
 OIDC/PKCE 手动验收：
 

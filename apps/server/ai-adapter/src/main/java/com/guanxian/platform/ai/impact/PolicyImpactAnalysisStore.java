@@ -12,7 +12,7 @@ public interface PolicyImpactAnalysisStore {
     Optional<PolicyImpactAnalysisView> findByPair(UUID policyDocumentId, UUID enterpriseId);
 
     List<PolicyImpactAnalysisView> list(
-            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, int offset, int limit);
+            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, long offset, int limit);
 
     long count(ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId);
 

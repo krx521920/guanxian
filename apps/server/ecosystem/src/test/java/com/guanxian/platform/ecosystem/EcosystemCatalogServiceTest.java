@@ -1,20 +1,29 @@
 package com.guanxian.platform.ecosystem;
 
 import com.guanxian.platform.member.api.EnterpriseLifecycle;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class EcosystemCatalogServiceTest {
     private static final UUID ASSOCIATION_ID = UUID.randomUUID();
@@ -95,6 +104,20 @@ class EcosystemCatalogServiceTest {
     }
 
     @Test
+    void extremePageUsesLongOffsetWithoutIntegerOverflow() {
+        EcosystemCatalogStore store = mock(EcosystemCatalogStore.class);
+        EcosystemCatalogService guarded = new EcosystemCatalogService(store, ignored -> true);
+        ActorScope actor = systemAdmin();
+
+        guarded.offerings(actor, null, false, Integer.MAX_VALUE, 100);
+        guarded.demands(actor, null, false, Integer.MAX_VALUE, 100);
+
+        long expectedOffset = (long) Integer.MAX_VALUE * 100;
+        verify(store).listOfferings(actor, null, false, expectedOffset, 100);
+        verify(store).listDemands(actor, null, false, expectedOffset, 100);
+    }
+
+    @Test
     void detailIncludeDeletedUsesTheSameAdministratorGateAsLists() {
         ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
         ActorScope otherEnterpriseAdmin = enterpriseAdmin(ENTERPRISE_B);
@@ -153,6 +176,66 @@ class EcosystemCatalogServiceTest {
 
         active.set(true);
         assertEquals(created.id(), guarded.offering(created.id(), owner, false).id());
+    }
+
+    @Test
+    void authorizedPartnerFieldsAreRedactedAndMissingAuthorizationHidesResource() {
+        InMemoryEcosystemCatalogStore store = new InMemoryEcosystemCatalogStore();
+        EcosystemCatalogService creator = new EcosystemCatalogService(store);
+        ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
+        OfferingView created = creator.createOffering(new OfferingUpsertRequest(
+                "受控产品", "PRODUCT", "敏感说明", List.of("矿山"), List.of("认证"), "PARTNERS"), owner);
+        PartnerFieldAuthorization namesOnly = (actor, enterpriseId, resourceType, resourceId) ->
+                Optional.of(Set.of("name"));
+        EcosystemCatalogService redacting = new EcosystemCatalogService(store, ignored -> true, namesOnly);
+
+        assertEquals("敏感说明", redacting.offering(created.id(), owner, false).description());
+        ActorScope externalPartner = new ActorScope(
+                UUID.randomUUID(), "external-partner", "external-partner", UUID.randomUUID(),
+                null, Set.of("ASSOCIATION_ADMIN"), Set.of(ASSOCIATION_ID));
+        OfferingView value = redacting.authorizedOffering(created, externalPartner).orElseThrow();
+        assertEquals("受控产品", value.name());
+        assertNull(value.enterpriseName());
+        assertNull(value.description());
+        assertTrue(value.scenarios().isEmpty());
+        assertTrue(value.qualifications().isEmpty());
+
+        EcosystemCatalogService denying = new EcosystemCatalogService(
+                store, ignored -> true, (actor, enterpriseId, resourceType, resourceId) -> Optional.empty());
+        assertTrue(denying.authorizedOffering(created, externalPartner).isEmpty());
+    }
+
+    @Test
+    void reviewerMustBelongToTheResourceEnterpriseAssociationBeforeTransition() {
+        EcosystemCatalogStore store = mock(EcosystemCatalogStore.class);
+        EcosystemCatalogService guarded = new EcosystemCatalogService(store, ignored -> true);
+        ActorScope reviewer = associationReviewer();
+        UUID offeringId = UUID.randomUUID();
+        UUID demandId = UUID.randomUUID();
+        OfferingView offering = new OfferingView(
+                offeringId, ENTERPRISE_B, "外部企业", "待审产品", "PRODUCT", null,
+                List.of(), List.of(), "MEMBERS", "PENDING_REVIEW", 0, false, Instant.now());
+        DemandView demand = new DemandView(
+                demandId, ENTERPRISE_B, "外部企业", "待审需求", "需求说明",
+                List.of(), List.of(), "MEMBERS", null, null, null,
+                "PENDING_REVIEW", null, 0, false, Instant.now());
+        when(store.findOffering(offeringId, reviewer, false)).thenReturn(Optional.of(offering));
+        when(store.findDemand(demandId, reviewer, false)).thenReturn(Optional.of(demand));
+        when(store.enterpriseBelongsToAssociation(ENTERPRISE_B, ASSOCIATION_ID)).thenReturn(false);
+
+        ForbiddenException offeringFailure = assertThrows(
+                ForbiddenException.class,
+                () -> guarded.reviewOffering(
+                        offeringId, 0, new ReviewDecisionRequest(true, null), reviewer));
+        ForbiddenException demandFailure = assertThrows(
+                ForbiddenException.class,
+                () -> guarded.reviewDemand(
+                        demandId, 0, new ReviewDecisionRequest(true, null), reviewer));
+
+        assertEquals("ASSOCIATION_SCOPE_VIOLATION", offeringFailure.code());
+        assertEquals("ASSOCIATION_SCOPE_VIOLATION", demandFailure.code());
+        verify(store, never()).transitionOffering(offeringId, 0, "ACTIVE", reviewer);
+        verify(store, never()).transitionDemand(demandId, 0, "OPEN", null, reviewer);
     }
 
     private static ActorScope enterpriseAdmin(UUID enterpriseId) {

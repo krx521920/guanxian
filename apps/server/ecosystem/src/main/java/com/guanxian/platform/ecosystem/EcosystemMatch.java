@@ -9,7 +9,7 @@ public record EcosystemMatch(
         String scene,
         String supplierCompany,
         String solution,
-        int score,
+        Integer score,
         List<String> reasons,
         String state,
         String updatedAt) {

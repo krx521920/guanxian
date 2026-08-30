@@ -3,6 +3,7 @@ package com.guanxian.platform.iam;
 import com.guanxian.platform.shared.error.ConflictException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -13,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -67,6 +69,20 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
                 comment, old.requestedAt(), now);
         accessRequests.put(id, value);
         return value;
+    }
+
+    @Override
+    public synchronized CrossAssociationDtos.AccessRequestView cancelAccessRequest(
+            UUID id, String reason, ActorScope actor, Instant now) {
+        var old = accessRequests.get(id);
+        if (old == null || !"PENDING".equals(old.status())) {
+            throw new ConflictException("access request is no longer pending");
+        }
+        var cancelled = new CrossAssociationDtos.AccessRequestView(
+                old.id(), old.applicantAssociationId(), old.targetAssociationId(), old.reason(),
+                "CANCELLED", old.requestedBySubject(), actor.subject(), reason, old.requestedAt(), now);
+        accessRequests.put(id, cancelled);
+        return cancelled;
     }
 
     @Override
@@ -190,6 +206,113 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
     }
 
     @Override
+    public synchronized List<CrossAssociationDtos.ConsentView> materializeExpiredConsents(
+            UUID enterpriseId,
+            UUID targetAssociationId,
+            String resourceType,
+            UUID resourceId,
+            Instant now) {
+        List<CrossAssociationDtos.ConsentView> expired = new ArrayList<>();
+        consents.values().stream()
+                .filter(value -> value.enterpriseId().equals(enterpriseId))
+                .filter(value -> value.targetAssociationId().equals(targetAssociationId))
+                .filter(value -> value.resourceType().equals(resourceType))
+                .filter(value -> value.resourceId().equals(resourceId))
+                .filter(value -> "ACTIVE".equals(value.status()) && value.revokedAt() == null)
+                .filter(value -> value.expiresAt() != null && !value.expiresAt().isAfter(now))
+                .toList()
+                .forEach(value -> {
+                    var changed = new CrossAssociationDtos.ConsentView(
+                            value.id(), value.enterpriseId(), value.targetAssociationId(), value.resourceType(),
+                            value.resourceId(), "EXPIRED", value.grantedBySubject(), value.expiresAt(), null,
+                            value.createdAt());
+                    consents.put(value.id(), changed);
+                    expired.add(changed);
+                });
+        return List.copyOf(expired);
+    }
+
+    @Override
+    public synchronized List<CrossAssociationDtos.ConsentView> revokeActiveConsentsBetweenAssociations(
+            UUID sourceAssociationId, UUID targetAssociationId, Instant now) {
+        List<CrossAssociationDtos.ConsentView> revoked = new ArrayList<>();
+        consents.values().stream()
+                .filter(value -> "ACTIVE".equals(value.status()) && value.revokedAt() == null)
+                .filter(value -> {
+                    UUID source = enterpriseAssociations.get(value.enterpriseId());
+                    return sourceAssociationId.equals(source) && targetAssociationId.equals(value.targetAssociationId())
+                            || targetAssociationId.equals(source)
+                            && sourceAssociationId.equals(value.targetAssociationId());
+                })
+                .toList()
+                .forEach(value -> {
+                    var changed = new CrossAssociationDtos.ConsentView(
+                            value.id(), value.enterpriseId(), value.targetAssociationId(), value.resourceType(),
+                            value.resourceId(), "REVOKED", value.grantedBySubject(), value.expiresAt(), now,
+                            value.createdAt());
+                    consents.put(value.id(), changed);
+                    revoked.add(changed);
+                });
+        return List.copyOf(revoked);
+    }
+
+    @Override
+    public synchronized Optional<Set<String>> authorizedFields(
+            UUID targetAssociationId,
+            UUID enterpriseId,
+            String resourceType,
+            UUID resourceId,
+            Instant now) {
+        UUID sourceAssociationId = enterpriseAssociations.get(enterpriseId);
+        if (sourceAssociationId == null || sourceAssociationId.equals(targetAssociationId)) {
+            return Optional.empty();
+        }
+        var relationship = relationship(sourceAssociationId, targetAssociationId).orElse(null);
+        if (relationship == null
+                || !"ACTIVE".equals(relationship.status())
+                || !relationship.allowMemberData()
+                || relationship.suspendedAt() != null
+                || relationship.revokedAt() != null
+                || relationship.expiresAt() != null && !relationship.expiresAt().isAfter(now)) {
+            return Optional.empty();
+        }
+        var activePolicies = policies.values().stream()
+                .filter(value -> value.sourceAssociationId().equals(sourceAssociationId))
+                .filter(value -> value.targetAssociationId().equals(targetAssociationId))
+                .filter(value -> value.resourceType().equals(resourceType))
+                .filter(value -> "ACTIVE".equals(value.status()))
+                .filter(value -> !value.validFrom().isAfter(now))
+                .filter(value -> value.expiresAt() == null || value.expiresAt().isAfter(now))
+                .toList();
+        if (activePolicies.isEmpty()) {
+            return Optional.empty();
+        }
+        Set<String> allowed = PartnerFieldAuthorization.allowedFields(resourceType);
+        Set<String> required = PartnerFieldAuthorization.requiredFields(resourceType);
+        boolean invalidPolicy = activePolicies.stream().anyMatch(policy -> {
+            List<String> values = policy.visibleFields();
+            return values == null || values.isEmpty() || values.stream().anyMatch(java.util.Objects::isNull)
+                    || !allowed.containsAll(values) || !values.containsAll(required);
+        });
+        if (invalidPolicy) {
+            return Optional.empty();
+        }
+        boolean consented = consents.values().stream()
+                .filter(value -> value.enterpriseId().equals(enterpriseId))
+                .filter(value -> value.targetAssociationId().equals(targetAssociationId))
+                .filter(value -> value.resourceType().equals(resourceType))
+                .filter(value -> value.resourceId().equals(resourceId))
+                .filter(value -> "ACTIVE".equals(value.status()) && value.revokedAt() == null)
+                .anyMatch(value -> value.expiresAt() == null || value.expiresAt().isAfter(now));
+        if (!consented) {
+            return Optional.empty();
+        }
+        Set<String> fields = new java.util.LinkedHashSet<>(activePolicies.getFirst().visibleFields());
+        activePolicies.stream().skip(1).forEach(policy -> fields.retainAll(policy.visibleFields()));
+        return fields.isEmpty() ? Optional.empty() : Optional.of(Set.copyOf(fields));
+    }
+
+    @Override
     public synchronized List<CrossAssociationDtos.RecommendationView> recommendations() {
         return List.copyOf(recommendations.values());
     }
@@ -238,6 +361,8 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
     @Override
     public synchronized boolean resourceOwnedByEnterprise(String resourceType, UUID resourceId, UUID enterpriseId) {
         return switch (resourceType) {
+            case "MEMBER" -> resourceId.equals(enterpriseId)
+                    && enterpriseAssociations.containsKey(enterpriseId);
             case "PRODUCT", "SERVICE" ->
                     enterpriseId.equals(resourceOwners.getOrDefault(resourceType, Map.of()).get(resourceId));
             case "DEMAND" -> demandOwnership(resourceId)
@@ -260,9 +385,10 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
 
     @Override
     public synchronized void audit(ActorScope actor, UUID associationId, UUID enterpriseId,
-                                   String action, String resourceType, Object resourceId, Object details) {
+                                   String action, String resourceType, Object resourceId,
+                                   Long resourceVersion, Object details) {
         audits.add(new AuditEntry(actor.subject(), associationId, enterpriseId, action, resourceType,
-                String.valueOf(resourceId), Instant.now()));
+                String.valueOf(resourceId), resourceVersion, Instant.now()));
     }
 
     synchronized List<AuditEntry> auditEntries() {
@@ -304,6 +430,6 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
     }
 
     record AuditEntry(String actorSubject, UUID associationId, UUID enterpriseId, String action,
-                      String resourceType, String resourceId, Instant occurredAt) {
+                      String resourceType, String resourceId, Long resourceVersion, Instant occurredAt) {
     }
 }

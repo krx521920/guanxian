@@ -46,7 +46,7 @@ class PostgresCollaborationStore implements CollaborationStore {
 
     @Override
     public List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         MapSqlParameterSource values = params(actor, query).addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(SELECT + where(actor, query, includeDeleted)
                 + " ORDER BY c.updated_at DESC, c.id LIMIT :limit OFFSET :offset", values, mapper);

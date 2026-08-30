@@ -66,7 +66,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
 
     @Override
     public List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return items.values().stream()
                 .filter(item -> canReadEnterpriseHistory(actor, item))
                 .filter(item -> includeDeleted || !item.deleted())

@@ -56,6 +56,15 @@ class CrossAssociationController {
         return ApiResponse.ok(service.reviewAccessRequest(id, request, actor(authentication)));
     }
 
+    @PutMapping("/access-requests/{id}/cancel")
+    @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
+    ApiResponse<CrossAssociationDtos.AccessRequestView> cancelAccessRequest(
+            @PathVariable UUID id,
+            @Valid @RequestBody CrossAssociationDtos.AccessRequestCancel request,
+            Authentication authentication) {
+        return ApiResponse.ok(service.cancelAccessRequest(id, request, actor(authentication)));
+    }
+
     @GetMapping("/relationships")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
     ApiResponse<List<CrossAssociationDtos.RelationshipView>> relationships(Authentication authentication) {
@@ -100,10 +109,28 @@ class CrossAssociationController {
         return versioned(value.version(), value);
     }
 
+    @PutMapping("/share-policies/{id}/status")
+    @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
+    ResponseEntity<ApiResponse<CrossAssociationDtos.SharePolicyView>> changeSharePolicyStatus(
+            @PathVariable UUID id,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
+            @Valid @RequestBody CrossAssociationDtos.SharePolicyStatusChange request,
+            Authentication authentication) {
+        var value = service.changeSharePolicyStatus(
+                id, VersionEtags.requiredVersion(ifMatch), request, actor(authentication));
+        return versioned(value.version(), value);
+    }
+
     @GetMapping("/consents")
     @PreAuthorize("hasAuthority('MEMBER_READ')")
     ApiResponse<List<CrossAssociationDtos.ConsentView>> consents(Authentication authentication) {
         return ApiResponse.ok(service.consents(actor(authentication)));
+    }
+
+    @GetMapping("/consent-targets")
+    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    ApiResponse<List<CrossAssociationDtos.ConsentTargetView>> consentTargets(Authentication authentication) {
+        return ApiResponse.ok(service.consentTargets(actor(authentication)));
     }
 
     @PostMapping("/consents")

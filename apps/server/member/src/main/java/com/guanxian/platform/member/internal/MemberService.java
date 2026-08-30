@@ -10,6 +10,7 @@ import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,13 +37,22 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
 
     private final MemberRepository repository;
     private final AuditTrail auditTrail;
+    private final PartnerFieldAuthorization partnerFieldAuthorization;
     @Value("${guanxian.member.seed-demo-data:false}")
     private boolean seedDemoData;
 
     @Autowired
-    MemberService(MemberRepository repository, AuditTrail auditTrail) {
+    MemberService(
+            MemberRepository repository,
+            AuditTrail auditTrail,
+            PartnerFieldAuthorization partnerFieldAuthorization) {
         this.repository = repository;
         this.auditTrail = auditTrail;
+        this.partnerFieldAuthorization = partnerFieldAuthorization;
+    }
+
+    MemberService(MemberRepository repository, AuditTrail auditTrail) {
+        this(repository, auditTrail, PartnerFieldAuthorization.allowAll());
     }
 
     MemberService(MemberRepository repository) {
@@ -86,6 +96,8 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         return repository.findAll().stream()
                 .filter(member -> allowDeleted || !member.deleted())
                 .filter(member -> MemberAccessPolicy.canRead(actor, member))
+                .map(member -> authorizeRead(actor, member))
+                .flatMap(Optional::stream)
                 .filter(member -> normalizedStatus.isEmpty() || member.status().equals(normalizedStatus))
                 .filter(member -> keyword.isEmpty() || searchableText(member).contains(keyword))
                 .sorted(Comparator.comparing(MemberProfile::name).thenComparing(MemberProfile::id))
@@ -128,7 +140,8 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         boolean allowDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationReviewer());
         return repository.findById(id)
                 .filter(member -> allowDeleted || !member.deleted())
-                .filter(member -> MemberAccessPolicy.canRead(actor, member));
+                .filter(member -> MemberAccessPolicy.canRead(actor, member))
+                .flatMap(member -> authorizeRead(actor, member));
     }
 
     public MemberProfile get(UUID id, ActorScope actor) {
@@ -427,6 +440,58 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         return String.join(" ", member.name(), nullToEmpty(member.category()), nullToEmpty(member.introduction()),
                 String.join(" ", member.capabilities()), String.join(" ", member.products()))
                 .toLowerCase(Locale.ROOT);
+    }
+
+    private Optional<MemberProfile> authorizeRead(ActorScope actor, MemberProfile member) {
+        if (!isCrossAssociationRead(actor, member)) {
+            return Optional.of(member);
+        }
+        Optional<Set<String>> authorization = partnerFieldAuthorization.authorizedFields(
+                actor, member.id(), "MEMBER", member.id());
+        if (authorization.isEmpty() || !"ACTIVE".equals(member.status())) {
+            return Optional.empty();
+        }
+        Set<String> visibleFields = authorization.orElseThrow().stream()
+                .filter(field -> field != null && PartnerFieldAuthorization.MEMBER_FIELDS.contains(field))
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        if (!visibleFields.containsAll(PartnerFieldAuthorization.requiredFields("MEMBER"))) {
+            return Optional.empty();
+        }
+        return Optional.of(redactPartnerMember(member, visibleFields));
+    }
+
+    private static boolean isCrossAssociationRead(ActorScope actor, MemberProfile member) {
+        return !actor.isSystemAdmin()
+                && actor.associationId() != null
+                && !actor.associationId().equals(member.associationId());
+    }
+
+    private static MemberProfile redactPartnerMember(MemberProfile member, Set<String> visibleFields) {
+        return new MemberProfile(
+                member.id(),
+                member.associationId(),
+                member.name(),
+                null,
+                visibleFields.contains("category") ? member.category() : null,
+                visibleFields.contains("address") ? member.address() : null,
+                null,
+                null,
+                visibleFields.contains("introduction") ? member.introduction() : null,
+                visibleFields.contains("capabilities") ? safeList(member.capabilities()) : List.of(),
+                visibleFields.contains("products") ? safeList(member.products()) : List.of(),
+                visibleFields.contains("cooperationNeeds") ? safeList(member.cooperationNeeds()) : List.of(),
+                member.visibility(),
+                member.status(),
+                member.version(),
+                member.createdAt(),
+                member.updatedAt(),
+                member.deletedAt(),
+                member.deletedBySubject(),
+                member.statusBeforeDelete());
+    }
+
+    private static List<String> safeList(List<String> values) {
+        return values == null ? List.of() : values;
     }
 
     private static String nullToEmpty(String value) {

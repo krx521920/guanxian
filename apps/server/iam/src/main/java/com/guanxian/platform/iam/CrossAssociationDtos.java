@@ -27,6 +27,10 @@ final class CrossAssociationDtos {
 
     enum AccessDecision { APPROVE, REJECT }
 
+    record AccessRequestCancel(
+            @Size(max = 2000) String reason) {
+    }
+
     record AccessRequestView(
             UUID id,
             UUID applicantAssociationId,
@@ -90,6 +94,12 @@ final class CrossAssociationDtos {
             Instant updatedAt) {
     }
 
+    record SharePolicyStatusChange(
+            @NotNull SharePolicyStatus status) {
+    }
+
+    enum SharePolicyStatus { ACTIVE, SUSPENDED }
+
     record ConsentCreate(
             UUID enterpriseId,
             @NotNull UUID targetAssociationId,
@@ -109,6 +119,12 @@ final class CrossAssociationDtos {
             Instant expiresAt,
             Instant revokedAt,
             Instant createdAt) {
+    }
+
+    record ConsentTargetView(
+            UUID targetAssociationId,
+            String resourceType,
+            Instant policyExpiresAt) {
     }
 
     record RecommendationCreate(

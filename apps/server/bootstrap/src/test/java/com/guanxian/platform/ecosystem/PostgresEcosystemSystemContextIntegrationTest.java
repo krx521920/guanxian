@@ -182,6 +182,28 @@ class PostgresEcosystemSystemContextIntegrationTest {
                 () -> workflow.negotiations(confirmedA.id(), systemA3));
     }
 
+    @Test
+    void postgresCatalogReviewUpdateRejectsAnotherAssociationAtTheWriteBoundary() {
+        seedScopes();
+        ActorScope systemB1 = system(ASSOCIATION_B, ENTERPRISE_B1);
+        ActorScope reviewerA = associationReviewer(ASSOCIATION_A);
+        OfferingView offering = catalog.createOffering(
+                offeringRequest(FIXTURE_PREFIX + "-跨协会待审供给"), systemB1);
+        offering = catalog.submitOffering(offering.id(), offering.version(), systemB1);
+        DemandView demand = catalog.createDemand(
+                demandRequest(FIXTURE_PREFIX + "-跨协会待审需求"), systemB1);
+        demand = catalog.submitDemand(demand.id(), demand.version(), systemB1);
+
+        assertTrue(catalogStore.transitionOffering(
+                offering.id(), offering.version(), "ACTIVE", reviewerA).isEmpty());
+        assertTrue(catalogStore.transitionDemand(
+                demand.id(), demand.version(), "OPEN", null, reviewerA).isEmpty());
+        assertEquals("PENDING_REVIEW", jdbc.queryForObject(
+                "SELECT status FROM product_service WHERE id=?", String.class, offering.id()));
+        assertEquals("PENDING_REVIEW", jdbc.queryForObject(
+                "SELECT status FROM cooperation_demand WHERE id=?", String.class, demand.id()));
+    }
+
     private void assertCatalogReadScopes(
             ActorScope global,
             ActorScope systemA,
@@ -297,5 +319,11 @@ class PostgresEcosystemSystemContextIntegrationTest {
         return new ActorScope(
                 null, "postgres-ecosystem-system", "system-admin",
                 associationId, enterpriseId, Set.of("SYSTEM_ADMIN"), Set.of());
+    }
+
+    private static ActorScope associationReviewer(UUID associationId) {
+        return new ActorScope(
+                UUID.randomUUID(), "postgres-ecosystem-reviewer", "association-admin",
+                associationId, null, Set.of("ASSOCIATION_ADMIN"), Set.of());
     }
 }

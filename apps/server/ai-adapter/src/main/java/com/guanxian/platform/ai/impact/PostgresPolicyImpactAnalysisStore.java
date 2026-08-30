@@ -125,7 +125,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
 
     @Override
     public List<PolicyImpactAnalysisView> list(
-            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, int offset, int limit) {
+            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, long offset, int limit) {
         MapSqlParameterSource params = filters(scope, status, policyDocumentId, enterpriseId)
                 .addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(SELECT + where(scope, status, policyDocumentId, enterpriseId)

@@ -7,7 +7,16 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
 import { platformApi } from '../services/platform-api'
-import type { Demand, MatchFeedback, MatchInvitation, MatchNegotiation, MatchOutcome, PersistedMatch } from '../types/domain'
+import type {
+  AssociationConsent,
+  AssociationConsentTarget,
+  Demand,
+  MatchFeedback,
+  MatchInvitation,
+  MatchNegotiation,
+  MatchOutcome,
+  PersistedMatch,
+} from '../types/domain'
 import { apiActionMessage, displayBusinessStatus, formatDateTime } from './business-form'
 
 const route = useRoute()
@@ -36,6 +45,9 @@ const invitationResponseComment = ref('')
 const negotiationForm = reactive({ stage: 'INITIAL_CONTACT', summary: '', nextAction: '', nextActionAt: '' })
 const feedbackForm = reactive({ rating: '', outcome: 'SUCCESS', closeReason: '', comment: '' })
 const outcomeForm = reactive({ title: '', summary: '', contractAmount: '', resultType: 'COOPERATION', visibility: 'ASSOCIATION' })
+const matchConsents = ref<AssociationConsent[]>([])
+const matchConsentTargets = ref<AssociationConsentTarget[]>([])
+const consentForm = reactive({ targetAssociationId: '', expiresAt: '' })
 const states = computed(() => ['全部', ...new Set(items.value.map((item) => displayBusinessStatus(item.state)))])
 const filtered = computed(() => items.value.filter((item) => state.value === '全部' || displayBusinessStatus(item.state) === state.value))
 const recommendedCount = computed(() => items.value.filter((item) => Boolean(item.recommendedAt)).length)
@@ -44,17 +56,19 @@ const canGenerate = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCI
 const canRecommend = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'].includes(auth.user.value?.role || ''))
 const canConfirm = (item: PersistedMatch) => isEnterpriseAdmin.value
   && [item.demandEnterpriseId, item.candidateEnterpriseId].includes(auth.user.value?.enterpriseId || '')
-  && ['PENDING_CONFIRMATION', 'RECOMMENDED', 'PARTIALLY_CONFIRMED'].includes(item.state)
+  && ['PENDING_CONFIRMATION', 'RECOMMENDED', 'PARTIALLY_CONFIRMED'].includes(item.state || '')
   && (auth.user.value?.enterpriseId === item.demandEnterpriseId ? !item.demandConfirmedAt : !item.candidateConfirmedAt)
 const isAssociationStaff = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR'].includes(auth.user.value?.role || ''))
 const isEnterpriseAdmin = computed(() => auth.user.value?.role === 'ENTERPRISE_ADMIN')
+const canManageEnterpriseConsent = computed(() => isEnterpriseAdmin.value
+  || (auth.user.value?.role === 'SYSTEM_ADMIN' && Boolean(auth.user.value.enterpriseId)))
 const isDemandOwner = (item: PersistedMatch) => isEnterpriseAdmin.value && auth.user.value?.enterpriseId === item.demandEnterpriseId
 const isCandidate = (item: PersistedMatch) => isEnterpriseAdmin.value && auth.user.value?.enterpriseId === item.candidateEnterpriseId
 const canInvite = (item: PersistedMatch) => item.state === 'CONFIRMED'
   && (isAssociationStaff.value || isDemandOwner(item))
 const canNegotiate = (item: PersistedMatch) => item.state === 'NEGOTIATING'
   && (isAssociationStaff.value || isDemandOwner(item) || isCandidate(item))
-const canSubmitFeedback = (item: PersistedMatch) => ['OUTCOME_PENDING', 'CLOSED'].includes(item.state)
+const canSubmitFeedback = (item: PersistedMatch) => ['OUTCOME_PENDING', 'CLOSED'].includes(item.state || '')
   && (isDemandOwner(item) || isCandidate(item))
 const canArchiveOutcome = (item: PersistedMatch) => item.state === 'OUTCOME_PENDING'
   && (isAssociationStaff.value || isDemandOwner(item))
@@ -64,13 +78,120 @@ const canRespondInvitation = (item: MatchInvitation) => isEnterpriseAdmin.value
   && (!item.expiresAt || new Date(item.expiresAt).getTime() > Date.now())
 const canCloseMatch = (item: PersistedMatch) => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR'].includes(auth.user.value?.role || '')
   || (auth.user.value?.role === 'ENTERPRISE_ADMIN' && auth.user.value.enterpriseId === item.demandEnterpriseId)
+const matchConsentHistory = computed(() => selected.value
+  ? matchConsents.value.filter((consent) => consent.resourceType === 'MATCH' && consent.resourceId === selected.value?.id)
+  : [])
+const activeMatchConsents = computed(() => matchConsentHistory.value.filter(isConsentActive))
+const eligibleMatchConsentTargets = computed(() => matchConsentTargets.value.filter((target) => target.resourceType === 'MATCH'))
+const grantableMatchConsentTargets = computed(() => eligibleMatchConsentTargets.value.filter((target) =>
+  !activeMatchConsents.value.some((consent) => consent.targetAssociationId === target.targetAssociationId)))
+const selectedMatchConsentTarget = computed(() => eligibleMatchConsentTargets.value.find((target) =>
+  target.targetAssociationId === consentForm.targetAssociationId))
+const minimumConsentExpiry = localDateTime(new Date(Date.now() + 60_000))
+const maximumConsentExpiry = computed(() => localDateTime(selectedMatchConsentTarget.value?.policyExpiresAt))
+const canManageSelectedMatchConsent = computed(() => Boolean(selected.value
+  && canManageEnterpriseConsent.value
+  && [selected.value.demandEnterpriseId, selected.value.candidateEnterpriseId].includes(auth.user.value?.enterpriseId || '')
+  && (eligibleMatchConsentTargets.value.length || matchConsentHistory.value.length)))
 
 function toInstant(value: string): string | null {
   return value ? new Date(value).toISOString() : null
 }
 
+function localDateTime(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function isConsentActive(item: AssociationConsent): boolean {
+  return item.status === 'ACTIVE' && !item.revokedAt
+    && (!item.expiresAt || new Date(item.expiresAt).getTime() > Date.now())
+}
+
+function defaultConsentExpiry(target: AssociationConsentTarget): string {
+  const oneYear = Date.now() + 365 * 86_400_000
+  const policyEnd = target.policyExpiresAt ? new Date(target.policyExpiresAt).getTime() : Number.POSITIVE_INFINITY
+  return localDateTime(new Date(Math.min(oneYear, policyEnd)))
+}
+
+function prepareMatchConsent() {
+  const first = grantableMatchConsentTargets.value[0]
+  consentForm.targetAssociationId = first?.targetAssociationId || ''
+  consentForm.expiresAt = first ? defaultConsentExpiry(first) : ''
+}
+
+function selectConsentTarget() {
+  const target = selectedMatchConsentTarget.value
+  consentForm.expiresAt = target ? defaultConsentExpiry(target) : ''
+}
+
+async function loadMatchConsentContext() {
+  if (!canManageEnterpriseConsent.value) return
+  try {
+    [matchConsents.value, matchConsentTargets.value] = await Promise.all([
+      platformApi.associationConsents(),
+      platformApi.associationConsentTargets(),
+    ])
+  } catch (reason) {
+    message.value = apiActionMessage(reason, '匹配记录已加载，但跨协会授权上下文暂时无法读取。')
+  }
+}
+
+async function grantMatchConsent() {
+  const item = selected.value
+  const target = selectedMatchConsentTarget.value
+  if (!item || !target || busy.value || !canManageSelectedMatchConsent.value) return
+  const expiry = new Date(consentForm.expiresAt)
+  if (Number.isNaN(expiry.getTime()) || expiry.getTime() <= Date.now()) {
+    message.value = '跨协会授权必须设置未来的截止时间。'
+    return
+  }
+  if (target.policyExpiresAt && expiry.getTime() > new Date(target.policyExpiresAt).getTime()) {
+    message.value = '企业授权截止时间不能晚于协会字段策略截止时间。'
+    return
+  }
+  busy.value = true
+  message.value = ''
+  try {
+    const saved = await platformApi.grantAssociationConsent({
+      enterpriseId: null,
+      targetAssociationId: target.targetAssociationId,
+      resourceType: 'MATCH',
+      resourceId: item.id,
+      expiresAt: expiry.toISOString(),
+    })
+    matchConsents.value = [saved, ...matchConsents.value]
+    prepareMatchConsent()
+    message.value = '匹配记录的跨协会字段授权已生效。'
+  } catch (reason) {
+    message.value = apiActionMessage(reason, '匹配记录授权失败，请确认关系和字段策略仍然有效。')
+  } finally {
+    busy.value = false
+  }
+}
+
+async function revokeMatchConsent(item: AssociationConsent) {
+  if (busy.value || !isConsentActive(item)) return
+  busy.value = true
+  message.value = ''
+  try {
+    const saved = await platformApi.revokeAssociationConsent(item)
+    matchConsents.value = matchConsents.value.map((value) => value.id === saved.id ? saved : value)
+    prepareMatchConsent()
+    message.value = '匹配记录的定向共享授权已撤销。'
+  } catch (reason) {
+    message.value = apiActionMessage(reason, '撤销匹配记录授权失败。')
+  } finally {
+    busy.value = false
+  }
+}
+
 async function openDetail(item: PersistedMatch) {
   selected.value = item
+  prepareMatchConsent()
   closeReason.value = ''
   invitations.value = []
   negotiations.value = []
@@ -103,6 +224,7 @@ async function refreshSelectedMatch(matchId: string) {
   const loaded = await platformApi.matches()
   items.value = loaded
   selected.value = loaded.find((item) => item.id === matchId) || null
+  prepareMatchConsent()
 }
 
 async function load() {
@@ -110,6 +232,7 @@ async function load() {
   try {
     const [matches, demandPage] = await Promise.all([platformApi.matches(), platformApi.demands()])
     items.value = matches; demands.value = demandPage.items
+    await loadMatchConsentContext()
     const fromRoute = typeof route.query.demand === 'string' ? route.query.demand : ''
     if (fromRoute && canGenerate.value) { selectedDemandId.value = fromRoute; generatorOpen.value = true }
   } catch (reason) { error.value = safePageResourceError(reason) }
@@ -254,10 +377,10 @@ onMounted(load)
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else class="match-list">
       <article v-for="item in filtered" :key="item.id" class="match-card panel">
-        <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - item.score * 1.13}` }"/></svg><div><strong>{{ item.score }}</strong><span>匹配度</span></div></div>
-        <div class="match-demand"><span class="eyebrow">需求方 · {{ item.scene }}</span><h2>{{ item.demandTitle }}</h2><p>{{ item.demandCompany }}</p></div>
+        <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - (item.score ?? 0) * 1.13}` }"/></svg><div><strong>{{ item.score ?? '—' }}</strong><span>匹配度</span></div></div>
+        <div class="match-demand"><span class="eyebrow">需求方 · {{ item.scene || '场景未授权' }}</span><h2>{{ item.demandTitle || '需求标题未授权' }}</h2><p>{{ item.demandCompany || '需求企业未授权' }}</p></div>
         <div class="match-arrow"><span>可解释推荐</span>→</div>
-        <div class="match-supplier"><span class="eyebrow">能力供给方</span><h2>{{ item.supplierCompany }}</h2><p>{{ item.solution }}</p></div>
+        <div class="match-supplier"><span class="eyebrow">能力供给方</span><h2>{{ item.supplierCompany || '供给企业未授权' }}</h2><p>{{ item.solution || '方案未授权' }}</p></div>
         <div class="match-actions"><StatusBadge :value="displayBusinessStatus(item.state)" /><small>{{ formatDateTime(item.updatedAt) }}</small><button class="primary-button small" @click="openDetail(item)">查看匹配详情</button></div>
         <div class="match-reasons"><b>推荐理由</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span></div>
       </article>
@@ -269,34 +392,52 @@ onMounted(load)
     <div v-if="selected" class="modal-backdrop" @click.self="selected = null">
       <section class="panel modal-card match-detail-modal">
         <div class="modal-head">
-          <div><span class="eyebrow">MATCH DETAIL</span><h2>{{ selected.demandTitle }}</h2></div>
+          <div><span class="eyebrow">MATCH DETAIL</span><h2>{{ selected.demandTitle || '需求标题未授权' }}</h2></div>
           <button class="icon-button" @click="selected = null">×</button>
         </div>
         <div v-if="message" class="save-message modal-message" aria-live="polite">{{ message }}</div>
         <div class="detail-grid">
-          <div><span>需求方</span><strong>{{ selected.demandCompany }}</strong></div>
-          <div><span>供给方</span><strong>{{ selected.supplierCompany }}</strong></div>
-          <div><span>匹配度</span><strong>{{ selected.score }}</strong></div>
+          <div><span>需求方</span><strong>{{ selected.demandCompany || '未授权' }}</strong></div>
+          <div><span>供给方</span><strong>{{ selected.supplierCompany || '未授权' }}</strong></div>
+          <div><span>匹配度</span><strong>{{ selected.score ?? '未授权' }}</strong></div>
           <div><span>当前状态</span><strong>{{ displayBusinessStatus(selected.state) }}</strong></div>
           <div><span>需求方确认</span><strong>{{ selected.demandConfirmedAt ? formatDateTime(selected.demandConfirmedAt) : '待确认' }}</strong></div>
           <div><span>供给方确认</span><strong>{{ selected.candidateConfirmedAt ? formatDateTime(selected.candidateConfirmedAt) : '待确认' }}</strong></div>
         </div>
         <div class="modal-copy">
-          <h3>推荐方案</h3><p>{{ selected.solution }}</p>
+          <h3>推荐方案</h3><p>{{ selected.solution || '该字段未获跨协会授权。' }}</p>
           <h3>推荐理由</h3><ul><li v-for="reason in selected.reasons" :key="reason">{{ reason }}</li></ul>
           <p v-if="selected.closedReason"><b>关闭原因：</b>{{ selected.closedReason }}</p>
         </div>
-        <div v-if="canCloseMatch(selected) && !['CLOSED', 'ARCHIVED'].includes(selected.state)" class="close-inline">
+        <div v-if="canCloseMatch(selected) && !['CLOSED', 'ARCHIVED'].includes(selected.state || '')" class="close-inline">
           <input v-model="closeReason" placeholder="关闭时必须填写原因" />
           <button class="text-button danger-text" :disabled="!closeReason.trim() || busy" @click="closeMatch">关闭匹配</button>
         </div>
         <div class="form-actions match-state-actions">
-          <button v-if="canRecommend && !selected.recommendedAt && ['PENDING_CONFIRMATION', 'PARTIALLY_CONFIRMED'].includes(selected.state)" class="primary-button" :disabled="busy" @click="transition('recommend')">协会推荐</button>
+          <button v-if="canRecommend && !selected.recommendedAt && ['PENDING_CONFIRMATION', 'PARTIALLY_CONFIRMED'].includes(selected.state || '')" class="primary-button" :disabled="busy" @click="transition('recommend')">协会推荐</button>
           <button v-if="canConfirm(selected)" class="primary-button" :disabled="busy" @click="transition('confirm')">确认本方意向</button>
-          <RouterLink v-if="['NEGOTIATING', 'OUTCOME_PENDING', 'ARCHIVED'].includes(selected.state)" class="primary-button" :to="`/collaborations?match=${selected.id}`">进入协作事项</RouterLink>
+          <RouterLink v-if="['NEGOTIATING', 'OUTCOME_PENDING', 'ARCHIVED'].includes(selected.state || '')" class="primary-button" :to="`/collaborations?match=${selected.id}`">进入协作事项</RouterLink>
         </div>
 
         <div class="match-workflow">
+          <section v-if="canManageSelectedMatchConsent" class="workflow-section">
+            <div class="workflow-title"><div><span class="eyebrow">PARTNER FIELD CONSENT</span><h3>匹配记录跨协会授权</h3></div><small>仅开放协会策略勾选的字段</small></div>
+            <p class="workflow-note">需求方或供给方企业管理员只能授权本企业参与的这条真实匹配；关系、字段策略或企业授权任一失效都会停止共享。</p>
+            <form v-if="grantableMatchConsentTargets.length" class="workflow-form" @submit.prevent="grantMatchConsent">
+              <label><span>目标协会 *</span><select v-model="consentForm.targetAssociationId" required @change="selectConsentTarget"><option value="" disabled>请选择</option><option v-for="target in grantableMatchConsentTargets" :key="target.targetAssociationId" :value="target.targetAssociationId">{{ target.targetAssociationId }}</option></select></label>
+              <label><span>授权截止时间 *</span><input v-model="consentForm.expiresAt" type="datetime-local" :min="minimumConsentExpiry" :max="maximumConsentExpiry || undefined" required /></label>
+              <div class="workflow-submit form-span-2"><button class="primary-button small" :disabled="busy">确认跨协会授权</button></div>
+            </form>
+            <div v-if="matchConsentHistory.length" class="workflow-record-list">
+              <article v-for="consent in matchConsentHistory" :key="consent.id" class="workflow-record">
+                <div class="workflow-record-head"><StatusBadge :value="displayBusinessStatus(isConsentActive(consent) ? 'ACTIVE' : consent.revokedAt ? 'REVOKED' : 'EXPIRED')" /><small>{{ formatDateTime(consent.createdAt) }}</small></div>
+                <p>目标协会：{{ consent.targetAssociationId }}</p><small>授权截止：{{ formatDateTime(consent.expiresAt) }}</small>
+                <button v-if="isConsentActive(consent)" type="button" class="text-button danger-text" :disabled="busy" @click="revokeMatchConsent(consent)">撤销授权</button>
+              </article>
+            </div>
+            <div v-else-if="!grantableMatchConsentTargets.length" class="workflow-empty">暂无可用 MATCH 字段策略或有效授权记录。</div>
+          </section>
+
           <div v-if="workflowLoading" class="workflow-loading">正在加载邀请、洽谈和成果记录…</div>
 
           <section v-else class="workflow-section">

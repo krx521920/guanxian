@@ -14,7 +14,7 @@ export function apiActionMessage(reason: unknown, fallback: string): string {
   return fallback
 }
 
-export function displayBusinessStatus(value: string): string {
+export function displayBusinessStatus(value: string | null | undefined): string {
   const labels: Record<string, string> = {
     DRAFT: '草稿', PENDING_REVIEW: '待审核', PUBLISHED: '已发布', ACTIVE: '进行中',
     APPROVED: '已通过', REJECTED: '已退回', DISABLED: '已停用', CLOSED: '已关闭',
@@ -27,8 +27,9 @@ export function displayBusinessStatus(value: string): string {
     SUCCESS: '已达成合作', NO_DEAL: '未达成合作', WITHDRAWN: '主动退出',
     COMPLETED: '已完成', OPEN: '已开放',
     IN_PROGRESS: '进行中', PENDING: '待处理', SUSPENDED: '已暂停', REVOKED: '已撤销',
+    CANCELLED: '已取消', EXPIRED: '已到期',
   }
-  return labels[value] || value || '未知'
+  return (value ? labels[value] : undefined) || value || '未知'
 }
 
 export function formatDateTime(value: string | null | undefined): string {

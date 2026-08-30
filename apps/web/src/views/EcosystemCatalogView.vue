@@ -8,7 +8,15 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
 import { platformApi } from '../services/platform-api'
-import type { Demand, DemandUpsertPayload, Offering, OfferingUpsertPayload } from '../types/domain'
+import type {
+  AssociationConsent,
+  AssociationConsentTarget,
+  AssociationShareResourceType,
+  Demand,
+  DemandUpsertPayload,
+  Offering,
+  OfferingUpsertPayload,
+} from '../types/domain'
 import { apiActionMessage, displayBusinessStatus, formatDateTime, nullableText, splitItems } from './business-form'
 
 const auth = useAuth()
@@ -28,6 +36,11 @@ const message = ref('')
 const editorOpen = ref(false)
 const editingOffering = ref<Offering | null>(null)
 const editingDemand = ref<Demand | null>(null)
+const consents = ref<AssociationConsent[]>([])
+const consentTargets = ref<AssociationConsentTarget[]>([])
+const consentOpen = ref(false)
+const consentResource = ref<Offering | Demand | null>(null)
+const consentForm = reactive({ targetAssociationId: '', expiresAt: '' })
 const keyword = ref('')
 const canOwnWrite = computed(() => auth.user.value?.role === 'ENTERPRISE_ADMIN'
   || (auth.user.value?.role === 'SYSTEM_ADMIN' && Boolean(auth.user.value.enterpriseId)))
@@ -37,6 +50,31 @@ const canOwn = (item: Offering | Demand) => canOwnWrite.value && auth.user.value
 const enterpriseLabel = (item: Offering | Demand) => item.enterpriseName?.trim() || item.enterpriseId
 const filteredOfferings = computed(() => offerings.value)
 const filteredDemands = computed(() => demands.value)
+const consentResourceType = computed<AssociationShareResourceType | null>(() => {
+  const item = consentResource.value
+  if (!item) return null
+  return 'kind' in item ? item.kind : 'DEMAND'
+})
+const consentResourceHistory = computed(() => {
+  const item = consentResource.value
+  const type = consentResourceType.value
+  return item && type
+    ? consents.value.filter((consent) => consent.resourceId === item.id && consent.resourceType === type)
+    : []
+})
+const eligibleConsentTargets = computed(() => {
+  const type = consentResourceType.value
+  if (!type) return []
+  return consentTargets.value.filter((target) => target.resourceType === type)
+})
+const grantableConsentTargets = computed(() => eligibleConsentTargets.value.filter((target) =>
+  !consentResourceHistory.value.some((consent) =>
+    consent.targetAssociationId === target.targetAssociationId && isConsentActive(consent))))
+const minimumConsentExpiry = localDateTime(new Date(Date.now() + 60_000))
+const maximumConsentExpiry = computed(() => {
+  const target = eligibleConsentTargets.value.find((item) => item.targetAssociationId === consentForm.targetAssociationId)
+  return localDateTime(target?.policyExpiresAt)
+})
 let searchTimer: number | null = null
 
 const offeringForm = reactive({ name: '', kind: 'PRODUCT' as 'PRODUCT' | 'SERVICE', description: '', scenarios: '', qualifications: '', visibility: 'MEMBERS' })
@@ -54,6 +92,120 @@ async function load() {
     demands.value = demandResult.items; demandTotal.value = demandResult.total; demandPage.value = demandResult.page
   } catch (reason) { error.value = safePageResourceError(reason) }
   finally { loading.value = false }
+}
+
+async function loadConsentContext() {
+  if (!canOwnWrite.value) return
+  try {
+    [consents.value, consentTargets.value] = await Promise.all([
+      platformApi.associationConsents(),
+      platformApi.associationConsentTargets(),
+    ])
+  } catch (reason) {
+    message.value = apiActionMessage(reason, '跨协会授权上下文加载失败，请稍后重试。')
+  }
+}
+
+function localDateTime(value: string | Date | null | undefined): string {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
+function consentType(item: Offering | Demand): AssociationShareResourceType {
+  return 'kind' in item ? item.kind : 'DEMAND'
+}
+
+function isConsentActive(item: AssociationConsent): boolean {
+  return item.status === 'ACTIVE' && !item.revokedAt
+    && (!item.expiresAt || new Date(item.expiresAt).getTime() > Date.now())
+}
+
+function isShareReady(item: Offering | Demand): boolean {
+  const approved = 'kind' in item ? item.status === 'ACTIVE' && !item.disabled : item.status === 'OPEN' && !item.disabled
+  return canOwn(item) && item.visibility === 'PARTNERS' && approved
+    && consentTargets.value.some((target) => target.resourceType === consentType(item))
+}
+
+function defaultConsentExpiry(targetAssociationId: string): string {
+  const target = eligibleConsentTargets.value.find((item) => item.targetAssociationId === targetAssociationId)
+  const oneYear = Date.now() + 365 * 86_400_000
+  const policyEnd = target?.policyExpiresAt ? new Date(target.policyExpiresAt).getTime() : Number.POSITIVE_INFINITY
+  return localDateTime(new Date(Math.min(oneYear, policyEnd)))
+}
+
+function selectConsentTarget() {
+  consentForm.expiresAt = defaultConsentExpiry(consentForm.targetAssociationId)
+}
+
+function openConsent(item: Offering | Demand) {
+  consentResource.value = item
+  const first = consentTargets.value.find((target) =>
+    target.resourceType === consentType(item)
+      && !consents.value.some((consent) => consent.resourceId === item.id
+        && consent.resourceType === consentType(item)
+        && consent.targetAssociationId === target.targetAssociationId
+        && isConsentActive(consent)))
+  consentForm.targetAssociationId = first?.targetAssociationId || ''
+  consentForm.expiresAt = first ? defaultConsentExpiry(first.targetAssociationId) : ''
+  consentOpen.value = true
+}
+
+async function grantConsent() {
+  const item = consentResource.value
+  const type = consentResourceType.value
+  const target = grantableConsentTargets.value.find((value) => value.targetAssociationId === consentForm.targetAssociationId)
+  if (!item || !type || !target || busy.value) return
+  const expiresAt = consentForm.expiresAt ? new Date(consentForm.expiresAt).toISOString() : null
+  if (!expiresAt || new Date(expiresAt).getTime() <= Date.now()) {
+    message.value = '跨协会授权必须设置未来的截止时间。'
+    return
+  }
+  if (target.policyExpiresAt && new Date(expiresAt).getTime() > new Date(target.policyExpiresAt).getTime()) {
+    message.value = '企业授权截止时间不能晚于协会字段策略截止时间。'
+    return
+  }
+  busy.value = true
+  message.value = ''
+  try {
+    const saved = await platformApi.grantAssociationConsent({
+      enterpriseId: null,
+      targetAssociationId: target.targetAssociationId,
+      resourceType: type,
+      resourceId: item.id,
+      expiresAt,
+    })
+    consents.value = [saved, ...consents.value]
+    const next = grantableConsentTargets.value[0]
+    consentForm.targetAssociationId = next?.targetAssociationId || ''
+    consentForm.expiresAt = next ? defaultConsentExpiry(next.targetAssociationId) : ''
+    message.value = '企业逐资源授权已生效；关系、字段策略或本授权任一失效都会立即停止共享。'
+  } catch (reason) {
+    message.value = apiActionMessage(reason, '跨协会授权失败，请刷新授权目标后重试。')
+  } finally {
+    busy.value = false
+  }
+}
+
+async function revokeConsent(item: AssociationConsent) {
+  if (busy.value || !isConsentActive(item)) return
+  busy.value = true
+  message.value = ''
+  try {
+    const saved = await platformApi.revokeAssociationConsent(item)
+    consents.value = consents.value.map((value) => value.id === saved.id ? saved : value)
+    if (!consentForm.targetAssociationId) {
+      consentForm.targetAssociationId = grantableConsentTargets.value[0]?.targetAssociationId || ''
+      selectConsentTarget()
+    }
+    message.value = '该资源的定向共享授权已撤销。'
+  } catch (reason) {
+    message.value = apiActionMessage(reason, '撤销授权失败。')
+  } finally {
+    busy.value = false
+  }
 }
 
 function openCreate(kind: 'offerings' | 'demands') {
@@ -136,7 +288,7 @@ watch(keyword, () => {
 onBeforeUnmount(() => { if (searchTimer !== null) window.clearTimeout(searchTimer) })
 
 onMounted(async () => {
-  await load()
+  await Promise.all([load(), loadConsentContext()])
   if (!canOwnWrite.value) return
   if (route.query.create === 'demand') openCreate('demands')
   else if (route.query.create === 'offering') openCreate('offerings')
@@ -161,7 +313,7 @@ onMounted(async () => {
         <h2>{{ item.name }}</h2><p>{{ item.description || '暂无详细说明' }}</p>
         <div class="tags"><span v-for="scene in item.scenarios" :key="scene">{{ scene }}</span></div>
         <small>更新于 {{ formatDateTime(item.updatedAt) }} · {{ item.visibility }}</small>
-        <div class="card-actions"><button v-if="canOwn(item)" class="text-button" @click="editOffering(item)">编辑</button><button v-if="canOwn(item) && item.status === 'DRAFT'" class="secondary-button small" :disabled="busy" @click="actOffering(item, 'submit')">提交审核</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="secondary-button small" @click="actOffering(item, 'reject')">退回</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="primary-button small" @click="actOffering(item, 'approve')">通过</button><button v-if="(canOwn(item) || canOperateCatalog) && !item.disabled" class="text-button danger-text" @click="actOffering(item, 'disable')">停用</button><button v-if="(canOwn(item) || canOperateCatalog) && item.disabled" class="text-button" @click="actOffering(item, 'restore')">恢复</button></div>
+        <div class="card-actions"><button v-if="canOwn(item)" class="text-button" @click="editOffering(item)">编辑</button><button v-if="canOwn(item) && item.status === 'DRAFT'" class="secondary-button small" :disabled="busy" @click="actOffering(item, 'submit')">提交审核</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="secondary-button small" @click="actOffering(item, 'reject')">退回</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="primary-button small" @click="actOffering(item, 'approve')">通过</button><button v-if="isShareReady(item)" class="secondary-button small" @click="openConsent(item)">跨协会授权</button><button v-if="(canOwn(item) || canOperateCatalog) && !item.disabled" class="text-button danger-text" @click="actOffering(item, 'disable')">停用</button><button v-if="(canOwn(item) || canOperateCatalog) && item.disabled" class="text-button" @click="actOffering(item, 'restore')">恢复</button></div>
       </article>
       <div v-if="!filteredOfferings.length" class="panel empty-business-state"><b>暂无产品或服务</b><span>建档后才能被需求匹配和协会推荐。</span></div>
       <PaginationBar :page="offeringPage" :size="pageSize" :total="offeringTotal" :disabled="loading" @change="changePage" @resize="resizePage" />
@@ -171,7 +323,7 @@ onMounted(async () => {
         <div class="asset-card-head"><span class="eyebrow">需求方 · {{ enterpriseLabel(item) }}</span><StatusBadge :value="displayBusinessStatus(item.status)" /></div>
         <h2>{{ item.title }}</h2><p>{{ item.description }}</p><div class="tags"><span v-for="scene in item.scenarios" :key="scene">{{ scene }}</span></div>
         <small>预算 {{ item.budgetMin ?? '—' }} ~ {{ item.budgetMax ?? '—' }} · 截止 {{ formatDateTime(item.responseDeadline) }}</small>
-        <div class="card-actions"><button v-if="canOwn(item)" class="text-button" @click="editDemand(item)">编辑</button><button v-if="canOwn(item) && item.status === 'DRAFT'" class="secondary-button small" @click="actDemand(item, 'submit')">提交审核</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="secondary-button small" @click="actDemand(item, 'reject')">退回</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="primary-button small" @click="actDemand(item, 'approve')">通过</button><RouterLink v-if="item.status === 'OPEN'" class="secondary-button small" :to="`/matching?demand=${item.id}`">查看匹配</RouterLink><button v-if="(canOwn(item) || canOperateCatalog) && !['CLOSED', 'DISABLED'].includes(item.status)" class="text-button danger-text" @click="actDemand(item, 'close')">关闭需求</button></div>
+        <div class="card-actions"><button v-if="canOwn(item)" class="text-button" @click="editDemand(item)">编辑</button><button v-if="canOwn(item) && item.status === 'DRAFT'" class="secondary-button small" @click="actDemand(item, 'submit')">提交审核</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="secondary-button small" @click="actDemand(item, 'reject')">退回</button><button v-if="canModerate && item.status === 'PENDING_REVIEW'" class="primary-button small" @click="actDemand(item, 'approve')">通过</button><RouterLink v-if="item.status === 'OPEN'" class="secondary-button small" :to="`/matching?demand=${item.id}`">查看匹配</RouterLink><button v-if="isShareReady(item)" class="secondary-button small" @click="openConsent(item)">跨协会授权</button><button v-if="(canOwn(item) || canOperateCatalog) && !['CLOSED', 'DISABLED'].includes(item.status)" class="text-button danger-text" @click="actDemand(item, 'close')">关闭需求</button></div>
       </article>
       <div v-if="!filteredDemands.length" class="panel empty-business-state"><b>暂无合作需求</b><span>发布真实需求后，系统将基于在架能力生成匹配。</span></div>
       <PaginationBar :page="demandPage" :size="pageSize" :total="demandTotal" :disabled="loading" @change="changePage" @resize="resizePage" />
@@ -184,6 +336,34 @@ onMounted(async () => {
         <div v-else class="form-grid modal-form"><label class="form-span-2"><span>需求标题 *</span><input v-model="demandForm.title" required maxlength="200" /></label><label class="form-span-2"><span>需求说明 *</span><textarea v-model="demandForm.description" required rows="5" /></label><label><span>应用场景</span><textarea v-model="demandForm.scenarios" rows="4" /></label><label><span>所需能力</span><textarea v-model="demandForm.requiredCapabilities" rows="4" /></label><label><span>预算下限</span><input v-model="demandForm.budgetMin" type="number" min="0" step="0.01" /></label><label><span>预算上限</span><input v-model="demandForm.budgetMax" type="number" min="0" step="0.01" /></label><label><span>响应截止</span><input v-model="demandForm.responseDeadline" type="datetime-local" /></label><label><span>可见范围</span><select v-model="demandForm.visibility"><option value="PRIVATE">仅本企业与协会</option><option value="MEMBERS">本协会会员</option><option value="PARTNERS">友好协会</option><option value="PUBLIC">公开</option><option value="DIRECTED">定向</option></select></label></div>
         <div class="form-actions"><button type="button" class="secondary-button" @click="editorOpen = false">取消</button><button class="primary-button" :disabled="busy">{{ busy ? '正在保存…' : '保存草稿' }}</button></div>
       </form>
+    </div>
+
+    <div v-if="consentOpen && consentResource" class="modal-backdrop" @click.self="consentOpen = false">
+      <div class="panel modal-card compact-modal">
+        <div class="modal-head">
+          <div><span class="eyebrow">RESOURCE CONSENT</span><h2>跨协会逐资源授权</h2></div>
+          <button type="button" class="icon-button" aria-label="关闭" @click="consentOpen = false">×</button>
+        </div>
+        <div class="form-section">
+          <h3>{{ 'kind' in consentResource ? consentResource.name : consentResource.title }}</h3>
+          <p>只有协会关系、字段策略、资源可见范围和本企业授权全部有效时，目标协会才能看到已批准字段。</p>
+        </div>
+        <form v-if="grantableConsentTargets.length" class="form-grid modal-form" @submit.prevent="grantConsent">
+          <label class="form-span-2"><span>目标协会 *</span><select v-model="consentForm.targetAssociationId" required @change="selectConsentTarget"><option value="" disabled>请选择</option><option v-for="target in grantableConsentTargets" :key="target.targetAssociationId" :value="target.targetAssociationId">{{ target.targetAssociationId }}</option></select></label>
+          <label class="form-span-2"><span>授权截止时间 *</span><input v-model="consentForm.expiresAt" type="datetime-local" :min="minimumConsentExpiry" :max="maximumConsentExpiry || undefined" required /></label>
+          <div class="form-actions form-span-2"><button class="primary-button" :disabled="busy">确认授权</button></div>
+        </form>
+        <div v-else class="empty-business-state"><b>没有新的可授权目标</b><span>当前有效字段策略对应的友好协会均已授权，或暂无可用策略。</span></div>
+        <div class="panel-header"><div><h2>授权记录</h2><p>撤销立即生效；重新授权会生成新的审计记录。</p></div></div>
+        <div v-if="consentResourceHistory.length" class="data-table-wrap"><table class="data-table">
+          <thead><tr><th>目标协会</th><th>状态</th><th>授权截止</th><th>授权/撤销时间</th><th></th></tr></thead>
+          <tbody><tr v-for="item in consentResourceHistory" :key="item.id">
+            <td>{{ item.targetAssociationId }}</td><td><StatusBadge :value="displayBusinessStatus(isConsentActive(item) ? 'ACTIVE' : item.revokedAt ? 'REVOKED' : 'EXPIRED')" /></td><td>{{ formatDateTime(item.expiresAt) }}</td>
+            <td>{{ item.revokedAt ? formatDateTime(item.revokedAt) : formatDateTime(item.createdAt) }}</td><td><button v-if="isConsentActive(item)" class="text-button danger-text" :disabled="busy" @click="revokeConsent(item)">撤销</button></td>
+          </tr></tbody>
+        </table></div>
+        <div v-else class="empty-business-state"><b>暂无授权记录</b></div>
+      </div>
     </div>
   </div>
 </template>

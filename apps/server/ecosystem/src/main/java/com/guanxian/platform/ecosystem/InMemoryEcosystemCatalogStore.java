@@ -35,7 +35,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<OfferingView> listOfferings(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return offerings.values().stream()
                 .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
                 .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
@@ -150,7 +150,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<DemandView> listDemands(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return demands.values().stream()
                 .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
                 .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))

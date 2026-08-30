@@ -14,6 +14,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -77,6 +78,56 @@ class PostgresEcosystemStoreScopeSqlTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
+    void partnerCatalogListAndCountShareFailClosedAuthorizationPredicates() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        PostgresEcosystemCatalogStore store = new PostgresEcosystemCatalogStore(jdbc, new ObjectMapper());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ActorScope partnerReader = actor(
+                "ASSOCIATION_ADMIN", null, Set.of(UUID.randomUUID()));
+
+        store.listOfferings(partnerReader, null, false, 0, 20);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+        assertPartnerCatalogPredicate(sql.getValue(), "name", "qualifications");
+
+        clearInvocations(jdbc);
+        store.countOfferings(partnerReader, null, false);
+        verify(jdbc).queryForObject(
+                sql.capture(), any(SqlParameterSource.class), eq(Long.class));
+        assertPartnerCatalogPredicate(sql.getValue(), "name", "qualifications");
+
+        clearInvocations(jdbc);
+        store.listDemands(partnerReader, null, false, 0, 20);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+        assertPartnerCatalogPredicate(sql.getValue(), "title", "responseDeadline");
+
+        clearInvocations(jdbc);
+        store.countDemands(partnerReader, null, false);
+        verify(jdbc).queryForObject(
+                sql.capture(), any(SqlParameterSource.class), eq(Long.class));
+        assertPartnerCatalogPredicate(sql.getValue(), "title", "responseDeadline");
+    }
+
+    @Test
+    void catalogReviewUpdatesCarryAssociationTenantPredicate() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        PostgresEcosystemCatalogStore store = new PostgresEcosystemCatalogStore(jdbc, new ObjectMapper());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ActorScope reviewer = actor("ASSOCIATION_ADMIN", null);
+
+        store.transitionOffering(UUID.randomUUID(), 0, "ACTIVE", reviewer);
+        verify(jdbc).update(sql.capture(), any(SqlParameterSource.class));
+        assertTrue(sql.getValue().contains("review_enterprise.association_id=:associationId"));
+        assertTrue(sql.getValue().contains("review_association.status='ACTIVE'"));
+
+        clearInvocations(jdbc);
+        store.transitionDemand(UUID.randomUUID(), 0, "OPEN", null, reviewer);
+        verify(jdbc).update(sql.capture(), any(SqlParameterSource.class));
+        assertTrue(sql.getValue().contains("review_enterprise.association_id=:associationId"));
+        assertTrue(sql.getValue().contains("review_association.status='ACTIVE'"));
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
     void workflowHistoryKeepsLifecycleFilterOnlyForEnterpriseParticipants() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         PostgresEcosystemWorkflowStore store = new PostgresEcosystemWorkflowStore(jdbc);
@@ -94,8 +145,25 @@ class PostgresEcosystemStoreScopeSqlTest {
     }
 
     private static ActorScope actor(String role, UUID enterpriseId) {
+        return actor(role, enterpriseId, Set.of());
+    }
+
+    private static ActorScope actor(String role, UUID enterpriseId, Set<UUID> partners) {
         return new ActorScope(
                 UUID.randomUUID(), "subject-" + role, role.toLowerCase(),
-                ASSOCIATION_ID, enterpriseId, Set.of(role), Set.of());
+                ASSOCIATION_ID, enterpriseId, Set.of(role), partners);
+    }
+
+    private static void assertPartnerCatalogPredicate(
+            String sql, String requiredField, String allowedField) {
+        assertTrue(sql.contains("e.association_id<>:associationId"));
+        assertTrue(sql.contains("source_association.status='ACTIVE'"));
+        assertTrue(sql.contains("target_association.status='ACTIVE'"));
+        assertTrue(sql.contains("transaction_timestamp()"));
+        assertTrue(sql.contains("jsonb_typeof(sp.visible_fields)='array'"));
+        assertTrue(sql.contains("sp.visible_fields @> CAST('[\"" + requiredField + "\"]' AS jsonb)"));
+        assertTrue(sql.contains("sp.visible_fields <@ CAST('[\"enterpriseName\""));
+        assertTrue(sql.contains("\"" + allowedField + "\"]' AS jsonb)"));
+        assertTrue(sql.contains("jsonb_typeof(invalid_sp.visible_fields)='array'"));
     }
 }

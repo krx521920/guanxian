@@ -46,8 +46,9 @@ public class PolicyService {
     public PolicyPage page(ActorScope actor, String query, boolean includeDeleted, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationStaff());
-        return new PolicyPage(store.list(actor, query, allowedDeleted, safePage * safeSize, safeSize),
+        return new PolicyPage(store.list(actor, query, allowedDeleted, offset, safeSize),
                 store.count(actor, query, allowedDeleted), safePage, safeSize);
     }
 

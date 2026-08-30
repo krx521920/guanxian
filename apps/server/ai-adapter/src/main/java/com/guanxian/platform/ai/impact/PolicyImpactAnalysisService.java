@@ -108,10 +108,11 @@ public class PolicyImpactAnalysisService {
         String status = normalizeStatus(requestedStatus);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         UUID enterpriseId = visibleEnterpriseFilter(actor, requestedEnterpriseId);
         var scope = actor.readScope();
         return new PolicyImpactPage(
-                store.list(scope, status, policyDocumentId, enterpriseId, safePage * safeSize, safeSize),
+                store.list(scope, status, policyDocumentId, enterpriseId, offset, safeSize),
                 store.count(scope, status, policyDocumentId, enterpriseId),
                 safePage,
                 safeSize);

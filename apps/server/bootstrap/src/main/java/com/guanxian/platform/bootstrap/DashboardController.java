@@ -188,7 +188,7 @@ public class DashboardController {
         return value == null || value.isBlank() ? 0 : 1;
     }
 
-    private static EcosystemMatch legacyMatch(PersistedMatchView value) {
+    static EcosystemMatch legacyMatch(PersistedMatchView value) {
         return new EcosystemMatch(
                 value.id().toString(), value.demandCompany(), value.demandTitle(), value.scene(),
                 value.supplierCompany(), value.solution(), value.score(), value.reasons(),

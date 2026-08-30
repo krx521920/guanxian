@@ -97,6 +97,15 @@ class NotificationServiceTest {
     }
 
     @Test
+    void maximumPageNumberDoesNotOverflowTheStoreOffset() {
+        NotificationMessagePage page = service.messages(
+                actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER"), false, Integer.MAX_VALUE, 100);
+
+        assertTrue(page.items().isEmpty());
+        assertEquals(Integer.MAX_VALUE, page.page());
+    }
+
+    @Test
     void unboundJwtIdentityCannotUsePersonalNotificationData() {
         ActorScope unbound = new ActorScope(null, "oidc-sub", "user", ASSOCIATION_A,
                 null, Set.of("ENTERPRISE_MEMBER"), Set.of());

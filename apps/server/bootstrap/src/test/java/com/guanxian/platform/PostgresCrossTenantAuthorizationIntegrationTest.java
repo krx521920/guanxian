@@ -2,6 +2,11 @@ package com.guanxian.platform;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guanxian.platform.ecosystem.DemandView;
+import com.guanxian.platform.ecosystem.EcosystemCatalogService;
+import com.guanxian.platform.ecosystem.EcosystemPage;
+import com.guanxian.platform.ecosystem.OfferingView;
+import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -19,14 +24,17 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -64,6 +72,9 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     @Autowired
     ObjectMapper objectMapper;
 
+    @Autowired
+    EcosystemCatalogService catalog;
+
     @Test
     void expiredRelationshipDoesNotGrantPartnerMemberVisibility() throws Exception {
         Fixture fixture = fixture(Instant.now().minusSeconds(60));
@@ -84,23 +95,274 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         insertPolicy(fixture, "PRODUCT", Instant.now().plusSeconds(3600));
         assertOfferingVisible(fixture, offeringId, false);
         UUID consentId = insertConsent(
-                fixture, "PRODUCT", offeringId, Instant.now().minusSeconds(60));
+                fixture.partnerEnterpriseId(), fixture.actorAssociationId(),
+                "PRODUCT", offeringId, "EXPIRED", Instant.now().minusSeconds(60));
         assertOfferingVisible(fixture, offeringId, false);
 
-        jdbc.update("UPDATE enterprise_share_consent SET expires_at=? WHERE id=?",
+        jdbc.update("UPDATE enterprise_share_consent SET status='ACTIVE', expires_at=? WHERE id=?",
                 java.sql.Timestamp.from(Instant.now().plusSeconds(3600)), consentId);
         assertOfferingVisible(fixture, offeringId, true);
+        assertCatalogSearch(fixture, "Partner Product", 1);
+        assertCatalogSearch(fixture, "Hidden Offering Description", 0);
+        assertCatalogSearch(fixture, "Partner Enterprise", 0);
 
-        jdbc.update("UPDATE association_share_policy SET expires_at=? WHERE source_association_id=? AND target_association_id=? AND resource_type='PRODUCT'",
-                java.sql.Timestamp.from(Instant.now().minusSeconds(1)),
+        Instant expiredPolicyNow = Instant.now();
+        jdbc.update("UPDATE association_share_policy SET valid_from=?, expires_at=? WHERE source_association_id=? AND target_association_id=? AND resource_type='PRODUCT'",
+                java.sql.Timestamp.from(expiredPolicyNow.minusSeconds(120)),
+                java.sql.Timestamp.from(expiredPolicyNow.minusSeconds(60)),
                 fixture.partnerAssociationId(), fixture.actorAssociationId());
         assertOfferingVisible(fixture, offeringId, false);
 
-        jdbc.update("UPDATE association_share_policy SET expires_at=? WHERE source_association_id=? AND target_association_id=? AND resource_type='PRODUCT'",
+        jdbc.update("UPDATE association_share_policy SET valid_from=?, expires_at=? WHERE source_association_id=? AND target_association_id=? AND resource_type='PRODUCT'",
+                java.sql.Timestamp.from(Instant.now()),
                 java.sql.Timestamp.from(Instant.now().plusSeconds(3600)),
                 fixture.partnerAssociationId(), fixture.actorAssociationId());
         jdbc.update("UPDATE enterprise_share_consent SET status='REVOKED', revoked_at=now() WHERE id=?", consentId);
         assertOfferingVisible(fixture, offeringId, false);
+    }
+
+    @Test
+    void partnerCatalogPagesApplyAssociationAndPolicyGuardsBeforePagination() {
+        Fixture fixture = fixture(Instant.now().plusSeconds(3600));
+        UUID offeringId = insertOffering(fixture.partnerEnterpriseId(), "PARTNERS");
+        UUID demandId = insertDemand(fixture.partnerEnterpriseId(), "PARTNERS");
+        insertPolicy(fixture, "PRODUCT", Instant.now().plusSeconds(3600));
+        insertPolicy(fixture, "DEMAND", Instant.now().plusSeconds(3600));
+        insertConsent(fixture, "PRODUCT", offeringId, Instant.now().plusSeconds(3600));
+        insertConsent(fixture, "DEMAND", demandId, Instant.now().plusSeconds(3600));
+        ActorScope partnerReader = new ActorScope(
+                UUID.randomUUID(), "catalog-partner-reader", "catalog-partner-reader",
+                fixture.actorAssociationId(), null, Set.of("ASSOCIATION_ADMIN"),
+                Set.of(fixture.partnerAssociationId()));
+
+        assertCatalogPage(catalog.offerings(partnerReader, null, false, 0, 1), offeringId);
+        assertCatalogPage(catalog.demands(partnerReader, null, false, 0, 1), demandId);
+
+        jdbc.update("UPDATE association SET status='INACTIVE' WHERE id=?", fixture.partnerAssociationId());
+        assertEmptyCatalogPage(catalog.offerings(partnerReader, null, false, 0, 1));
+        assertEmptyCatalogPage(catalog.demands(partnerReader, null, false, 0, 1));
+        jdbc.update("UPDATE association SET status='ACTIVE' WHERE id=?", fixture.partnerAssociationId());
+
+        jdbc.update("UPDATE association SET status='INACTIVE' WHERE id=?", fixture.actorAssociationId());
+        assertEmptyCatalogPage(catalog.offerings(partnerReader, null, false, 0, 1));
+        assertEmptyCatalogPage(catalog.demands(partnerReader, null, false, 0, 1));
+        jdbc.update("UPDATE association SET status='ACTIVE' WHERE id=?", fixture.actorAssociationId());
+
+        String visibleFieldsConstraint = jdbc.queryForObject("""
+                SELECT pg_get_constraintdef(c.oid)
+                  FROM pg_constraint c
+                  JOIN pg_class t ON t.oid=c.conrelid
+                 WHERE t.relname='association_share_policy'
+                   AND c.conname='association_share_policy_visible_fields_ck'
+                """, String.class);
+        jdbc.execute("ALTER TABLE association_share_policy "
+                + "DROP CONSTRAINT association_share_policy_visible_fields_ck");
+        try {
+            // Simulate a row written before V17. Production writes cannot bypass the CHECK,
+            // while the runtime authorization layer must still fail closed for legacy damage.
+            jdbc.update("""
+                    UPDATE association_share_policy
+                       SET visible_fields='["name","unsupported"]'::jsonb
+                     WHERE source_association_id=? AND target_association_id=?
+                       AND resource_type='PRODUCT'
+                    """, fixture.partnerAssociationId(), fixture.actorAssociationId());
+            jdbc.update("""
+                    UPDATE association_share_policy
+                       SET visible_fields='["title",null]'::jsonb
+                     WHERE source_association_id=? AND target_association_id=?
+                       AND resource_type='DEMAND'
+                    """, fixture.partnerAssociationId(), fixture.actorAssociationId());
+            assertEmptyCatalogPage(catalog.offerings(partnerReader, null, false, 0, 1));
+            assertEmptyCatalogPage(catalog.demands(partnerReader, null, false, 0, 1));
+
+            jdbc.update("""
+                    UPDATE association_share_policy
+                       SET visible_fields='"name"'::jsonb
+                     WHERE source_association_id=? AND target_association_id=?
+                    """, fixture.partnerAssociationId(), fixture.actorAssociationId());
+            assertEmptyCatalogPage(catalog.offerings(partnerReader, null, false, 0, 1));
+            assertEmptyCatalogPage(catalog.demands(partnerReader, null, false, 0, 1));
+        } finally {
+            jdbc.update("""
+                    UPDATE association_share_policy
+                       SET visible_fields=CASE resource_type
+                             WHEN 'PRODUCT' THEN '["name"]'::jsonb
+                             WHEN 'DEMAND' THEN '["title"]'::jsonb
+                             ELSE visible_fields
+                           END
+                     WHERE source_association_id=? AND target_association_id=?
+                    """, fixture.partnerAssociationId(), fixture.actorAssociationId());
+            jdbc.execute("ALTER TABLE association_share_policy ADD CONSTRAINT "
+                    + "association_share_policy_visible_fields_ck " + visibleFieldsConstraint);
+        }
+    }
+
+    @Test
+    void partnerMemberIsVisibleOnlyThroughPolicyConsentAndSensitiveFieldsStayRedacted() throws Exception {
+        Fixture fixture = fixture(Instant.now().plusSeconds(3600));
+        jdbc.update("""
+                UPDATE enterprise
+                   SET unified_social_credit_code='91110000SENSITIVE',
+                       contact_name='Sensitive Contact', contact_phone='13800000000',
+                       description='Authorized introduction', address='Restricted address'
+                 WHERE id=?
+                """, fixture.partnerEnterpriseId());
+        insertPolicy(fixture, "MEMBER", Instant.now().plusSeconds(3600));
+        insertConsent(fixture, "MEMBER", fixture.partnerEnterpriseId(), Instant.now().plusSeconds(1800));
+
+        String response = mockMvc.perform(get("/api/v1/members/{id}", fixture.partnerEnterpriseId())
+                        .with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode member = objectMapper.readTree(response).path("data");
+        assertEquals(fixture.partnerEnterpriseId().toString(), member.path("id").asText());
+        assertEquals("Authorized introduction", member.path("introduction").asText());
+        assertTrue(member.path("unifiedSocialCreditCode").isNull());
+        assertTrue(member.path("contactName").isNull());
+        assertTrue(member.path("contactPhone").isNull());
+        assertTrue(member.path("address").isNull());
+    }
+
+    @Test
+    void expiredActiveConsentIsMaterializedAuditedAndRegrantedThroughApi() throws Exception {
+        Fixture fixture = fixture(Instant.now().plusSeconds(3600));
+        UUID offeringId = insertOffering(fixture.partnerEnterpriseId(), "PARTNERS");
+        insertPolicy(fixture, "PRODUCT", Instant.now().plusSeconds(3600));
+        String enterpriseSubject = "partner-enterprise-" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO user_account(
+                    id,association_id,enterprise_id,external_subject,username,display_name,status)
+                VALUES (?,?,?,?,?,?,'ACTIVE')
+                """, UUID.randomUUID(), fixture.partnerAssociationId(), fixture.partnerEnterpriseId(),
+                enterpriseSubject, enterpriseSubject, "Partner Enterprise User");
+        UUID expiredConsentId = UUID.randomUUID();
+        jdbc.execute("ALTER TABLE enterprise_share_consent DISABLE TRIGGER enterprise_share_consent_materialize_expiry_trg");
+        try {
+            jdbc.update("""
+                    INSERT INTO enterprise_share_consent(
+                        id,enterprise_id,target_association_id,resource_type,resource_id,
+                        status,granted_by_subject,expires_at)
+                    VALUES (?,?,?,?,?,'ACTIVE','legacy-enterprise-user',?)
+                    """, expiredConsentId, fixture.partnerEnterpriseId(), fixture.actorAssociationId(),
+                    "PRODUCT", offeringId, java.sql.Timestamp.from(Instant.now().minusSeconds(60)));
+        } finally {
+            jdbc.execute("ALTER TABLE enterprise_share_consent ENABLE TRIGGER enterprise_share_consent_materialize_expiry_trg");
+        }
+
+        mockMvc.perform(post("/api/v1/cross-associations/consents")
+                        .with(enterpriseActor(enterpriseSubject))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"targetAssociationId":"%s","resourceType":"PRODUCT",
+                                 "resourceId":"%s","expiresAt":"%s"}
+                                """.formatted(fixture.actorAssociationId(), offeringId,
+                                Instant.now().plusSeconds(1800))))
+                .andExpect(status().isCreated());
+
+        assertEquals("EXPIRED", jdbc.queryForObject(
+                "SELECT status FROM enterprise_share_consent WHERE id=?", String.class, expiredConsentId));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM enterprise_share_consent
+                 WHERE enterprise_id=? AND target_association_id=?
+                   AND resource_type='PRODUCT' AND resource_id=? AND status='ACTIVE'
+                """, Integer.class, fixture.partnerEnterpriseId(), fixture.actorAssociationId(), offeringId));
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_log
+                 WHERE association_id=? AND enterprise_id=?
+                   AND action='ENTERPRISE_SHARE_CONSENT_EXPIRE' AND resource_id=?
+                """, Integer.class, fixture.partnerAssociationId(), fixture.partnerEnterpriseId(),
+                expiredConsentId.toString()));
+    }
+
+    @Test
+    void relationshipLifecycleWritesVersionedAuditIntoBothAssociationDomains() throws Exception {
+        UUID sourceAssociationId = UUID.randomUUID();
+        UUID targetAssociationId = UUID.randomUUID();
+        String suffix = UUID.randomUUID().toString();
+        String sourceSubject = "relationship-source-" + suffix;
+        String targetSubject = "relationship-target-" + suffix;
+        jdbc.update("INSERT INTO association(id,name,status) VALUES (?,?,'ACTIVE'), (?,?,'ACTIVE')",
+                sourceAssociationId, "Relationship Source " + suffix,
+                targetAssociationId, "Relationship Target " + suffix);
+        jdbc.update("""
+                INSERT INTO user_account(id,association_id,external_subject,username,display_name,status)
+                VALUES (?,?,?,?,?,'ACTIVE'), (?,?,?,?,?,'ACTIVE')
+                """, UUID.randomUUID(), sourceAssociationId, sourceSubject, sourceSubject, "Source Reviewer",
+                UUID.randomUUID(), targetAssociationId, targetSubject, targetSubject, "Target Reviewer");
+
+        var requestResult = mockMvc.perform(post("/api/v1/cross-associations/access-requests")
+                        .with(actor(sourceSubject))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"targetAssociationId":"%s","reason":"versioned bilateral audit"}
+                                """.formatted(targetAssociationId)))
+                .andExpect(status().isCreated()).andReturn();
+        UUID requestId = UUID.fromString(bodyData(
+                requestResult.getResponse().getContentAsString()).path("id").asText());
+
+        mockMvc.perform(put("/api/v1/cross-associations/access-requests/{id}/review", requestId)
+                        .with(actor(targetSubject))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" +
+                                "\"decision\":\"APPROVE\",\"allowMemberData\":true}"))
+                .andExpect(status().isOk());
+
+        String relationshipId = sourceAssociationId + ":" + targetAssociationId;
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_log
+                 WHERE action='ASSOCIATION_RELATIONSHIP_ESTABLISH'
+                   AND resource_id=? AND resource_version=0
+                   AND association_id IN (?,?)
+                """, Integer.class, relationshipId, sourceAssociationId, targetAssociationId));
+
+        mockMvc.perform(put("/api/v1/cross-associations/relationships/{source}/{target}",
+                        sourceAssociationId, targetAssociationId)
+                        .with(actor(targetSubject))
+                        .header(HttpHeaders.IF_MATCH, "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"SUSPEND\",\"reason\":\"maintenance\"}"))
+                .andExpect(status().isOk());
+
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_log
+                 WHERE action='ASSOCIATION_RELATIONSHIP_SUSPEND'
+                   AND resource_id=? AND resource_version=1
+                   AND association_id IN (?,?)
+                """, Integer.class, relationshipId, sourceAssociationId, targetAssociationId));
+
+        mockMvc.perform(put("/api/v1/cross-associations/relationships/{source}/{target}",
+                        sourceAssociationId, targetAssociationId)
+                        .with(actor(targetSubject))
+                        .header(HttpHeaders.IF_MATCH, "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"REVOKE\",\"reason\":\"partnership ended\"}"))
+                .andExpect(status().isOk());
+
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM association_relationship
+                 WHERE source_association_id=? AND target_association_id=?
+                   AND status='REVOKED'
+                   AND suspended_at IS NULL
+                   AND suspended_by_association_id IS NULL
+                   AND suspended_by_subject IS NULL
+                   AND revoked_at IS NOT NULL
+                   AND revoked_by_subject=?
+                   AND revoke_reason='partnership ended'
+                """, Integer.class, sourceAssociationId, targetAssociationId, targetSubject));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_log
+                 WHERE action='ASSOCIATION_RELATIONSHIP_REVOKE'
+                   AND resource_id=? AND resource_version=2
+                   AND association_id IN (?,?)
+                """, Integer.class, relationshipId, sourceAssociationId, targetAssociationId));
+
+        mockMvc.perform(put("/api/v1/cross-associations/relationships/{source}/{target}",
+                        sourceAssociationId, targetAssociationId)
+                        .with(actor(targetSubject))
+                        .header(HttpHeaders.IF_MATCH, "\"2\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"EXPIRE\"}"))
+                .andExpect(status().isConflict());
     }
 
     @Test
@@ -133,6 +395,48 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         assertEquals(0, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM product_service WHERE id=? AND deleted_at IS NOT NULL",
                 Integer.class, offeringId));
+    }
+
+    @Test
+    void externalMatchRequiresEveryParticipantConsentAndReturnsOnlyAuthorizedFields() throws Exception {
+        Fixture fixture = fixture(Instant.now().plusSeconds(3600));
+        UUID candidateEnterpriseId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO enterprise(id,association_id,name,visibility,status)
+                VALUES (?,?,?,'PARTNERS','ACTIVE')
+                """, candidateEnterpriseId, fixture.partnerAssociationId(), "Second Partner Enterprise");
+        UUID demandId = insertDemand(fixture.partnerEnterpriseId(), "PARTNERS");
+        UUID matchId = jdbc.queryForObject("""
+                INSERT INTO ecosystem_match(
+                    demand_id,candidate_enterprise_id,score,explanation,review_status,
+                    demand_company_snapshot,demand_title_snapshot,scene_snapshot,
+                    supplier_company_snapshot,solution,reasons,state)
+                VALUES (?,?,88,'{}'::jsonb,'PENDING','Demand Owner','Authorized Demand Title',
+                        'Hidden Scene','Hidden Supplier','Hidden Solution',
+                        CAST('[\"Hidden Reason\"]' AS jsonb),'PENDING_CONFIRMATION')
+                RETURNING id
+                """, UUID.class, demandId, candidateEnterpriseId);
+        insertPolicy(fixture, "MATCH", Instant.now().plusSeconds(3600));
+        insertConsent(fixture, "MATCH", matchId, Instant.now().plusSeconds(1800));
+
+        assertMatchVisible(fixture, matchId, false);
+        UUID candidateConsent = insertConsent(
+                candidateEnterpriseId, fixture.actorAssociationId(), "MATCH", matchId,
+                Instant.now().plusSeconds(1800));
+        String response = mockMvc.perform(get("/api/v1/matches").with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode match = findById(objectMapper.readTree(response).path("data"), matchId);
+        assertEquals("Authorized Demand Title", match.path("demandTitle").asText());
+        assertEquals("PENDING_CONFIRMATION", match.path("state").asText());
+        assertTrue(match.path("solution").isNull());
+        assertTrue(match.path("supplierCompany").isNull());
+        assertTrue(match.path("score").isNull());
+        assertTrue(match.path("reasons").isArray() && match.path("reasons").isEmpty());
+
+        jdbc.update("UPDATE enterprise_share_consent SET status='REVOKED', revoked_at=now() WHERE id=?",
+                candidateConsent);
+        assertMatchVisible(fixture, matchId, false);
     }
 
     @Test
@@ -265,8 +569,8 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     private UUID insertOffering(UUID enterpriseId, String visibility) {
         UUID id = UUID.randomUUID();
         jdbc.update("""
-                INSERT INTO product_service(id,enterprise_id,name,kind,visibility,status,version)
-                VALUES (?,?,'Partner Product','PRODUCT',?,'ACTIVE',0)
+                INSERT INTO product_service(id,enterprise_id,name,kind,description,visibility,status,version)
+                VALUES (?,?,'Partner Product','PRODUCT','Hidden Offering Description',?,'ACTIVE',0)
                 """, id, enterpriseId, visibility);
         return id;
     }
@@ -359,34 +663,109 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     }
 
     private void insertPolicy(Fixture fixture, String resourceType, Instant expiresAt) {
+        String visibleFields = switch (resourceType) {
+            case "MEMBER" -> "[\"name\",\"introduction\"]";
+            case "DEMAND" -> "[\"title\"]";
+            case "MATCH" -> "[\"demandTitle\",\"state\"]";
+            default -> "[\"name\"]";
+        };
         jdbc.update("""
                 INSERT INTO association_share_policy(
                     source_association_id,target_association_id,resource_type,visible_fields,
                     status,valid_from,expires_at,created_by_subject)
-                VALUES (?,?,?,CAST('[\"name\"]' AS jsonb),'ACTIVE',now(),?,'partner-admin')
-                """, fixture.partnerAssociationId(), fixture.actorAssociationId(), resourceType,
+                VALUES (?,?,?,CAST(? AS jsonb),'ACTIVE',now(),?,'partner-admin')
+                """, fixture.partnerAssociationId(), fixture.actorAssociationId(), resourceType, visibleFields,
                 java.sql.Timestamp.from(expiresAt));
     }
 
     private UUID insertConsent(
             Fixture fixture, String resourceType, UUID resourceId, Instant expiresAt) {
+        return insertConsent(fixture.partnerEnterpriseId(), fixture.actorAssociationId(),
+                resourceType, resourceId, expiresAt);
+    }
+
+    private UUID insertConsent(
+            UUID enterpriseId,
+            UUID targetAssociationId,
+            String resourceType,
+            UUID resourceId,
+            Instant expiresAt) {
+        return insertConsent(enterpriseId, targetAssociationId, resourceType, resourceId, "ACTIVE", expiresAt);
+    }
+
+    private UUID insertConsent(
+            UUID enterpriseId,
+            UUID targetAssociationId,
+            String resourceType,
+            UUID resourceId,
+            String status,
+            Instant expiresAt) {
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO enterprise_share_consent(
                     id,enterprise_id,target_association_id,resource_type,resource_id,
                     status,granted_by_subject,expires_at)
-                VALUES (?,?,?,?,?,'ACTIVE','partner-enterprise-admin',?)
-                """, id, fixture.partnerEnterpriseId(), fixture.actorAssociationId(), resourceType,
-                resourceId, java.sql.Timestamp.from(expiresAt));
+                VALUES (?,?,?,?,?,?,'partner-enterprise-admin',?)
+                """, id, enterpriseId, targetAssociationId, resourceType, resourceId,
+                status, java.sql.Timestamp.from(expiresAt));
         return id;
+    }
+
+    private void assertMatchVisible(Fixture fixture, UUID id, boolean expected) throws Exception {
+        String response = mockMvc.perform(get("/api/v1/matches").with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertEquals(expected, containsId(objectMapper.readTree(response).path("data"), id));
     }
 
     private void assertOfferingVisible(Fixture fixture, UUID id, boolean expected) throws Exception {
         String response = mockMvc.perform(get("/api/v1/offerings").with(actor(fixture.subject())))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertEquals(expected, containsId(
-                objectMapper.readTree(response).path("data").path("items"), id));
+        JsonNode items = objectMapper.readTree(response).path("data").path("items");
+        assertEquals(expected, containsId(items, id));
+        if (expected) {
+            JsonNode offering = findById(items, id);
+            assertEquals("Partner Product", offering.path("name").asText());
+            assertTrue(offering.path("enterpriseName").isNull());
+            assertTrue(offering.path("description").isNull());
+            assertTrue(offering.path("scenarios").isArray() && offering.path("scenarios").isEmpty());
+            assertTrue(offering.path("qualifications").isArray() && offering.path("qualifications").isEmpty());
+        }
+    }
+
+    private void assertCatalogSearch(Fixture fixture, String query, int expected) throws Exception {
+        String response = mockMvc.perform(get("/api/v1/offerings")
+                        .param("query", query).with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode page = objectMapper.readTree(response).path("data");
+        assertEquals(expected, page.path("total").asInt());
+        assertEquals(expected, page.path("items").size());
+    }
+
+    private static void assertCatalogPage(EcosystemPage<?> page, UUID expectedId) {
+        assertEquals(1, page.total());
+        assertEquals(1, page.items().size());
+        Object item = page.items().getFirst();
+        UUID actualId = switch (item) {
+            case OfferingView offering -> offering.id();
+            case DemandView demand -> demand.id();
+            default -> throw new AssertionError("unexpected catalog resource: " + item);
+        };
+        assertEquals(expectedId, actualId);
+    }
+
+    private static void assertEmptyCatalogPage(EcosystemPage<?> page) {
+        assertEquals(0, page.total());
+        assertTrue(page.items().isEmpty());
+    }
+
+    private static JsonNode findById(JsonNode values, UUID id) {
+        for (JsonNode value : values) {
+            if (id.toString().equals(value.path("id").asText())) return value;
+        }
+        throw new AssertionError("expected resource was not found: " + id);
     }
 
     private static boolean containsId(JsonNode values, UUID id) {

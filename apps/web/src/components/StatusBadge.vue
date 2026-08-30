@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const props = defineProps<{ value: string }>()
+const props = defineProps<{ value: string | null | undefined }>()
 
 const toneMap: Record<string, string> = {
   已认证: 'success',
@@ -23,5 +23,5 @@ const toneMap: Record<string, string> = {
 </script>
 
 <template>
-  <span class="status-badge" :class="`status-${toneMap[props.value] || 'neutral'}`">{{ value }}</span>
+  <span class="status-badge" :class="`status-${toneMap[props.value || ''] || 'neutral'}`">{{ value || '未授权' }}</span>
 </template>

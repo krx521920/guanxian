@@ -43,7 +43,7 @@ class PostgresPolicyStore implements PolicyStore {
     }
 
     @Override
-    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         MapSqlParameterSource params = parameters(actor, query)
                 .addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(SELECT + where(actor, query, includeDeleted)

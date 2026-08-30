@@ -67,6 +67,18 @@ class PolicyImpactAnalysisServiceTest {
     }
 
     @Test
+    void maximumPageNumberDoesNotOverflowTheStoreOffset() {
+        PolicyImpactAnalysisService service = new PolicyImpactAnalysisService(
+                new MemoryPolicyImpactAnalysisStore(true), new DeterministicPolicyImpactAnalyzer());
+
+        PolicyImpactPage page = service.page(
+                associationAdmin(ASSOCIATION), null, null, null, Integer.MAX_VALUE, 100);
+
+        assertEquals(0, page.items().size());
+        assertEquals(Integer.MAX_VALUE, page.page());
+    }
+
+    @Test
     void inactiveEnterprisePolicyImpactIsHistoricalForAdministratorsButNotParticipants() {
         AtomicBoolean active = new AtomicBoolean(true);
         EnterpriseLifecycle lifecycle = ignored -> active.get();

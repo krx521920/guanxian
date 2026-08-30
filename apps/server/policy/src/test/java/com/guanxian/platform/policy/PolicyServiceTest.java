@@ -88,6 +88,15 @@ class PolicyServiceTest {
     }
 
     @Test
+    void maximumPageNumberDoesNotOverflowTheStoreOffset() {
+        PolicyPage page = service.page(
+                associationAdmin(ASSOCIATION_A), null, false, Integer.MAX_VALUE, 100);
+
+        assertThat(page.items()).isEmpty();
+        assertThat(page.page()).isEqualTo(Integer.MAX_VALUE);
+    }
+
+    @Test
     void systemAdministratorMustUseTheSelectedAssociationContext() {
         ActorScope globalAdministrator = systemAdmin(null);
         assertThatThrownBy(() -> service.create(request("无归属政策", "PRIVATE"), globalAdministrator))

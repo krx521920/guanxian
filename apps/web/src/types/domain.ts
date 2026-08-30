@@ -240,15 +240,15 @@ export interface PolicyQuestionAnswer {
 
 export interface EcosystemMatch {
   id: string
-  demandCompany: string
-  demandTitle: string
-  scene: string
-  supplierCompany: string
-  solution: string
-  score: number
+  demandCompany: string | null
+  demandTitle: string | null
+  scene: string | null
+  supplierCompany: string | null
+  solution: string | null
+  score: number | null
   reasons: string[]
-  state: string
-  updatedAt: string
+  state: string | null
+  updatedAt: string | null
 }
 
 export interface Collaboration {
@@ -291,7 +291,7 @@ export interface EcosystemPage<T> {
 export interface Offering {
   id: string
   enterpriseId: string
-  enterpriseName: string
+  enterpriseName: string | null
   name: string
   kind: 'PRODUCT' | 'SERVICE'
   description: string | null
@@ -316,7 +316,7 @@ export interface OfferingUpsertPayload {
 export interface Demand {
   id: string
   enterpriseId: string
-  enterpriseName: string
+  enterpriseName: string | null
   title: string
   description: string
   scenarios: string[]
@@ -473,8 +473,85 @@ export interface AssociationRelationship {
   status: string
   allowMemberData: boolean
   expiresAt: string | null
+  suspendedAt: string | null
+  suspendedByAssociationId: string | null
+  suspendedBySubject: string | null
+  revokedAt: string | null
+  revokedBySubject: string | null
+  revokeReason: string | null
   version: number
+  createdAt: string
   updatedAt: string
+}
+
+export type AssociationShareResourceType = 'MEMBER' | 'PRODUCT' | 'SERVICE' | 'DEMAND' | 'MATCH'
+
+export interface AssociationSharePolicy {
+  id: string
+  sourceAssociationId: string
+  targetAssociationId: string
+  resourceType: AssociationShareResourceType
+  visibleFields: string[]
+  status: 'ACTIVE' | 'SUSPENDED'
+  validFrom: string
+  expiresAt: string | null
+  createdBySubject: string
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface AssociationSharePolicyPayload {
+  sourceAssociationId?: string | null
+  targetAssociationId: string
+  resourceType: AssociationShareResourceType
+  visibleFields: string[]
+  validFrom: string | null
+  expiresAt: string | null
+  status: 'ACTIVE' | 'SUSPENDED'
+}
+
+export interface AssociationConsent {
+  id: string
+  enterpriseId: string
+  targetAssociationId: string
+  resourceType: AssociationShareResourceType
+  resourceId: string
+  status: string
+  grantedBySubject: string
+  expiresAt: string | null
+  revokedAt: string | null
+  createdAt: string
+}
+
+export interface AssociationConsentTarget {
+  targetAssociationId: string
+  resourceType: AssociationShareResourceType
+  policyExpiresAt: string | null
+}
+
+export interface AssociationConsentPayload {
+  enterpriseId?: string | null
+  targetAssociationId: string
+  resourceType: AssociationShareResourceType
+  resourceId: string
+  expiresAt: string | null
+}
+
+export interface AssociationRecommendation {
+  id: string
+  sourceAssociationId: string
+  targetAssociationId: string
+  demandId: string | null
+  matchId: string | null
+  status: string
+  summary: string
+  createdBySubject: string
+  reviewedBySubject: string | null
+  reviewComment: string | null
+  createdAt: string
+  reviewedAt: string | null
+  version: number
 }
 
 export interface NotificationMessage {

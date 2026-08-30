@@ -67,7 +67,13 @@ public class MemberController {
         int safePage = Math.max(0, page);
         int safeSize = Math.min(100, Math.max(1, size));
         List<com.guanxian.platform.member.api.MemberProfile> visible = memberService.findAll(q, status, includeDeleted, actor);
-        List<MemberListItem> items = memberService.page(q, status, includeDeleted, actor, safePage, safeSize).stream()
+        long offset = (long) safePage * safeSize;
+        List<com.guanxian.platform.member.api.MemberProfile> pageMembers = offset >= visible.size()
+                ? List.of()
+                : visible.subList(
+                        Math.toIntExact(offset),
+                        Math.toIntExact(Math.min((long) visible.size(), offset + safeSize)));
+        List<MemberListItem> items = pageMembers.stream()
                 .map(member -> MemberListItem.from(member, actor, memberService)).toList();
         return ApiResponse.ok(new MemberPage(items, visible.size(), safePage, safeSize));
     }

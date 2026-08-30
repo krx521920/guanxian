@@ -113,7 +113,7 @@ class PostgresNotificationStore implements NotificationStore {
 
     @Override
     public List<NotificationMessageView> messages(
-            UUID userId, UUID associationId, boolean unreadOnly, int offset, int limit) {
+            UUID userId, UUID associationId, boolean unreadOnly, long offset, int limit) {
         MapSqlParameterSource params = new MapSqlParameterSource("userId", userId)
                 .addValue("associationId", associationId)
                 .addValue("offset", offset).addValue("limit", limit);

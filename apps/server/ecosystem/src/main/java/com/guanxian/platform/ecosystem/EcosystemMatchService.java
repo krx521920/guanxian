@@ -8,6 +8,7 @@ import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,18 +20,24 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 public class EcosystemMatchService {
+    private static final Comparator<PersistedMatchView> OUTBOUND_MATCH_ORDER = Comparator
+            .comparing(PersistedMatchView::score, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(PersistedMatchView::id);
     private final MemberDirectory memberDirectory;
     private final AiTextService aiTextService;
     private final EcosystemCatalogService catalogService;
     private final EcosystemMatchStore matchStore;
     private final EcosystemCatalogStore catalogStore;
     private final EnterpriseLifecycle enterpriseLifecycle;
+    private final PartnerFieldAuthorization partnerFields;
 
     @Autowired
     public EcosystemMatchService(
@@ -39,13 +46,26 @@ public class EcosystemMatchService {
             EcosystemCatalogService catalogService,
             EcosystemMatchStore matchStore,
             EcosystemCatalogStore catalogStore,
-            EnterpriseLifecycle enterpriseLifecycle) {
+            EnterpriseLifecycle enterpriseLifecycle,
+            PartnerFieldAuthorization partnerFields) {
         this.memberDirectory = memberDirectory;
         this.aiTextService = aiTextService;
         this.catalogService = catalogService;
         this.matchStore = matchStore;
         this.catalogStore = catalogStore;
         this.enterpriseLifecycle = enterpriseLifecycle;
+        this.partnerFields = partnerFields;
+    }
+
+    public EcosystemMatchService(
+            MemberDirectory memberDirectory,
+            AiTextService aiTextService,
+            EcosystemCatalogService catalogService,
+            EcosystemMatchStore matchStore,
+            EcosystemCatalogStore catalogStore,
+            EnterpriseLifecycle enterpriseLifecycle) {
+        this(memberDirectory, aiTextService, catalogService, matchStore, catalogStore,
+                enterpriseLifecycle, PartnerFieldAuthorization.allowAll());
     }
 
     EcosystemMatchService(
@@ -60,7 +80,7 @@ public class EcosystemMatchService {
 
     @Transactional(readOnly = true)
     public List<PersistedMatchView> persisted(ActorScope actor) {
-        return matchStore.list(actor).stream().filter(value -> canReadMatch(value, actor)).toList();
+        return outboundMatches(matchStore.list(actor), actor);
     }
 
     public List<EcosystemMatch> match(MatchRequest request, ActorScope actor) {
@@ -72,7 +92,9 @@ public class EcosystemMatchService {
                 .filter(member -> enterpriseLifecycle.isOperational(member.id()))
                 .filter(member -> !member.name().equalsIgnoreCase(request.demandCompany()))
                 .map(member -> score(member, request, tags))
-                .sorted(Comparator.comparingInt(EcosystemMatch::score).reversed()
+                .sorted(Comparator.comparing(
+                                EcosystemMatch::score,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(EcosystemMatch::supplierCompany)
                         .thenComparing(EcosystemMatch::id))
                 .limit(limit)
@@ -119,12 +141,12 @@ public class EcosystemMatchService {
                     actor, "GENERATE_OR_REFRESH", "ECOSYSTEM_MATCH", value.id(),
                     actor.associationId(), value.demandEnterpriseId(), value.version(), value);
         }
-        return persisted;
+        return outboundMatches(persisted, actor);
     }
 
     @Transactional(readOnly = true)
     public List<PersistedMatchView> persisted(UUID demandId, ActorScope actor) {
-        return matchStore.list(demandId, actor).stream().filter(value -> canReadMatch(value, actor)).toList();
+        return outboundMatches(matchStore.list(demandId, actor), actor);
     }
 
     @Transactional
@@ -133,7 +155,7 @@ public class EcosystemMatchService {
         if (!actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
             throw new ForbiddenException("MATCH_REVIEWER_REQUIRED", "association reviewer identity is required");
         }
-        PersistedMatchView current = find(id, actor);
+        PersistedMatchView current = findRawAuthorized(id, actor);
         requireOperationalMatch(current);
         requireOwningAssociation(current, actor);
         MatchLifecycle.requireRecommendationAllowed(current);
@@ -145,13 +167,13 @@ public class EcosystemMatchService {
         catalogStore.recordChange(
                 actor, "RECOMMEND", "ECOSYSTEM_MATCH", updated.id(),
                 actor.associationId(), updated.demandEnterpriseId(), updated.version(), updated);
-        return updated;
+        return outboundMatch(updated, actor);
     }
 
     @Transactional
     public PersistedMatchView confirm(UUID id, long expectedVersion, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
-        PersistedMatchView current = find(id, actor);
+        PersistedMatchView current = findRawAuthorized(id, actor);
         requireOperationalMatch(current);
         if (actor.enterpriseId() == null
                 || (!actor.enterpriseId().equals(current.demandEnterpriseId())
@@ -177,14 +199,14 @@ public class EcosystemMatchService {
         catalogStore.recordChange(
                 actor, action, "ECOSYSTEM_MATCH", updated.id(),
                 actor.associationId(), updated.demandEnterpriseId(), updated.version(), updated);
-        return updated;
+        return outboundMatch(updated, actor);
     }
 
     @Transactional
     public PersistedMatchView close(
             UUID id, long expectedVersion, MatchCloseRequest request, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
-        PersistedMatchView current = find(id, actor);
+        PersistedMatchView current = findRawAuthorized(id, actor);
         requireOperationalMatch(current);
         boolean owningAssociation = actor.isAssociationStaff()
                 && catalogStore.enterpriseBelongsToAssociation(
@@ -206,9 +228,87 @@ public class EcosystemMatchService {
                 current, expectedVersion, MatchLifecycle.CLOSED, request.reason(), "CLOSE", actor);
     }
 
-    private PersistedMatchView find(UUID id, ActorScope actor) {
-        return matchStore.find(id, actor).filter(value -> canReadMatch(value, actor))
+    private PersistedMatchView findRawAuthorized(UUID id, ActorScope actor) {
+        PersistedMatchView value = matchStore.find(id, actor)
+                .filter(match -> canReadMatch(match, actor))
                 .orElseThrow(() -> new NotFoundException("ecosystem match", id));
+        if (authorizedMatch(value, actor).isEmpty()) {
+            throw new NotFoundException("ecosystem match", id);
+        }
+        return value;
+    }
+
+    Optional<PersistedMatchView> authorizedMatch(PersistedMatchView value, ActorScope actor) {
+        if (actor.isSystemAdmin() || actorParticipatesInMatch(value, actor)) {
+            return Optional.of(value);
+        }
+        Optional<Set<String>> demandAuthorization = participantFields(
+                value.demandEnterpriseId(), value.id(), actor);
+        if (demandAuthorization.isEmpty()) {
+            return Optional.empty();
+        }
+        List<Set<String>> ownerAuthorizations = new ArrayList<>();
+        ownerAuthorizations.add(demandAuthorization.orElseThrow());
+        if (!value.candidateEnterpriseId().equals(value.demandEnterpriseId())) {
+            Optional<Set<String>> candidateAuthorization = participantFields(
+                    value.candidateEnterpriseId(), value.id(), actor);
+            if (candidateAuthorization.isEmpty()) {
+                return Optional.empty();
+            }
+            ownerAuthorizations.add(candidateAuthorization.orElseThrow());
+        }
+        Set<String> fields = new java.util.LinkedHashSet<>(ownerAuthorizations.getFirst());
+        ownerAuthorizations.stream().skip(1).forEach(fields::retainAll);
+        if (fields.isEmpty()) return Optional.empty();
+        return Optional.of(new PersistedMatchView(
+                value.id(), value.demandId(), value.demandEnterpriseId(), value.candidateEnterpriseId(),
+                fields.contains("demandCompany") ? value.demandCompany() : null,
+                fields.contains("demandTitle") ? value.demandTitle() : null,
+                fields.contains("scene") ? value.scene() : null,
+                fields.contains("supplierCompany") ? value.supplierCompany() : null,
+                fields.contains("solution") ? value.solution() : null,
+                fields.contains("score") ? value.score() : null,
+                fields.contains("reasons") ? value.reasons() : List.of(),
+                fields.contains("state") ? value.state() : null,
+                null, null, null, null, value.version(), null));
+    }
+
+    private Optional<Set<String>> participantFields(
+            UUID enterpriseId, UUID matchId, ActorScope actor) {
+        return partnerFields.authorizedFields(actor, enterpriseId, "MATCH", matchId)
+                .map(fields -> fields.stream()
+                        .filter(field -> field != null
+                                && PartnerFieldAuthorization.MATCH_FIELDS.contains(field))
+                        .collect(Collectors.toUnmodifiableSet()))
+                .filter(fields -> !fields.isEmpty());
+    }
+
+    private boolean actorParticipatesInMatch(PersistedMatchView value, ActorScope actor) {
+        if (actor.enterpriseId() != null
+                && (actor.enterpriseId().equals(value.demandEnterpriseId())
+                || actor.enterpriseId().equals(value.candidateEnterpriseId()))) {
+            return true;
+        }
+        return actor.associationId() != null
+                && (catalogStore.enterpriseBelongsToAssociation(
+                        value.demandEnterpriseId(), actor.associationId())
+                || catalogStore.enterpriseBelongsToAssociation(
+                        value.candidateEnterpriseId(), actor.associationId()));
+    }
+
+    private List<PersistedMatchView> outboundMatches(
+            List<PersistedMatchView> values, ActorScope actor) {
+        return values.stream()
+                .filter(value -> canReadMatch(value, actor))
+                .map(value -> authorizedMatch(value, actor))
+                .flatMap(Optional::stream)
+                .sorted(OUTBOUND_MATCH_ORDER)
+                .toList();
+    }
+
+    private PersistedMatchView outboundMatch(PersistedMatchView value, ActorScope actor) {
+        return authorizedMatch(value, actor)
+                .orElseThrow(() -> new NotFoundException("ecosystem match", value.id()));
     }
 
     private PersistedMatchView transition(
@@ -227,7 +327,7 @@ public class EcosystemMatchService {
         catalogStore.recordChange(
                 actor, action, "ECOSYSTEM_MATCH", updated.id(),
                 actor.associationId(), updated.demandEnterpriseId(), updated.version(), updated);
-        return updated;
+        return outboundMatch(updated, actor);
     }
 
     private void requireDemandOwnerOrAssociation(DemandView demand, ActorScope actor) {
@@ -361,7 +461,7 @@ public class EcosystemMatchService {
     }
 
     private EcosystemMatch score(MemberProfile member, MatchRequest request, List<String> tags) {
-        String memberText = String.join(" ", member.name(), member.category(),
+        String memberText = String.join(" ", member.name(), nullToEmpty(member.category()),
                 nullToEmpty(member.introduction()), String.join(" ", member.capabilities()),
                 String.join(" ", member.products())).toLowerCase(Locale.ROOT);
         List<String> reasons = new ArrayList<>();

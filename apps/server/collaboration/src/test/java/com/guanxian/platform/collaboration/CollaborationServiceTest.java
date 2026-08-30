@@ -148,6 +148,15 @@ class CollaborationServiceTest {
     }
 
     @Test
+    void maximumPageNumberDoesNotOverflowTheStoreOffset() {
+        CollaborationPage<CollaborationView> page =
+                service.page(enterprise(), null, false, Integer.MAX_VALUE, 100);
+
+        assertTrue(page.items().isEmpty());
+        assertEquals(Integer.MAX_VALUE, page.page());
+    }
+
+    @Test
     void systemAdministratorReadsGloballyButCannotWriteWithoutAssociationContext() {
         CollaborationView created = service.create(request("协会内事项"), reviewer());
 

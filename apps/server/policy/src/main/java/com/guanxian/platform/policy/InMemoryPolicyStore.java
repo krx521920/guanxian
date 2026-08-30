@@ -47,7 +47,7 @@ class InMemoryPolicyStore implements PolicyStore {
     }
 
     @Override
-    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return policies.values().stream()
                 .filter(policy -> includeDeleted || !policy.deleted())
                 .filter(policy -> canRead(actor, policy))

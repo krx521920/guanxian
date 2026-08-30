@@ -92,8 +92,9 @@ public class NotificationService {
         UUID associationId = readAssociation(actor);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         return new NotificationMessagePage(
-                store.messages(userId, associationId, unreadOnly, safePage * safeSize, safeSize),
+                store.messages(userId, associationId, unreadOnly, offset, safeSize),
                 store.countMessages(userId, associationId, unreadOnly), safePage, safeSize);
     }
 

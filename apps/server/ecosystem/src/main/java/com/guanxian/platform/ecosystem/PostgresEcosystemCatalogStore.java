@@ -44,6 +44,11 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
               FROM cooperation_demand d
               JOIN enterprise e ON e.id = d.enterprise_id
             """;
+    private static final String OFFERING_POLICY_FIELDS =
+            "[\"enterpriseName\",\"name\",\"description\",\"scenarios\",\"qualifications\"]";
+    private static final String DEMAND_POLICY_FIELDS =
+            "[\"enterpriseName\",\"title\",\"description\",\"scenarios\","
+                    + "\"requiredCapabilities\",\"budgetMin\",\"budgetMax\",\"responseDeadline\"]";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -57,7 +62,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<OfferingView> listOfferings(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         MapSqlParameterSource params = commonParams(actor, query)
                 .addValue("offset", offset)
                 .addValue("limit", limit);
@@ -156,7 +161,8 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                        updated_by_subject=:subject,
                        updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NULL
-                """ + systemWriteClause("product_service", actor), params);
+                """ + systemWriteClause("product_service", actor)
+                        + reviewAssociationWriteClause("product_service", targetStatus), params);
         return updated == 0 ? Optional.empty() : findOffering(id, actor, false);
     }
 
@@ -192,7 +198,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<DemandView> listDemands(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         MapSqlParameterSource params = commonParams(actor, query)
                 .addValue("offset", offset)
                 .addValue("limit", limit);
@@ -297,7 +303,8 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                        updated_by_subject=:subject,
                        updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NULL
-                """ + systemWriteClause("cooperation_demand", actor), params);
+                """ + systemWriteClause("cooperation_demand", actor)
+                        + reviewAssociationWriteClause("cooperation_demand", targetStatus), params);
         return updated == 0 ? Optional.empty() : findDemand(id, actor, false);
     }
 
@@ -445,12 +452,18 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
             sql.append(" AND ").append(alias).append(".deleted_at IS NULL");
         }
         if (query != null && !query.isBlank()) {
-            sql.append(" AND (lower(").append(alias).append(".name) LIKE :query")
-                    .append(" OR lower(coalesce(").append(alias).append(".description,'')) LIKE :query")
-                    .append(" OR lower(e.name) LIKE :query)");
-            if ("d".equals(alias)) {
-                int start = sql.indexOf("lower(d.name)");
-                sql.replace(start, start + "lower(d.name)".length(), "lower(d.title)");
+            String anchor = "d".equals(alias) ? "d.title" : alias + ".name";
+            String fullSearch = "(lower(" + anchor + ") LIKE :query"
+                    + " OR lower(coalesce(" + alias + ".description,'')) LIKE :query"
+                    + " OR lower(e.name) LIKE :query)";
+            if (actor.isSystemAdmin() && actor.associationId() == null) {
+                sql.append(" AND ").append(fullSearch);
+            } else if (actor.associationId() != null) {
+                sql.append(" AND ((e.association_id=:associationId AND ").append(fullSearch)
+                        .append(") OR (e.association_id<>:associationId AND lower(")
+                        .append(anchor).append(") LIKE :query))");
+            } else {
+                sql.append(" AND lower(").append(anchor).append(") LIKE :query");
             }
         }
         return sql.toString();
@@ -458,30 +471,58 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
 
     private static void appendAuthorizedPartnerRead(StringBuilder sql, String alias) {
         String resourceType = "p".equals(alias) ? "upper(p.kind)" : "'DEMAND'";
+        String requiredField = "p".equals(alias) ? "name" : "title";
+        String allowedFields = "p".equals(alias) ? OFFERING_POLICY_FIELDS : DEMAND_POLICY_FIELDS;
         sql.append(" OR (e.association_id IN (:partnerIds) AND ")
+                .append("e.association_id<>:associationId AND ")
                 .append("e.status='ACTIVE' AND e.deleted_at IS NULL AND ")
                 .append(alias).append(".visibility IN ('PARTNERS','PUBLIC') AND ")
                 .append(alias).append(".status=:publishedStatus AND ")
                 .append(alias).append(".deleted_at IS NULL AND ")
-                .append("EXISTS (SELECT 1 FROM association_relationship ar ")
+                .append("EXISTS (SELECT 1 FROM association source_association ")
+                .append("WHERE source_association.id=e.association_id ")
+                .append("AND source_association.status='ACTIVE') ")
+                .append("AND EXISTS (SELECT 1 FROM association target_association ")
+                .append("WHERE target_association.id=:associationId ")
+                .append("AND target_association.status='ACTIVE') ")
+                .append("AND EXISTS (SELECT 1 FROM association_relationship ar ")
                 .append("WHERE ar.status='ACTIVE' AND ar.allow_member_data=TRUE ")
                 .append("AND ar.suspended_at IS NULL AND ar.revoked_at IS NULL ")
-                .append("AND (ar.expires_at IS NULL OR ar.expires_at>now()) ")
+                .append("AND (ar.expires_at IS NULL OR ar.expires_at>transaction_timestamp()) ")
                 .append("AND ((ar.source_association_id=e.association_id AND ar.target_association_id=:associationId) ")
                 .append("OR (ar.target_association_id=e.association_id AND ar.source_association_id=:associationId))) ")
                 .append("AND EXISTS (SELECT 1 FROM association_share_policy sp ")
                 .append("WHERE sp.source_association_id=e.association_id ")
                 .append("AND sp.target_association_id=:associationId ")
                 .append("AND sp.resource_type=").append(resourceType).append(" ")
-                .append("AND sp.status='ACTIVE' AND sp.valid_from<=now() ")
-                .append("AND (sp.expires_at IS NULL OR sp.expires_at>now())) ")
+                .append("AND sp.status='ACTIVE' AND sp.valid_from<=transaction_timestamp() ")
+                .append("AND (sp.expires_at IS NULL OR sp.expires_at>transaction_timestamp()) ")
+                .append("AND jsonb_typeof(sp.visible_fields)='array' ")
+                .append("AND sp.visible_fields @> CAST('[\"").append(requiredField)
+                .append("\"]' AS jsonb) ")
+                .append("AND sp.visible_fields <@ CAST('").append(allowedFields)
+                .append("' AS jsonb)) ")
+                .append("AND NOT EXISTS (SELECT 1 FROM association_share_policy invalid_sp ")
+                .append("WHERE invalid_sp.source_association_id=e.association_id ")
+                .append("AND invalid_sp.target_association_id=:associationId ")
+                .append("AND invalid_sp.resource_type=").append(resourceType).append(" ")
+                .append("AND invalid_sp.status='ACTIVE' ")
+                .append("AND invalid_sp.valid_from<=transaction_timestamp() ")
+                .append("AND (invalid_sp.expires_at IS NULL ")
+                .append("OR invalid_sp.expires_at>transaction_timestamp()) ")
+                .append("AND NOT (jsonb_typeof(invalid_sp.visible_fields)='array' ")
+                .append("AND invalid_sp.visible_fields @> CAST('[\"").append(requiredField)
+                .append("\"]' AS jsonb) ")
+                .append("AND invalid_sp.visible_fields <@ CAST('").append(allowedFields)
+                .append("' AS jsonb))) ")
                 .append("AND EXISTS (SELECT 1 FROM enterprise_share_consent esc ")
                 .append("WHERE esc.enterprise_id=").append(alias).append(".enterprise_id ")
                 .append("AND esc.target_association_id=:associationId ")
                 .append("AND esc.resource_type=").append(resourceType).append(" ")
                 .append("AND esc.resource_id=").append(alias).append(".id ")
                 .append("AND esc.status='ACTIVE' AND esc.revoked_at IS NULL ")
-                .append("AND (esc.expires_at IS NULL OR esc.expires_at>now())))");
+                .append("AND (esc.expires_at IS NULL ")
+                .append("OR esc.expires_at>transaction_timestamp())))");
     }
 
     private MapSqlParameterSource commonParams(ActorScope actor, String query) {
@@ -535,6 +576,23 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                 + " WHERE scope_enterprise.id=" + alias + ".enterprise_id"
                 + " AND scope_enterprise.association_id=:associationId"
                 + enterprise + ")";
+    }
+
+    private static String reviewAssociationWriteClause(String alias, String targetStatus) {
+        boolean reviewTransition = "product_service".equals(alias)
+                ? "ACTIVE".equals(targetStatus) || "REJECTED".equals(targetStatus)
+                : "OPEN".equals(targetStatus) || "REJECTED".equals(targetStatus);
+        if (!reviewTransition) {
+            return "";
+        }
+        return " AND EXISTS (SELECT 1 FROM enterprise review_enterprise"
+                + " JOIN association review_association"
+                + " ON review_association.id=review_enterprise.association_id"
+                + " WHERE review_enterprise.id=" + alias + ".enterprise_id"
+                + " AND review_enterprise.association_id=:associationId"
+                + " AND review_enterprise.status='ACTIVE'"
+                + " AND review_enterprise.deleted_at IS NULL"
+                + " AND review_association.status='ACTIVE')";
     }
 
     private MapSqlParameterSource offeringParams(OfferingUpsertRequest request) {
