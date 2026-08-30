@@ -83,6 +83,9 @@ guanxian:
       issuer-uri: ${GUANXIAN_JWT_ISSUER_URI:}
       jwk-set-uri: ${GUANXIAN_JWT_JWK_SET_URI:}
       principal-claim: ${GUANXIAN_JWT_PRINCIPAL_CLAIM:preferred_username}
+      health-check-enabled: ${GUANXIAN_JWT_HEALTH_CHECK_ENABLED:true}
+      health-check-timeout: ${GUANXIAN_JWT_HEALTH_CHECK_TIMEOUT:2s}
+      health-check-cache-ttl: ${GUANXIAN_JWT_HEALTH_CHECK_CACHE_TTL:10s}
       # Empty by default: an unbound SYSTEM_ADMIN claim is never sufficient.
       # Use exact, comma-separated IdP subject IDs only for initial provisioning.
       bootstrap-system-admin-subjects: ${GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS:}

@@ -8,7 +8,7 @@
 
 当前已形成可运行的首期工程基线，模块边界、OIDC 数据域、会员审核审计和 Excel 调查采集闭环已经接通。企业调查表作为 106 家会员冷启动入口，经过逐行预检、协会审核后进入企业、产品、需求与场景库。
 
-当前处于 Phase 2 权限与持久化收口阶段：代码级身份生命周期、系统管理员代管上下文和主要业务数据域已经形成闭环；正式 IdP 浏览器验收、完整依赖环境 E2E、备份恢复演练及真实模型验收仍是上线闸门。
+计划第 5 步的本地验收已经完成：代码级身份生命周期、系统管理员代管上下文、主要业务数据域，以及 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合浏览器 E2E 已形成可复验闭环。该结果只证明隔离测试环境中的业务旅程和依赖接线成立；正式 IdP、TLS/私网、备份恢复、集中日志与真实告警，以及真实模型和协会语料验收仍是生产上线闸门。
 
 ## 工程结构
 
@@ -65,12 +65,20 @@ docker compose --profile app up --build -d
 
 容器模式默认从 `http://localhost:8081` 访问。执行 `./scripts/verify.ps1` 可统一校验 Compose、Web、AI 服务和 Java 后端。
 
+需要使用仓库内置的真实 PostgreSQL、MinIO、Redis 和 Keycloak/OIDC 数据执行浏览器 E2E 时，运行：
+
+```powershell
+./tools/testing/Start-E2eStack.ps1
+```
+
+脚本强制使用独立项目名 `guanxian-platform-e2e`，并读取 `tests/e2e/compose.env` 中仅供本机测试的固定身份和端口；它会等待所有依赖健康且数据库种子导入成功后，才返回 Web 地址 `http://127.0.0.1:18082`。重复执行不会删除数据卷；结束环境可运行 `docker compose --project-name guanxian-platform-e2e --env-file tests/e2e/compose.env -f compose.yaml -f compose.e2e.yaml --profile app down`，除非明确需要重新初始化，禁止附加 `--volumes`。
+
 ## 测试与质量验证
 
 仓库默认只执行单元测试、集成测试、权限与数据隔离回归、类型检查和构建。变异测试与隔离的 OIDC/PKCE 验收仅可手动触发；模糊请求、高压/负载、ZAP 主动扫描和网络故障注入已退出 CI，不得重新加入自动或手动工作流。
 
 快速入口和当前可复验基线见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，手动质量检查执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
 
-2026-08-30 当前工作区常规基线：Java Surefire 63 个测试套件、305 项测试，失败、错误和跳过均为 0；Web 15 个 Vitest 文件、167 项测试通过，`vue-tsc -b` 类型检查和 Vite 生产构建通过。该基线包含真实 PostgreSQL 16 Testcontainers 的 Flyway V1–V18 迁移、数据隔离、匹配闭环与 ETag/CAS 回归，但不代表真实 MinIO、Redis、正式 OIDC 或完整浏览器 E2E 已经完成。
+2026-08-31 当前工作区基线：Java Surefire 67 个测试报告、314 项测试，失败、错误和跳过均为 0；Web 15 个 Vitest 文件、167 项测试通过，`vue-tsc -b` 类型检查和 Vite 生产构建通过；Playwright 在串行、零重试条件下 5/5 条真实浏览器旅程通过。验证覆盖 PostgreSQL 16 Testcontainers 的 Flyway V1–V18、数据隔离、匹配闭环与 ETag/CAS，以及隔离 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境中的真实登录、角色权限、附件/通知和完整匹配成果归档。该基线不代表正式 IdP、生产网络、备份恢复、告警或灾备已经验收。
 
 > 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、在生产数据隔离副本执行 V1–V18 迁移与恢复演练，并用协会真实语料完成效果和费用验收。

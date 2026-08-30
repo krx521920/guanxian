@@ -26,6 +26,8 @@ zap-reports/
 *.class
 
 # Node
+/.pnpm-store/
+/.worktrees/
 **/node_modules/
 **/dist/
 **/.vite/

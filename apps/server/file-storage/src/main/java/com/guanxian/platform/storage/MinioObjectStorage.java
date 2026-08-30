@@ -6,7 +6,10 @@ import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
@@ -16,18 +19,29 @@ import java.util.Arrays;
 
 @Component
 @ConditionalOnProperty(name = "guanxian.storage.backend", havingValue = "minio")
-final class MinioObjectStorage implements ObjectStorage {
+final class MinioObjectStorage implements ObjectStorage, HealthIndicator {
     private final MinioClient client;
     private final String bucket;
+    private final boolean production;
     private volatile boolean bucketReady;
 
     MinioObjectStorage(StorageProperties properties, Environment environment) {
         validate(properties, environment.getActiveProfiles());
         this.bucket = properties.getBucket().trim();
+        this.production = isProduction(environment.getActiveProfiles());
         this.client = MinioClient.builder()
                 .endpoint(properties.getEndpoint().trim())
                 .credentials(properties.getAccessKey().trim(), properties.getSecretKey())
                 .build();
+    }
+
+    @PostConstruct
+    void initializeBucket() {
+        try {
+            ensureBucket();
+        } catch (Exception exception) {
+            throw new IllegalStateException("MinIO bucket initialization failed", exception);
+        }
     }
 
     @Override
@@ -64,11 +78,29 @@ final class MinioObjectStorage implements ObjectStorage {
         }
     }
 
+    @Override
+    public Health health() {
+        try {
+            boolean exists = client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+            if (!exists) {
+                bucketReady = false;
+                return Health.down().build();
+            }
+            return Health.up().build();
+        } catch (Exception exception) {
+            return Health.down(exception).build();
+        }
+    }
+
     private synchronized void ensureBucket() throws Exception {
         if (bucketReady) {
             return;
         }
         if (!client.bucketExists(BucketExistsArgs.builder().bucket(bucket).build())) {
+            if (production) {
+                throw new IllegalStateException(
+                        "production MinIO bucket must be provisioned before server startup");
+            }
             client.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
         }
         bucketReady = true;
@@ -91,8 +123,7 @@ final class MinioObjectStorage implements ObjectStorage {
                 throw new IllegalStateException(
                         "MinIO endpoint must be an HTTP(S) origin without credentials");
             }
-            if (Arrays.stream(activeProfiles).anyMatch(profile ->
-                    "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile)) && !https) {
+            if (isProduction(activeProfiles) && !https) {
                 throw new IllegalStateException("MinIO endpoint must use HTTPS in production");
             }
         } catch (IllegalArgumentException exception) {
@@ -102,5 +133,10 @@ final class MinioObjectStorage implements ObjectStorage {
                 || properties.getSecretKey() == null || properties.getSecretKey().length() < 16) {
             throw new IllegalStateException("MinIO credentials must be configured");
         }
+    }
+
+    private static boolean isProduction(String[] activeProfiles) {
+        return Arrays.stream(activeProfiles).anyMatch(profile ->
+                "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile));
     }
 }

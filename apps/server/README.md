@@ -47,6 +47,8 @@ V16–V18 会在 DDL 生效前检查历史数据。除 V16/V17 的协会与跨�
 curl http://localhost:8080/api/v1/health
 ```
 
+该接口聚合 PostgreSQL、MinIO、Redis 和 OIDC/JWK 依赖状态：全部可用时返回 200；任一必需依赖不可用时返回 503 与稳定错误码 `DEPENDENCY_UNAVAILABLE`，不向未认证调用方泄露内部异常、地址或凭据。
+
 ## 首批接口
 
 | 方法 | 地址 | 权限 |
@@ -150,7 +152,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-2026-08-30 当前工作区普通全量回归基线为 63 个 Surefire 测试套件、305 项测试，失败、错误和跳过均为 0。真实 PostgreSQL 16 Testcontainers 已覆盖 Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级、V17→V18 匹配闭环升级、脏数据失败回滚及关键双写并发/CAS。PIT 分数只能引用与当前提交对应的 `bootstrap/target/pit-reports/` 产物，历史分数不得冒充当前结果；这些数据库测试也不能替代真实 MinIO、Redis、正式 OIDC 或完整浏览器 E2E。
+2026-08-31 当前工作区普通全量回归基线为 67 个 Surefire 测试报告、314 项测试，失败、错误和跳过均为 0。真实 PostgreSQL 16 Testcontainers 已覆盖 Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级、V17→V18 匹配闭环升级、脏数据失败回滚及关键双写并发/CAS；隔离 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境的 Playwright 5/5 条浏览器旅程也已通过。PIT 分数只能引用与当前提交对应的 `bootstrap/target/pit-reports/` 产物，历史分数不得冒充当前结果；本地联合 E2E 仍不能替代正式 IdP、生产网络、备份恢复或告警验收。
 
 ## Docker
 
@@ -160,10 +162,10 @@ docker build -t guanxian-server:dev .
 docker run --rm -p 8080:8080 guanxian-server:dev
 ```
 
-## Phase 2 上线闸门
+## 后续生产上线闸门
 
 1. 将系统管理员账号绑定、停用、恢复、解绑和代管上下文接入管理页面，并落实高权限操作双人复核。
-2. 使用正式 IdP 完成真实浏览器 OIDC/PKCE 登录与各身份权限验收，关闭全部演示身份。
+2. 使用正式 IdP（不是隔离 Keycloak）完成生产域浏览器 OIDC/PKCE 登录与各身份权限验收，关闭全部演示身份。
 3. 在生产数据隔离副本完成 V12→V18 升级、V16–V18 脏数据处置、备份恢复和回滚兼容演练。
 4. 为会员附件补齐病毒扫描、数据质量评分和导入批次撤销策略。
 5. 配置合规的真实模型与 Embedding 供应商，使用协会真实语料完成出处、效果、费用和数据出境验收；通过前继续使用“管理协作平台”名称。

@@ -85,7 +85,7 @@ class PostgresCollaborationStore implements CollaborationStore {
                        AND de.status='ACTIVE' AND de.deleted_at IS NULL
                        AND ce.status='ACTIVE' AND ce.deleted_at IS NULL
                        AND de.association_id=:associationId
-                       AND (:enterpriseId IS NULL
+                       AND (CAST(:enterpriseId AS UUID) IS NULL
                             OR d.enterprise_id=:enterpriseId
                             OR m.candidate_enterprise_id=:enterpriseId)
                 )

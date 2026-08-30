@@ -205,6 +205,18 @@ class PostgresEcosystemSystemContextIntegrationTest {
     }
 
     @Test
+    void associationOutcomeReadHandlesNullEnterpriseContext() {
+        seedScopes();
+        ActorScope enterprise = system(ASSOCIATION_A, ENTERPRISE_A1);
+        ActorScope reviewer = associationReviewer(ASSOCIATION_A);
+        DemandView demand = openDemand(FIXTURE_PREFIX + "-协会成果空列表", enterprise);
+        PersistedMatchView match = matchStore.upsert(
+                demand, List.of(candidate(ENTERPRISE_A2, "A供给企业")), reviewer).getFirst();
+
+        assertTrue(workflow.outcomes(match.id(), reviewer).isEmpty());
+    }
+
+    @Test
     void candidateSystemContextCanActForItsEnterpriseButCannotManageTheDemandOwnerWorkflow() {
         seedScopes();
         ActorScope demandAssociation = system(ASSOCIATION_A, null);

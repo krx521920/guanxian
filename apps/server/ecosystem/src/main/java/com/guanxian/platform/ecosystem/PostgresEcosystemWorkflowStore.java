@@ -438,7 +438,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
 
     private static String outcomeVisibilityScope() {
         return " AND ((o.visibility='PRIVATE' AND o.archived_by_subject=:subject)"
-                + " OR (o.visibility='ENTERPRISES' AND :enterpriseId IS NOT NULL"
+                + " OR (o.visibility='ENTERPRISES' AND CAST(:enterpriseId AS UUID) IS NOT NULL"
                 + " AND (d.enterprise_id=:enterpriseId"
                 + " OR m.candidate_enterprise_id=:enterpriseId))"
                 + " OR (o.visibility='ASSOCIATION'"

@@ -155,7 +155,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
         return """
                  AND association_id = :actorAssociationId
                  AND (visibility = 'ASSOCIATION'
-                      OR (:actorEnterpriseId IS NOT NULL AND enterprise_id = :actorEnterpriseId))
+                      OR (CAST(:actorEnterpriseId AS UUID) IS NOT NULL AND enterprise_id = :actorEnterpriseId))
                 """;
     }
 

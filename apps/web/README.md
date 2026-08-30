@@ -88,7 +88,6 @@ npm run dev
 npm run typecheck
 npm run test
 npm run build
-npm run mutation
 ```
 
 当前自动化测试分为三类：
@@ -114,6 +113,16 @@ npm run mutation
 | `src/views/interaction-contract.test.ts` | 原生按钮行为、生产 API 去模拟数据和匹配全流程入口 |
 | `src/views/match-workflow.test.ts` | 服务端动作许可、洽谈阶段顺序、邀请过期与刷新后安全关闭详情 |
 
+### 真实浏览器 E2E
+
+Playwright 连接隔离的 PostgreSQL、MinIO、Redis 和 Keycloak E2E 栈，执行真实 OIDC 登录、身份页面权限、两家企业与协会的匹配业务闭环、附件上传下载/删除恢复及通知已读验收：
+
+```bash
+npm run test:e2e
+```
+
+首次运行需要安装 Chromium。完整前置条件、测试账号和数据隔离要求见 `tests/e2e/README.md`。如覆盖默认 Web 基址，必须同步修改 Web 构建中的 OIDC 回调地址和 Keycloak 客户端登记地址；只改 Playwright 基址会导致登录回调失败。测试固定单 worker、零重试。
+
 ### 变异测试
 
 
@@ -132,7 +141,7 @@ npm run mutation
 
 质量阈值为：80 分以上绿色、60–79.99 分黄色、低于 60 分红色，低于 50 分时命令失败。变异测试比普通单元测试耗时明显更长，适合在提交合并前或 CI 的独立质量任务中运行；日常开发优先运行 `npm run test`。
 
-当前基线（2026-08-30）：11 个测试文件、137 项 Vitest 测试全部通过。最近一次 Stryker 报告生成于 2026-08-26，共 937 个变异体，其中 664 个被杀死、79 个存活、194 个无覆盖；只能将与当前提交对应的报告作为质量依据。
+当前常规基线（2026-08-31）：15 个 Vitest 文件、167 项测试全部通过，类型检查与生产构建通过；3 个 Playwright 文件中的 5 条真实依赖浏览器旅程在串行、零重试条件下全部通过。最近一次 Stryker 报告生成于 2026-08-26，共 937 个变异体，其中 664 个被杀死、79 个存活、194 个无覆盖；该历史报告不属于本轮验收，只能将与当前提交对应的报告作为质量依据。
 
 如只想排查一个测试文件，可执行：
 

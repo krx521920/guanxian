@@ -22,6 +22,12 @@ Production MinIO configuration:
 | `guanxian.storage.redis-url` | Redis endpoint used only when limiting is enabled; `rediss://` is mandatory in production |
 | `guanxian.storage.rate-limit-per-minute` | Per-subject write limit; default 30 |
 
+In a production profile the bucket must already exist and the endpoint must use HTTPS. The
+application refuses to start when the bucket is missing; automatic bucket creation is limited to
+non-production environments. Grant the application account only the object operations required by
+this private bucket. Production also refuses to start unless the MinIO backend and Redis-backed
+attachment write rate limiter are enabled; Redis outages fail attachment writes closed.
+
 V7 extends `object_file` with lifecycle status, optimistic version, update time and deleting
 subject. Upload/delete/restore actions are written to `audit_log`; Redis decisions are written
 to `rate_limit_audit`.

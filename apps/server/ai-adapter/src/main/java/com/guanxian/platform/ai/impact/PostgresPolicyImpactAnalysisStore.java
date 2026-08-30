@@ -98,7 +98,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    AND document_version.version = document.current_version
                    AND (
                        LOWER(BTRIM(document.title)) = LOWER(BTRIM(:policyTitle))
-                       OR (:sourceUrl IS NOT NULL AND document.source_url = :sourceUrl)
+                       OR (CAST(:sourceUrl AS TEXT) IS NOT NULL AND document.source_url = :sourceUrl)
                    )
                  ORDER BY document.updated_at DESC, chunk.chunk_index
                  LIMIT 200

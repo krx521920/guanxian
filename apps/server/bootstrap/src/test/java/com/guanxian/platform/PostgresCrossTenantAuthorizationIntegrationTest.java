@@ -478,6 +478,10 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
                                 .header(HttpHeaders.IF_MATCH, "\"0\""))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertEquals("RECOMMENDED", recommended.path("state").asText());
+        mockMvc.perform(get("/api/v1/matches/{id}/outcomes", fixture.matchId())
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
         String supplierRecommended = mockMvc.perform(get("/api/v1/matches")
                         .with(enterpriseActor(fixture.supplierSubject())))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -585,12 +589,26 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
                         .content("{\"rating\":5,\"outcome\":\"SUCCESS\",\"comment\":\"验收通过\"}"))
                 .andExpect(status().isOk());
 
+        String readyResponse = mockMvc.perform(get("/api/v1/matches")
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode readyMatch = findById(
+                objectMapper.readTree(readyResponse).path("data"), fixture.matchId());
+        assertTrue(containsText(readyMatch.path("allowedActions"), "ARCHIVE"));
+
         mockMvc.perform(post("/api/v1/matches/{id}/outcomes", fixture.matchId())
-                        .with(enterpriseActor(fixture.demandSubject()))
+                        .with(actor(fixture.reviewerSubject()))
                         .header(HttpHeaders.IF_MATCH, etag(matchVersion(fixture.matchId())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(outcomeJson()))
                 .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/matches/{id}/outcomes", fixture.matchId())
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("合作成果"));
 
         assertEquals("ARCHIVED", matchState(fixture.matchId()));
         assertEquals(2, jdbc.queryForObject(
@@ -838,6 +856,15 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     private static boolean containsId(JsonNode values, UUID id) {
         for (JsonNode value : values) {
             if (id.toString().equals(value.path("id").asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsText(JsonNode values, String expected) {
+        for (JsonNode value : values) {
+            if (expected.equals(value.asText())) {
                 return true;
             }
         }

@@ -1,6 +1,6 @@
 # 测试与质量验收指南
 
-更新时间：2026-08-30。
+更新时间：2026-08-31。
 
 ## 1. 当前批准的验证范围
 
@@ -9,7 +9,7 @@
 | 常规单元与接口测试 | JUnit、Vitest、pytest | 验证业务规则、参数边界和稳定错误合同 | 每次 CI |
 | 权限与数据隔离 | MockMvc、Spring Security、PostgreSQL Testcontainers | 验证身份、企业数据域、跨协会授权和 ETag | 每次 CI/PR |
 | 类型检查与构建 | vue-tsc、Vite、Maven、ruff | 验证类型、依赖和可构建性 | 每次 CI |
-| OIDC/PKCE 验收 | Keycloak、PowerShell | 验证隔离身份环境中的授权码流程 | 手动 |
+| OIDC/PKCE 验收 | Keycloak、Playwright、PowerShell | 验证隔离身份环境中的授权码流程和角色业务旅程 | 手动 |
 | 变异测试 | PIT、StrykerJS、mutmut | 检查常规测试能否识别实现错误 | 手动 |
 | 供应链检查 | Trivy、npm audit、pip-audit | 静态检查仓库和依赖 | 安全工作流 |
 
@@ -17,15 +17,17 @@
 
 ## 2. 可追溯基线
 
-当前仓库包含 Flyway `V1` 至 `V18` 共 18 个版本化迁移。当前 Java 普通全量回归包含 63 个 Surefire 测试套件、305 项测试，已经在真实 PostgreSQL 16 Testcontainers 上完成 V18 验证。
+当前仓库包含 Flyway `V1` 至 `V18` 共 18 个版本化迁移。当前 Java 普通全量回归生成 67 个 Surefire 测试报告、包含 314 项测试，已经在真实 PostgreSQL 16 Testcontainers 上完成 V18 验证。
 
-2026-08-30 本地常规验证基线：
+2026-08-31 本地验证基线：
 
 - Web：15 个 Vitest 文件、167 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
-- Java：63 个 Surefire 测试套件、305 项测试通过，失败、错误和跳过均为 0；Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级和 V17→V18 匹配闭环升级均已在本工作区通过。
+- Java：67 个 Surefire 测试报告、314 项测试通过，失败、错误和跳过均为 0；Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级和 V17→V18 匹配闭环升级均已在本工作区通过。
 - AI：默认批准范围收集 46 项测试；`stress` 与 `fuzz` 标记均不进入默认执行。
 - 运维配置：`tests/operations` 28 项、`tests/config` 10 项，CI 分目录执行，共 38 项。
-- 真实依赖检查：PostgreSQL 16 Testcontainers 覆盖 Flyway V1–V18 空库迁移、V15→V17、V16→V17 与 V17→V18 干净升级、歧义数据失败事务回滚、并发邀请唯一性和陈旧反馈 CAS；Redis、Keycloak、MinIO 仍需在第五阶段完整浏览器 E2E 中联合复验。
+- 真实依赖检查：PostgreSQL 16 Testcontainers 覆盖 Flyway V1–V18 空库迁移、V15→V17、V16→V17 与 V17→V18 干净升级、歧义数据失败事务回滚、并发邀请唯一性和陈旧反馈 CAS；隔离 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境中的 Playwright 5/5 条浏览器旅程通过，覆盖四个真实账号、角色权限、附件与通知，以及从供需建档到成果归档的完整匹配闭环。
+
+本轮本机 E2E 由 Docker 运行真实 PostgreSQL、MinIO、Redis 和 Keycloak，业务后端与 Web 使用本机进程连接这些依赖。Docker Desktop 访问 Docker Hub 基础镜像元数据时因本机证书信任链报 `x509: certificate signed by unknown authority`，因此没有把应用镜像构建记为通过，也没有关闭 TLS 校验规避；完整应用容器构建必须在具备可信证书链的 CI 或构建环境复验。
 
 测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V3、89 项、125 项或 47 项基线。
 
@@ -57,6 +59,17 @@ python -m unittest discover -s tests/config -p "test_*.py" -v
 
 该脚本只验证本项目隔离环境中的健康、正常鉴权、权限拒绝、请求追踪与 ETag 乐观并发，不执行主动扫描或高负载行为。
 
+真实依赖浏览器 E2E：
+
+```powershell
+./tools/testing/Start-E2eStack.ps1
+Push-Location apps/web
+npm run test:e2e
+Pop-Location
+```
+
+该栈固定使用项目名 `guanxian-platform-e2e` 和 `tests/e2e/compose.env` 中的测试专用端口/凭据。Playwright 单 worker、零重试；`E2E_WEB_BASE_URL` 如有变化，必须同步修改 Web OIDC 回调和 Keycloak 客户端登记地址。它只验证隔离环境，不替代正式 IdP、TLS、备份恢复、集中日志或告警验收。
+
 ## 4. PostgreSQL 与身份验收
 
 真实 PostgreSQL 回归由以下 Testcontainers 测试承担：
@@ -72,6 +85,7 @@ python -m unittest discover -s tests/config -p "test_*.py" -v
 - `PostgresEnterpriseLifecycleIsolationIntegrationTest`：企业停用/删除后的历史只读与写入阻断。
 - `PostgresCollaborationSystemContextIntegrationTest`：协作事项系统上下文与跨租户隔离。
 - `PostgresPolicyLifecycleIntegrationTest` 与 `PostgresPolicyImpactIntegrationTest`：政策生命周期、数据域和影响分析落库。
+- `PostgresMinioRedisIntegrationTest`：真实 PostgreSQL 元数据、MinIO 对象读写/软删除恢复与 Redis 限流联合验证。
 
 Docker 不可用时，Testcontainers 未执行不能视为通过；应由标准 Ubuntu CI Runner 完成。
 

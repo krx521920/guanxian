@@ -8,7 +8,13 @@
 
 # 启动后端与 AI 服务，验证鉴权、匹配、请求追踪和 ETag 乐观并发
 ./tests/smoke/runtime-smoke.ps1
+
+# 启动隔离的 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境
+./tools/testing/Start-E2eStack.ps1
+Push-Location apps/web; npm run test:e2e; Pop-Location
 ```
+
+浏览器 E2E 固定使用项目名 `guanxian-platform-e2e`、单 worker 和零重试，不得连接生产数据或生产身份域。覆盖基址时还必须同步 Web OIDC 回调和 Keycloak 客户端登记地址。
 
 变异测试分别执行：
 

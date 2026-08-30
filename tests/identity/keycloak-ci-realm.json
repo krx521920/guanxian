@@ -44,7 +44,7 @@
       "enabled": true,
       "emailVerified": true,
       "firstName": "CI",
-      "lastName": "Association Admin",
+      "lastName": "协会管理员",
       "email": "ci-association-admin@invalid.example",
       "credentials": [
         {
@@ -78,7 +78,7 @@
       "enabled": true,
       "emailVerified": true,
       "firstName": "CI",
-      "lastName": "Enterprise Admin",
+      "lastName": "企业管理员",
       "email": "ci-enterprise-admin@invalid.example",
       "credentials": [
         { "type": "password", "value": "ci-only-user-password", "temporary": false }
@@ -91,12 +91,25 @@
       "enabled": true,
       "emailVerified": true,
       "firstName": "CI",
-      "lastName": "Enterprise Member",
+      "lastName": "市场经理",
       "email": "ci-enterprise-member@invalid.example",
       "credentials": [
         { "type": "password", "value": "ci-only-user-password", "temporary": false }
       ],
       "realmRoles": ["ENTERPRISE_MEMBER"]
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000005",
+      "username": "ci-supplier-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "CI",
+      "lastName": "供给方管理员",
+      "email": "ci-supplier-admin@invalid.example",
+      "credentials": [
+        { "type": "password", "value": "ci-only-user-password", "temporary": false }
+      ],
+      "realmRoles": ["ENTERPRISE_ADMIN"]
     }
   ]
 }

@@ -23,7 +23,7 @@
    docker compose --env-file .env config --quiet
    ```
 
-4. 确认 HTTPS 证书、DNS、OIDC issuer/JWK、回调地址、PostgreSQL、MinIO 和 Redis 的连通性。
+4. 确认 HTTPS 证书、DNS、OIDC issuer/JWK、回调地址、PostgreSQL、MinIO 和 Redis 的连通性；按 `GUANXIAN_STORAGE_BUCKET` 预先创建私有 MinIO bucket，并只授予应用账号所需的对象读写/删除权限。生产 Profile 不会自动创建 bucket，bucket 缺失时后端应拒绝启动。
 5. 确认磁盘余量至少能容纳当前数据库的两份备份和一次恢复演练。
 6. 在部署前创建一次 PostgreSQL 备份，并将 MinIO 对象存储快照或版本状态记入同一变更单。
 
@@ -144,7 +144,7 @@ Remove-Item Env:GUANXIAN_ALLOW_TEST_RESTORE
 1. 冻结变更窗口，确认负责人、回滚负责人和观察窗口。
 2. 完成第 2 节预检和第 3 节部署前备份。
 3. 拉取审批版本并记录 digest：`docker compose pull`。
-4. 先启动 PostgreSQL、MinIO、Redis，等待健康检查通过。
+4. 启动生产 Compose 中的 PostgreSQL 并等待健康；确认外部 MinIO 私有 bucket 和 Redis 已由基础设施团队启动，且可从后端 egress 网络访问。
 5. 启动后端。Flyway 迁移失败时立即停止，不要用 `repair` 或手工改迁移历史绕过。
 6. 启动前端和网关，依次验证健康接口、OIDC 登录、协会管理员、企业管理员、只读用户、附件上传下载、审计记录和限流降级。
 7. 观察至少 30 分钟：5xx、P95 延迟、数据库连接、磁盘、JVM、MinIO 错误率、Redis 限流错误和身份认证失败率。
