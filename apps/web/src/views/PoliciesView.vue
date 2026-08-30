@@ -19,7 +19,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
+  <div class="policies-page">
     <PageHeader title="政策标准" description="向上连接政策与标准，智能识别行业影响和企业机会">
       <button class="secondary-button">政策订阅设置</button><button class="primary-button">+ 收录政策</button>
     </PageHeader>

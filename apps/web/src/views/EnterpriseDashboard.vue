@@ -14,7 +14,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
+  <div class="enterprise-page">
     <PageHeader title="企业工作台" :description="`${auth.user.value?.organization} · 管理能力资产，发现政策与合作机会`">
       <button class="secondary-button">预览企业主页</button><button class="primary-button">+ 发布供需</button>
     </PageHeader>

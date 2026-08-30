@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { displayStatus } from './status-display'
+
 const props = defineProps<{ value: string }>()
+const label = computed(() => displayStatus(props.value))
 
 const toneMap: Record<string, string> = {
   已认证: 'success',
@@ -23,5 +27,5 @@ const toneMap: Record<string, string> = {
 </script>
 
 <template>
-  <span class="status-badge" :class="`status-${toneMap[props.value] || 'neutral'}`">{{ value }}</span>
+  <span class="status-badge" :class="`status-${toneMap[label] || 'neutral'}`">{{ label }}</span>
 </template>

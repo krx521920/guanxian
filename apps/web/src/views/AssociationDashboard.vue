@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { Building2, ClipboardCheck, GitCompareArrows, ScrollText } from '@lucide/vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import MetricCard from '../components/MetricCard.vue'
 import PageHeader from '../components/PageHeader.vue'
+import { displayStatus } from '../components/status-display'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import { platformApi } from '../services/platform-api'
@@ -10,11 +12,19 @@ import { platformApi } from '../services/platform-api'
 const { data, loading, error, load } = useAsyncResource(platformApi.associationDashboard)
 onMounted(load)
 
-const activityIcons = { policy: '规', match: '荐', member: '企', task: '协' }
+const activityIcons = { policy: ScrollText, match: GitCompareArrows, member: Building2, task: ClipboardCheck }
+
+function displayActivityDetail(value: string): string {
+  return value.replace(/\b(COMPLETED|DRAFT|OPEN|IN_PROGRESS|PUBLISHED)\b/g, (status) => displayStatus(status))
+}
+
+function displayActivityTime(value: string): string {
+  return value.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || value
+}
 </script>
 
 <template>
-  <div>
+  <div class="association-page">
     <PageHeader title="协会工作台" description="掌握会员动态、行业资源与生态协作全局">
       <button class="secondary-button">导入企业资料</button>
       <button class="primary-button">+ 发布协会事项</button>
@@ -40,8 +50,8 @@ const activityIcons = { policy: '规', match: '荐', member: '企', task: '协' 
           <div class="panel-header"><div><h2>最新动态</h2><p>政策、会员和协作变化</p></div><button class="icon-button">•••</button></div>
           <div class="activity-list">
             <div v-for="activity in data.activities" :key="activity.id" class="activity-item">
-              <span class="activity-icon" :class="activity.type">{{ activityIcons[activity.type] }}</span>
-              <div><strong>{{ activity.title }}</strong><p>{{ activity.detail }}</p><small>{{ activity.time }}</small></div>
+              <span class="activity-icon" :class="activity.type"><component :is="activityIcons[activity.type]" aria-hidden="true" /></span>
+              <div><strong>{{ activity.title }}</strong><p>{{ displayActivityDetail(activity.detail) }}</p><small>{{ displayActivityTime(activity.time) }}</small></div>
             </div>
           </div>
         </article>

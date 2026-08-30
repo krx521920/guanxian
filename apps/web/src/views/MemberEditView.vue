@@ -91,7 +91,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
+  <div class="member-form-page member-edit-page">
     <PageHeader title="编辑会员企业" description="修改通过 ETag 防止并发覆盖；企业自助修改后自动进入协会审核">
       <RouterLink class="secondary-button" to="/members">返回会员列表</RouterLink>
     </PageHeader>
