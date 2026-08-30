@@ -12,6 +12,7 @@ const router = useRouter()
 const auth = useAuth()
 const mobileOpen = ref(false)
 const sidebarCollapsed = ref(false)
+const keyboardNavigation = ref(false)
 const profileOpen = ref(false)
 const notificationOpen = ref(false)
 const notificationUnreadCount = ref(0)
@@ -147,6 +148,7 @@ function setAppearance(value: 'light' | 'dark') {
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
+  keyboardNavigation.value = false
   const target = event.target as Node
   if (
     profileOpen.value
@@ -161,6 +163,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
 }
 
 function handleDocumentKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Tab') keyboardNavigation.value = true
   if (event.key === 'Escape') {
     closeProfile()
     closeNotification()
@@ -194,7 +197,13 @@ async function logout() {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+  <div
+    class="app-shell"
+    :class="{
+      'sidebar-collapsed': sidebarCollapsed,
+      'keyboard-navigation': keyboardNavigation
+    }"
+  >
     <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
