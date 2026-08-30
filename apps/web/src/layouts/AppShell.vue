@@ -30,11 +30,11 @@ const primaryTheme = ref('teal')
 const appearance = ref<'light' | 'dark'>('light')
 
 const primaryThemes = [
-  { value: 'teal', label: '管网青', color: '#2f6f68' },
-  { value: 'blue', label: '深海蓝', color: '#3f6480' },
-  { value: 'violet', label: '岩层靛', color: '#5d607c' },
-  { value: 'orange', label: '黄铜棕', color: '#94613c' },
-  { value: 'rose', label: '勃艮第红', color: '#884a59' }
+  { value: 'teal', label: '管网青', lightColor: '#2f6f68', darkColor: '#5fa89e' },
+  { value: 'blue', label: '深海蓝', lightColor: '#3f6480', darkColor: '#7199b5' },
+  { value: 'violet', label: '岩层靛', lightColor: '#5d607c', darkColor: '#888ba8' },
+  { value: 'orange', label: '黄铜棕', lightColor: '#94613c', darkColor: '#bd8964' },
+  { value: 'rose', label: '勃艮第红', lightColor: '#884a59', darkColor: '#b97888' }
 ]
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
@@ -292,7 +292,7 @@ async function logout() {
                     type="button"
                     :title="item.label"
                     :aria-label="`主色：${item.label}`"
-                    :style="{ '--swatch': item.color }"
+                    :style="{ '--swatch': appearance === 'dark' ? item.darkColor : item.lightColor }"
                     @click="setPrimaryTheme(item.value)"
                   />
                 </div>
