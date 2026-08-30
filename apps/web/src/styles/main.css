@@ -9,16 +9,16 @@
   --primary-soft: #e8f1ef;
   --primary-highlight: #78a9a3;
   --brand-logo: #236b66;
-  --sidebar-start: color-mix(in srgb, var(--primary) 5%, #fbfcfc);
-  --sidebar-end: color-mix(in srgb, var(--primary) 10%, #f5f8f7);
-  --sidebar-edge: color-mix(in srgb, var(--primary) 18%, #e6ebeb);
+  --sidebar-start: color-mix(in srgb, var(--primary) 8%, #fbfcfc);
+  --sidebar-end: color-mix(in srgb, var(--primary) 16%, #f5f8f7);
+  --sidebar-edge: color-mix(in srgb, var(--primary) 20%, #e6ebeb);
   --sidebar-text: color-mix(in srgb, var(--primary-dark) 42%, #718080);
   --sidebar-text-strong: color-mix(in srgb, var(--primary-dark) 68%, #16262b);
   --sidebar-text-muted: color-mix(in srgb, var(--primary-dark) 24%, #929d9c);
   --sidebar-hover: color-mix(in srgb, var(--primary) 7%, transparent);
   --sidebar-active-start: color-mix(in srgb, var(--primary) 14%, transparent);
   --sidebar-active-end: color-mix(in srgb, var(--primary) 8%, transparent);
-  --sidebar-active-edge: color-mix(in srgb, var(--primary) 25%, transparent);
+  --sidebar-active-edge: color-mix(in srgb, var(--primary) 10%, transparent);
   --page: #f4f6f9;
   --ink: #172235;
   --muted: #687588;
@@ -35,7 +35,7 @@ html[data-primary="blue"] { --primary: #3f6480; --primary-dark: #2d485a; --prima
 html[data-primary="violet"] { --primary: #5d607c; --primary-dark: #45485d; --primary-soft: #eeeff3; --primary-highlight: #9699ac; }
 html[data-primary="orange"] { --primary: #94613c; --primary-dark: #6d472d; --primary-soft: #f4ece6; --primary-highlight: #c09a7d; }
 html[data-primary="rose"] { --primary: #884a59; --primary-dark: #643742; --primary-soft: #f3e9ec; --primary-highlight: #b68793; }
-html[data-appearance="dark"] { color-scheme: dark; --primary: #5fa89e; --primary-dark: #3f857c; --primary-soft: #193a38; --primary-highlight: #82bdb5; --page: #0f1620; --ink: #e8edf4; --muted: #9aa7b8; --line: #2c3746; --panel: #18212e; --surface-hover: #222d3b; --surface-soft: #202a37; --shadow: 0 10px 30px rgba(0, 0, 0, .22); --sidebar-start: color-mix(in srgb, var(--primary-dark) 28%, #14232a); --sidebar-end: color-mix(in srgb, var(--primary-dark) 18%, #08171d); --sidebar-edge: color-mix(in srgb, var(--primary) 18%, #23323b); --sidebar-text: color-mix(in srgb, var(--primary-highlight) 30%, rgba(236, 245, 244, .68)); --sidebar-text-strong: color-mix(in srgb, var(--primary-highlight) 16%, #f2f8f7); --sidebar-text-muted: color-mix(in srgb, var(--primary-highlight) 18%, rgba(225, 238, 236, .48)); --sidebar-hover: color-mix(in srgb, var(--primary) 9%, transparent); --sidebar-active-start: color-mix(in srgb, var(--primary) 32%, transparent); --sidebar-active-end: color-mix(in srgb, var(--primary) 20%, transparent); --sidebar-active-edge: color-mix(in srgb, var(--primary) 28%, transparent); }
+html[data-appearance="dark"] { color-scheme: dark; --primary: #5fa89e; --primary-dark: #3f857c; --primary-soft: #193a38; --primary-highlight: #82bdb5; --page: #0f1620; --ink: #e8edf4; --muted: #9aa7b8; --line: #2c3746; --panel: #18212e; --surface-hover: #222d3b; --surface-soft: #202a37; --shadow: 0 10px 30px rgba(0, 0, 0, .22); --sidebar-start: color-mix(in srgb, var(--primary-dark) 38%, #14232a); --sidebar-end: color-mix(in srgb, var(--primary-dark) 28%, #08171d); --sidebar-edge: color-mix(in srgb, var(--primary) 20%, #23323b); --sidebar-text: color-mix(in srgb, var(--primary-highlight) 30%, rgba(236, 245, 244, .68)); --sidebar-text-strong: color-mix(in srgb, var(--primary-highlight) 16%, #f2f8f7); --sidebar-text-muted: color-mix(in srgb, var(--primary-highlight) 18%, rgba(225, 238, 236, .48)); --sidebar-hover: color-mix(in srgb, var(--primary) 9%, transparent); --sidebar-active-start: color-mix(in srgb, var(--primary) 32%, transparent); --sidebar-active-end: color-mix(in srgb, var(--primary) 20%, transparent); --sidebar-active-edge: color-mix(in srgb, var(--primary) 18%, transparent); }
 html[data-appearance="dark"][data-primary="blue"] { --primary: #7199b5; --primary-dark: #527993; --primary-soft: #1c303d; --primary-highlight: #94b3c7; }
 html[data-appearance="dark"][data-primary="violet"] { --primary: #888ba8; --primary-dark: #696d8c; --primary-soft: #282a3b; --primary-highlight: #a7a9be; }
 html[data-appearance="dark"][data-primary="orange"] { --primary: #bd8964; --primary-dark: #986846; --primary-soft: #3a2b22; --primary-highlight: #d0a68a; }
@@ -89,10 +89,10 @@ h1, h2, h3, p { margin-top: 0; }
 .sidebar-profile .notification-button i { border-color: var(--sidebar-end); }
 .notification-popover-shell { position: absolute; left: calc(100% + 10px); bottom: 0; z-index: 4; width: 320px; }
 .main-area { width: calc(100% - 232px); min-height: 100vh; margin-left: 232px; transition: width .24s cubic-bezier(.4, 0, .2, 1), margin-left .24s cubic-bezier(.4, 0, .2, 1); }
-.topbar { position: sticky; top: 0; z-index: 20; height: 72px; padding: 0 26px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(12px); display: flex; align-items: center; }
+.topbar { position: sticky; top: 0; z-index: 20; height: 72px; padding: 0 18px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(12px); display: flex; align-items: center; }
 .sidebar-trigger { width: 40px; height: 40px; flex: 0 0 auto; }
 .sidebar-trigger svg { width: 21px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.topbar-divider { width: 1px; height: 22px; margin: 0 17px; background: var(--line); }
+.topbar-divider { width: 1px; height: 22px; margin: 0 11px; background: var(--line); }
 .crumb { color: #94a0af; font-size: 14px; display: flex; gap: 12px; align-items: center; }
 .crumb b { color: #c9d0d8; }
 .crumb strong { color: #435065; font-weight: 650; }
