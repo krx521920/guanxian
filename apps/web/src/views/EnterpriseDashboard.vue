@@ -22,7 +22,7 @@ onMounted(load)
     <template v-else-if="data">
       <section class="profile-completeness panel">
         <div class="completeness-ring" :style="{ '--progress': `${data.completeness * 3.6}deg` }"><div><strong>{{ data.completeness }}%</strong><span>资料完整度</span></div></div>
-        <div><span class="eyebrow">ENTERPRISE PROFILE</span><h2>企业资料已具备匹配条件</h2><p>补充 2 项产品技术参数和 1 个项目案例，可进一步提升 AI 匹配准确度。</p><button class="text-button">继续完善资料 →</button></div>
+        <div><h2>企业资料已具备匹配条件</h2><p>补充 2 项产品技术参数和 1 个项目案例，可进一步提升 AI 匹配准确度。</p><button class="text-button">继续完善资料 →</button></div>
         <div class="profile-checks"><span class="done">✓ 基本信息</span><span class="done">✓ 场景能力</span><span class="todo">• 技术参数</span><span class="todo">• 典型案例</span></div>
       </section>
 

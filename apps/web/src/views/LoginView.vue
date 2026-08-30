@@ -56,7 +56,6 @@ async function login() {
     <section class="login-panel">
       <form class="login-card" @submit.prevent="login">
         <div class="mobile-brand"><div class="brand-mark"><span /><span /><span /></div><strong>管线智联</strong></div>
-        <span class="eyebrow">{{ auth.isDemoMode ? 'LOCAL DEMO' : 'SECURE ACCESS' }}</span>
         <h2>欢迎使用管理协作平台</h2>
         <p>{{ auth.isDemoMode ? '请选择本地测试身份' : '使用统一身份认证安全登录' }}</p>
 

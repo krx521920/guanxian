@@ -81,13 +81,13 @@ const tiers = [
     </section>
 
     <section class="ecosystem-section-heading">
-      <div><span class="eyebrow">HUITIAN PILOT</span><h2>回天地区网格化试点</h2><p>仅展示社区级服务覆盖，不呈现涉密管线位置</p></div>
+      <div><h2>回天地区网格化试点</h2><p>仅展示社区级服务覆盖，不呈现涉密管线位置</p></div>
       <div class="pilot-tabs"><button v-for="area in trialAreas" :key="area.name" :class="{ active: selectedArea.name === area.name }" @click="selectedArea = area">{{ area.name }}</button></div>
     </section>
 
     <section class="pilot-grid-layout">
       <article class="matrix-panel panel">
-        <div class="panel-header"><div><h2>管线矩阵 Matrix</h2><p>点击网格查看街道级服务覆盖与活跃度</p></div><div class="matrix-header-tools"><div class="matrix-legend"><span><i class="normal" />稳定</span><span><i class="warm" />关注</span><span><i class="hot" />活跃</span></div><span class="live-badge"><i /> LIVE</span></div></div>
+        <div class="panel-header"><div><h2>管线矩阵</h2><p>点击网格查看街道级服务覆盖与活跃度</p></div><div class="matrix-header-tools"><div class="matrix-legend"><span><i class="normal" />稳定</span><span><i class="warm" />关注</span><span><i class="hot" />活跃</span></div><span class="live-badge"><i /> 实时</span></div></div>
         <div class="matrix-content">
           <div class="matrix-map">
             <button v-for="cell in gridCells" :key="cell.id" :class="['matrix-cell', cell.level, { selected: selectedCell === cell.id }]" :aria-label="`网格 ${cell.id + 1}`" @click="selectedCell = cell.id"><i v-if="cell.level !== 'normal'" /></button>
@@ -102,7 +102,7 @@ const tiers = [
       </article>
 
       <aside class="pilot-summary panel">
-        <div class="pilot-summary-head"><div><span class="eyebrow">PILOT STATUS</span><h3>试点运行概览</h3></div><span class="live-badge"><i /> 实时</span></div>
+        <div class="pilot-summary-head"><div><h3>试点运行概览</h3></div><span class="live-badge"><i /> 实时</span></div>
         <article class="pilot-stat"><span class="pilot-stat-icon"><Building2 aria-hidden="true" /></span><div><span>已接入单位</span><strong>{{ selectedArea.units }}</strong><small>辖区管线相关单位</small></div></article>
         <article class="pilot-stat"><span class="pilot-stat-icon"><Grid3X3 aria-hidden="true" /></span><div><span>试点网格</span><strong>{{ selectedArea.grids }}</strong><small>{{ selectedArea.streets.join(' · ') }}</small></div></article>
         <article class="pilot-stat"><span class="pilot-stat-icon"><BadgeCheck aria-hidden="true" /></span><div><span>服务认领率</span><strong>{{ selectedArea.claimed }}%</strong><div class="pilot-progress"><i :style="{ width: `${selectedArea.claimed}%` }" /></div></div></article>
@@ -110,7 +110,7 @@ const tiers = [
       </aside>
     </section>
 
-    <section class="ecosystem-section-heading"><div><span class="eyebrow">MEMBER VALUE</span><h2>会员权益分级</h2><p>通过数据边界和增值能力体现协会服务价值</p></div><button class="secondary-button">查看权限矩阵</button></section>
+    <section class="ecosystem-section-heading"><div><h2>会员权益分级</h2><p>通过数据边界和增值能力体现协会服务价值</p></div><button class="secondary-button">查看权限矩阵</button></section>
     <section class="tier-grid">
       <article v-for="(tier, index) in tiers" :key="tier.name" class="tier-card panel" :class="{ featured: index === 0 }">
         <div class="tier-top"><span>0{{ index + 1 }}</span><em>{{ tier.accent }}</em></div><small>{{ tier.level }}</small><h3>{{ tier.name }}</h3>
