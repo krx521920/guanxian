@@ -46,7 +46,7 @@ const tiers = [
 
 <template>
   <div class="ecosystem-page">
-    <PageHeader eyebrow="AI ECOSYSTEM COMMAND CENTER" title="地下管线 AI 生态全景" description="连接政府生态位、会员能力与社区网格，让政策、产品和需求形成可持续协作闭环">
+    <PageHeader title="地下管线 AI 生态全景" description="连接政府生态位、会员能力与社区网格，让政策、产品和需求形成可持续协作闭环">
       <RouterLink class="primary-button ecosystem-link-button" to="/matching">进入智能匹配 →</RouterLink>
     </PageHeader>
 

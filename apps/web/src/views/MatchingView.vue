@@ -15,7 +15,7 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="ECOSYSTEM MATCHING" title="生态匹配" description="基于场景、能力、资质与案例，连接真实供需并推动协作">
+    <PageHeader title="生态匹配" description="基于场景、能力、资质与案例，连接真实供需并推动协作">
       <button class="secondary-button">匹配规则</button><button class="primary-button">生成新一轮匹配</button>
     </PageHeader>
     <section class="match-summary">

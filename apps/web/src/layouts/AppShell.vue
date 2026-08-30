@@ -18,6 +18,9 @@ const notificationUnreadCount = ref(0)
 const roleMenuOpen = ref(false)
 const themeMenuOpen = ref(false)
 const appearanceMenuOpen = ref(false)
+type ProfileSubmenuKey = 'role' | 'theme' | 'appearance'
+const profileSubmenuKeys: ProfileSubmenuKey[] = ['role', 'theme', 'appearance']
+const submenuCloseTimers: Partial<Record<ProfileSubmenuKey, ReturnType<typeof setTimeout>>> = {}
 const profileButtonRef = ref<HTMLElement | null>(null)
 const profileMenuRef = ref<HTMLElement | null>(null)
 const notificationButtonRef = ref<HTMLElement | null>(null)
@@ -60,18 +63,48 @@ function toggleSidebar() {
 function switchRole(role: UserRole) {
   if (!auth.isDemoMode) return
   router.push(auth.switchRole(role))
-  roleMenuOpen.value = false
-  profileOpen.value = false
+  closeProfile()
+}
+
+function setProfileSubmenuOpen(menu: ProfileSubmenuKey, open: boolean) {
+  if (menu === 'role') roleMenuOpen.value = open
+  if (menu === 'theme') themeMenuOpen.value = open
+  if (menu === 'appearance') appearanceMenuOpen.value = open
+}
+
+function clearSubmenuCloseTimer(menu: ProfileSubmenuKey) {
+  const timer = submenuCloseTimers[menu]
+  if (timer === undefined) return
+  clearTimeout(timer)
+  delete submenuCloseTimers[menu]
+}
+
+function openProfileSubmenu(menu: ProfileSubmenuKey) {
+  profileSubmenuKeys.forEach((key) => {
+    clearSubmenuCloseTimer(key)
+    setProfileSubmenuOpen(key, key === menu)
+  })
+}
+
+function scheduleProfileSubmenuClose(menu: ProfileSubmenuKey) {
+  clearSubmenuCloseTimer(menu)
+  submenuCloseTimers[menu] = setTimeout(() => {
+    setProfileSubmenuOpen(menu, false)
+    delete submenuCloseTimers[menu]
+  }, 160)
+}
+
+function closeProfileSubmenus() {
+  profileSubmenuKeys.forEach((key) => {
+    clearSubmenuCloseTimer(key)
+    setProfileSubmenuOpen(key, false)
+  })
 }
 
 function toggleProfile() {
   profileOpen.value = !profileOpen.value
   if (profileOpen.value) notificationOpen.value = false
-  if (!profileOpen.value) {
-    roleMenuOpen.value = false
-    themeMenuOpen.value = false
-    appearanceMenuOpen.value = false
-  }
+  if (!profileOpen.value) closeProfileSubmenus()
 }
 
 function toggleNotification() {
@@ -81,9 +114,7 @@ function toggleNotification() {
 
 function closeProfile() {
   profileOpen.value = false
-  roleMenuOpen.value = false
-  themeMenuOpen.value = false
-  appearanceMenuOpen.value = false
+  closeProfileSubmenus()
 }
 
 function closeNotification() {
@@ -149,6 +180,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  closeProfileSubmenus()
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   document.removeEventListener('keydown', handleDocumentKeyDown)
 })
@@ -217,15 +249,15 @@ async function logout() {
             <div
               v-if="auth.isDemoMode"
               class="profile-menu-item-wrap"
-              @mouseenter="roleMenuOpen = true"
-              @mouseleave="roleMenuOpen = false"
+              @mouseenter="openProfileSubmenu('role')"
+              @mouseleave="scheduleProfileSubmenuClose('role')"
             >
               <button
                 class="profile-menu-item"
                 type="button"
                 aria-haspopup="menu"
                 :aria-expanded="roleMenuOpen"
-                @click="roleMenuOpen = true"
+                @click="openProfileSubmenu('role')"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 <span>切换身份</span>
@@ -251,10 +283,10 @@ async function logout() {
             </button>
             <div
               class="profile-menu-item-wrap"
-              @mouseenter="themeMenuOpen = true"
-              @mouseleave="themeMenuOpen = false"
+              @mouseenter="openProfileSubmenu('theme')"
+              @mouseleave="scheduleProfileSubmenuClose('theme')"
             >
-              <button class="profile-menu-item" type="button" aria-haspopup="menu" :aria-expanded="themeMenuOpen" @click="themeMenuOpen = true">
+              <button class="profile-menu-item" type="button" aria-haspopup="menu" :aria-expanded="themeMenuOpen" @click="openProfileSubmenu('theme')">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 1 10-10c0 2.76-2.24 5-5 5h-1.8c-.74 0-1.2.8-.82 1.43l.3.5c.44.73-.09 1.67-.94 1.67H12Z"/><circle cx="7.5" cy="10.5" r=".5"/><circle cx="10.5" cy="7.5" r=".5"/><circle cx="14" cy="7" r=".5"/><circle cx="17" cy="10" r=".5"/></svg>
                 <span>主题</span>
                 <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
@@ -296,10 +328,10 @@ async function logout() {
             </div>
             <div
               class="profile-menu-item-wrap"
-              @mouseenter="appearanceMenuOpen = true"
-              @mouseleave="appearanceMenuOpen = false"
+              @mouseenter="openProfileSubmenu('appearance')"
+              @mouseleave="scheduleProfileSubmenuClose('appearance')"
             >
-              <button class="profile-menu-item" type="button" aria-haspopup="menu" :aria-expanded="appearanceMenuOpen" @click="appearanceMenuOpen = true">
+              <button class="profile-menu-item" type="button" aria-haspopup="menu" :aria-expanded="appearanceMenuOpen" @click="openProfileSubmenu('appearance')">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5L7 22l-5-5Z"/><path d="m14 5 1.5-1.5M6 3v4M4 5h4M19 13v4M17 15h4"/></svg>
                 <span>外观</span>
                 <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>

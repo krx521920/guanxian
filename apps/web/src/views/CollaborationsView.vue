@@ -14,7 +14,7 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="COLLABORATION" title="协作事项" description="从智能推荐到人工确认、协同推进和结果反馈的完整闭环">
+    <PageHeader title="协作事项" description="从智能推荐到人工确认、协同推进和结果反馈的完整闭环">
       <button class="primary-button">+ 发起协作</button>
     </PageHeader>
     <section class="workflow-strip panel">

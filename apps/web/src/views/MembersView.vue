@@ -83,7 +83,7 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="MEMBER ENTERPRISES" title="会员企业" description="统一沉淀会员画像、产品服务与场景能力">
+    <PageHeader title="会员企业" description="统一沉淀会员画像、产品服务与场景能力">
       <template v-if="canCollect">
         <button class="secondary-button" :disabled="importBusy" @click="downloadTemplate">下载调查模板</button>
         <button class="secondary-button" :disabled="importBusy" @click="chooseImportFile">批量导入</button>

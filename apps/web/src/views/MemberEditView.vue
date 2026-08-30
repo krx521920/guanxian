@@ -92,7 +92,7 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="MEMBER PROFILE" title="编辑会员企业" description="修改通过 ETag 防止并发覆盖；企业自助修改后自动进入协会审核">
+    <PageHeader title="编辑会员企业" description="修改通过 ETag 防止并发覆盖；企业自助修改后自动进入协会审核">
       <RouterLink class="secondary-button" to="/members">返回会员列表</RouterLink>
     </PageHeader>
     <AsyncResourceState v-if="loading || loadError" :loading="loading" :error="loadError" @retry="load" />

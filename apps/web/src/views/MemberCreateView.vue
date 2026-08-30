@@ -50,7 +50,7 @@ async function submit() {
 
 <template>
   <div>
-    <PageHeader eyebrow="MEMBER COLLECTION" title="新增会员企业" description="新增资料将纳入协会数据域，并按账号权限进入审核流程">
+    <PageHeader title="新增会员企业" description="新增资料将纳入协会数据域，并按账号权限进入审核流程">
       <RouterLink class="secondary-button" to="/members">返回会员列表</RouterLink>
     </PageHeader>
     <form class="panel member-edit-form" @submit.prevent="submit">

@@ -15,7 +15,7 @@ const activityIcons = { policy: '规', match: '荐', member: '企', task: '协' 
 
 <template>
   <div>
-    <PageHeader eyebrow="ASSOCIATION OVERVIEW" title="协会工作台" description="掌握会员动态、行业资源与生态协作全局">
+    <PageHeader title="协会工作台" description="掌握会员动态、行业资源与生态协作全局">
       <button class="secondary-button">导入企业资料</button>
       <button class="primary-button">+ 发布协会事项</button>
     </PageHeader>
