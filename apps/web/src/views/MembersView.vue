@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Columns3, Rows3 } from '@lucide/vue'
 import { RouterLink } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -18,11 +19,36 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const importPreview = ref<MemberImportPreview | null>(null)
 const importBusy = ref(false)
 const importMessage = ref<string | null>(null)
+const density = ref<'comfortable' | 'compact'>('comfortable')
+const page = ref(1)
+const pageSize = ref(10)
+const visibleColumns = ref(['role', 'products', 'completeness', 'status', 'updatedAt'])
+const configurableColumns = [
+  { key: 'role', label: '业务角色 / 场景' },
+  { key: 'products', label: '主要产品与服务' },
+  { key: 'completeness', label: '资料完整度' },
+  { key: 'status', label: '状态' },
+  { key: 'updatedAt', label: '更新日期' },
+]
 const canCollect = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR'].includes(auth.user.value?.role || ''))
 const filtered = computed(() => (items.value || []).filter((item) => {
   const hitsKeyword = !keyword.value || `${item.name}${item.role}${item.products.join('')}`.includes(keyword.value)
   return hitsKeyword && (status.value === '全部' || item.status === status.value)
 }))
+const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / pageSize.value)))
+const paginated = computed(() => filtered.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value))
+
+function hasColumn(key: string) { return visibleColumns.value.includes(key) }
+function toggleColumn(key: string) {
+  visibleColumns.value = hasColumn(key)
+    ? visibleColumns.value.filter((value) => value !== key)
+    : [...visibleColumns.value, key]
+}
+
+watch([filtered, pageSize], () => {
+  if (page.value > totalPages.value) page.value = totalPages.value
+})
+watch([keyword, status], () => { page.value = 1 })
 
 function importError(reason: unknown): string {
   if (reason instanceof ApiRequestError) {
@@ -106,16 +132,21 @@ onMounted(load)
       <div class="form-actions"><button class="text-button" type="button" @click="importPreview = null">关闭</button><button class="primary-button" type="button" :disabled="importBusy || importPreview.validRows === 0 || importPreview.status !== 'PREVIEWED'" @click="commitImport">{{ importPreview.status === 'COMMITTED' ? '已提交' : (importBusy ? '正在导入…' : `确认导入 ${importPreview.validRows} 家`) }}</button></div>
     </section>
 
-    <section class="panel filter-panel">
+    <section class="panel filter-panel member-toolbar">
       <div class="search-box"><span>⌕</span><input v-model="keyword" placeholder="搜索企业名称、业务角色或产品服务" /></div>
       <select v-model="status" class="filter-select"><option>全部</option><option>已认证</option><option>待完善</option><option>待审核</option><option>已停用</option></select>
       <span class="result-count">共 {{ filtered.length }} 家企业</span>
+      <div class="table-tools">
+        <button class="toolbar-icon-button" type="button" :title="density === 'comfortable' ? '切换为紧凑密度' : '切换为舒适密度'" @click="density = density === 'comfortable' ? 'compact' : 'comfortable'"><Rows3 aria-hidden="true" /><span>{{ density === 'comfortable' ? '舒适' : '紧凑' }}</span></button>
+        <details class="column-picker"><summary><Columns3 aria-hidden="true" /><span>列设置</span></summary><div class="column-picker-menu"><label v-for="column in configurableColumns" :key="column.key"><input type="checkbox" :checked="hasColumn(column.key)" @change="toggleColumn(column.key)" />{{ column.label }}</label></div></details>
+      </div>
     </section>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
-    <section v-else-if="items" class="panel flush-panel">
-      <div class="data-table-wrap"><table class="data-table member-table"><thead><tr><th>企业</th><th>业务角色 / 场景</th><th>主要产品与服务</th><th>资料完整度</th><th>状态</th><th>更新日期</th><th></th></tr></thead><tbody>
-        <tr v-for="item in filtered" :key="item.id"><td><div class="enterprise-cell"><span class="enterprise-logo">{{ item.shortName.slice(0, 2) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.city || '未填写地址' }} · 联系人：{{ item.contact || '未填写' }}</small></div></div></td><td><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td><td>{{ item.products.join('、') || '—' }}</td><td><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td><td><StatusBadge :value="item.status" /></td><td class="table-muted">{{ formatDate(item.updatedAt) }}</td><td><RouterLink v-if="item.canEdit || item.canReview" class="row-action" :to="`/members/${item.id}/edit`">{{ item.canReview && item.status === '待审核' ? '审核' : '编辑' }}</RouterLink><span v-else class="table-muted">查看</span></td></tr>
+    <section v-else-if="items" class="panel flush-panel member-data-panel" :class="`density-${density}`">
+      <div class="data-table-wrap"><table class="data-table member-table"><thead><tr><th>企业</th><th v-show="hasColumn('role')">业务角色 / 场景</th><th v-show="hasColumn('products')">主要产品与服务</th><th v-show="hasColumn('completeness')">资料完整度</th><th v-show="hasColumn('status')">状态</th><th v-show="hasColumn('updatedAt')">更新日期</th><th></th></tr></thead><tbody>
+        <tr v-for="item in paginated" :key="item.id"><td><div class="enterprise-cell"><span class="enterprise-logo">{{ item.shortName.slice(0, 2) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.city || '未填写地址' }} · 联系人：{{ item.contact || '未填写' }}</small></div></div></td><td v-show="hasColumn('role')"><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td><td v-show="hasColumn('products')">{{ item.products.join('、') || '—' }}</td><td v-show="hasColumn('completeness')"><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td><td v-show="hasColumn('status')"><StatusBadge :value="item.status" /></td><td v-show="hasColumn('updatedAt')" class="table-muted">{{ formatDate(item.updatedAt) }}</td><td><RouterLink v-if="item.canEdit || item.canReview" class="row-action" :to="`/members/${item.id}/edit`">{{ item.canReview && item.status === '待审核' ? '审核' : '编辑' }}</RouterLink><span v-else class="table-muted">查看</span></td></tr>
       </tbody></table></div>
+      <footer class="table-pagination"><span>第 {{ page }} / {{ totalPages }} 页</span><label>每页<select v-model="pageSize"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select>条</label><div><button type="button" :disabled="page <= 1" @click="page--">上一页</button><button type="button" :disabled="page >= totalPages" @click="page++">下一页</button></div></footer>
     </section>
   </div>
 </template>

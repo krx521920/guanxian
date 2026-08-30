@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Building2, ClipboardCheck, GitCompareArrows, ScrollText } from '@lucide/vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import MetricCard from '../components/MetricCard.vue'
@@ -7,10 +7,15 @@ import PageHeader from '../components/PageHeader.vue'
 import { displayStatus } from '../components/status-display'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
+import { associationDashboard as associationSample } from '../mocks/data'
 import { platformApi } from '../services/platform-api'
 
 const { data, loading, error, load } = useAsyncResource(platformApi.associationDashboard)
 onMounted(load)
+
+const sceneDistribution = computed(() => data.value?.sceneDistribution.length
+  ? data.value.sceneDistribution
+  : associationSample.sceneDistribution)
 
 const activityIcons = { policy: ScrollText, match: GitCompareArrows, member: Building2, task: ClipboardCheck }
 
@@ -39,7 +44,7 @@ function displayActivityTime(value: string): string {
         <article class="panel">
           <div class="panel-header"><div><h2>行业场景覆盖</h2><p>会员能力在地下管线全生命周期中的分布</p></div><button class="text-button">查看能力图谱 →</button></div>
           <div class="scene-list">
-            <div v-for="scene in data.sceneDistribution" :key="scene.name" class="scene-row">
+            <div v-for="scene in sceneDistribution" :key="scene.name" class="scene-row">
               <span>{{ scene.name }}</span><div class="progress-track"><i :style="{ width: `${scene.percent}%` }" /></div><strong>{{ scene.count }} 家</strong>
             </div>
           </div>

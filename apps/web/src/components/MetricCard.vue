@@ -25,6 +25,13 @@ const iconComponents = {
   '策': ScrollText,
 }
 const iconComponent = computed(() => iconComponents[props.icon as keyof typeof iconComponents] || Sparkles)
+const sparkHeights = computed(() => ({
+  info: [34, 48, 42, 61, 57, 78],
+  success: [30, 39, 52, 49, 68, 82],
+  warning: [56, 41, 62, 47, 71, 65],
+  danger: [68, 60, 72, 58, 51, 44],
+  neutral: [40, 48, 44, 53, 51, 60],
+}[props.metric.tone]))
 </script>
 
 <template>
@@ -33,7 +40,9 @@ const iconComponent = computed(() => iconComponents[props.icon as keyof typeof i
       <span class="metric-label">{{ metric.label }}</span>
       <span class="metric-symbol"><component :is="iconComponent" aria-hidden="true" /></span>
     </div>
-    <strong>{{ metric.value }}</strong>
-    <p>{{ metric.change }}</p>
+    <div class="metric-value-row">
+      <div><strong>{{ metric.value }}</strong><p>{{ metric.change }}</p></div>
+      <span class="metric-sparkline" aria-hidden="true"><i v-for="(height, index) in sparkHeights" :key="index" :style="{ height: `${height}%` }" /></span>
+    </div>
   </article>
 </template>
