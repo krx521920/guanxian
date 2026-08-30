@@ -30,11 +30,11 @@ const primaryTheme = ref('teal')
 const appearance = ref<'light' | 'dark'>('light')
 
 const primaryThemes = [
-  { value: 'teal', label: '青绿', color: '#126b68' },
-  { value: 'blue', label: '蓝色', color: '#2563eb' },
-  { value: 'violet', label: '紫色', color: '#7c3aed' },
-  { value: 'orange', label: '橙色', color: '#ea580c' },
-  { value: 'rose', label: '玫红', color: '#e11d48' }
+  { value: 'teal', label: '管网青', color: '#2f6f68' },
+  { value: 'blue', label: '深海蓝', color: '#3f6480' },
+  { value: 'violet', label: '岩层靛', color: '#5d607c' },
+  { value: 'orange', label: '黄铜棕', color: '#94613c' },
+  { value: 'rose', label: '勃艮第红', color: '#884a59' }
 ]
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')

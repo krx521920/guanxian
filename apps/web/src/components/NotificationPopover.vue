@@ -199,7 +199,7 @@ onMounted(refreshUnreadCount)
 .notification-tabs button::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; }
 .notification-tabs button.active { color: var(--ink); }
 .notification-tabs button.active::after { background: var(--primary); }
-.notification-list { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.notification-list { height: 380px; overflow-y: auto; overscroll-behavior: contain; }
 .notification-item { width: 100%; min-height: 76px; padding: 11px 14px; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); background: transparent; display: grid; grid-template-columns: 32px minmax(0, 1fr) 8px; gap: 10px; align-items: start; text-align: left; transition: background-color .16s ease; }
 .notification-item:last-child { border-bottom: 0; }
 .notification-item:hover { background: var(--surface-hover); }
