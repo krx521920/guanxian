@@ -10,10 +10,25 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
 const mobileOpen = ref(false)
+const sidebarCollapsed = ref(false)
 const profileOpen = ref(false)
 
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
+const breadcrumbSection = computed(() => {
+  if (route.path.startsWith('/members')) return '企业管理'
+  if (route.path.startsWith('/policies')) return '政策服务'
+  if (['/ecosystem', '/matching', '/collaborations'].some((path) => route.path.startsWith(path))) return '生态协作'
+  return '工作空间'
+})
+
+function toggleSidebar() {
+  if (window.matchMedia('(max-width: 780px)').matches) {
+    mobileOpen.value = !mobileOpen.value
+    return
+  }
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
 
 function switchRole(event: Event) {
   if (!auth.isDemoMode) return
@@ -30,8 +45,8 @@ async function logout() {
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar" :class="{ open: mobileOpen }">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+    <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
         <div><strong>管线智联</strong><small>AI 管理协作平台</small></div>
@@ -56,7 +71,9 @@ async function logout() {
         >
           <span class="avatar">{{ initials }}</span>
           <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
-          <span class="chevron" :class="{ open: profileOpen }">⌄</span>
+        </button>
+        <button class="icon-button notification-button" type="button" aria-label="消息通知">
+          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i />
         </button>
         <div v-if="profileOpen" class="profile-menu">
           <template v-if="auth.isDemoMode">
@@ -73,13 +90,18 @@ async function logout() {
 
     <main class="main-area">
       <header class="topbar">
-        <button class="icon-button menu-button" aria-label="打开导航" @click="mobileOpen = true">☰</button>
-        <div class="crumb"><span>北京地下管线协会</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
-        <div class="top-actions">
-          <button class="icon-button notification-button" aria-label="消息通知">
-            <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i />
-          </button>
-        </div>
+        <button
+          class="icon-button sidebar-trigger"
+          type="button"
+          aria-controls="main-sidebar"
+          :aria-expanded="mobileOpen || !sidebarCollapsed"
+          :aria-label="mobileOpen ? '关闭导航' : (sidebarCollapsed ? '展开侧边栏' : '收起侧边栏')"
+          @click="toggleSidebar"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+        </button>
+        <span class="topbar-divider" aria-hidden="true" />
+        <nav class="crumb" aria-label="面包屑导航"><span>{{ breadcrumbSection }}</span><b>›</b><strong>{{ route.meta.title }}</strong></nav>
       </header>
       <div class="page-container"><RouterView /></div>
     </main>
