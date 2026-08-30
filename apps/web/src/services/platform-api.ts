@@ -1,4 +1,4 @@
-import { associationDashboard, collaborations, enterpriseDashboard, matches, members, policies } from '../mocks/data'
+import { associationDashboard, collaborations, enterpriseDashboard, matches, members, notifications, policies } from '../mocks/data'
 import type {
   Collaboration,
   DashboardData,
@@ -9,6 +9,8 @@ import type {
   MemberImportPreview,
   MemberProfile,
   MemberUpsertPayload,
+  NotificationMessage,
+  NotificationMessagePage,
   Policy,
   VersionedMember,
 } from '../types/domain'
@@ -20,6 +22,20 @@ const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/
 const mock = <T>(data: T) => async () => {
   await new Promise((resolve) => window.setTimeout(resolve, 120))
   return data
+}
+
+const mockNotificationPage = (unreadOnly: boolean): NotificationMessagePage => {
+  const items = unreadOnly ? notifications.filter((item) => item.readAt === null) : notifications
+  return { items, total: items.length, page: 0, size: 20 }
+}
+
+const mockMarkNotificationRead = (id: string) => async (): Promise<NotificationMessage> => {
+  await new Promise((resolve) => window.setTimeout(resolve, 120))
+  const index = notifications.findIndex((item) => item.id === id)
+  if (index < 0) throw new Error('通知不存在')
+  const updated = { ...notifications[index], status: 'READ', readAt: new Date().toISOString() }
+  notifications[index] = updated
+  return updated
 }
 
 function requiredEtag(response: Response | null): string {
@@ -126,4 +142,14 @@ export const platformApi = {
   policies: () => request<Policy[]>('/policies', {}, mock(policies)),
   matches: () => request<EcosystemMatch[]>('/matches', {}, mock(matches)),
   collaborations: () => request<Collaboration[]>('/collaborations', {}, mock(collaborations)),
+  notificationMessages: (unreadOnly = false) => request<NotificationMessagePage>(
+    `/notifications/messages?unreadOnly=${unreadOnly}&page=0&size=20`,
+    {},
+    mock(mockNotificationPage(unreadOnly)),
+  ),
+  markNotificationRead: (id: string) => request<NotificationMessage>(
+    `/notifications/messages/${encodeURIComponent(id)}/read`,
+    { method: 'PUT' },
+    mockMarkNotificationRead(id),
+  ),
 }

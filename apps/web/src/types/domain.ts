@@ -36,6 +36,28 @@ export interface Activity {
   type: 'policy' | 'match' | 'member' | 'task'
 }
 
+export interface NotificationMessage {
+  id: string
+  userId: string
+  associationId: string | null
+  notificationType: string
+  title: string
+  body: string
+  resourceType: string | null
+  resourceId: string | null
+  status: string
+  readAt: string | null
+  createdAt: string
+  deliveredAt: string | null
+}
+
+export interface NotificationMessagePage {
+  items: NotificationMessage[]
+  total: number
+  page: number
+  size: number
+}
+
 export interface MemberEnterprise {
   id: string
   name: string

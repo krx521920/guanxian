@@ -225,6 +225,31 @@ describe('member ETag API contract', () => {
     )
   })
 
+  it('uses the notification message and read acknowledgement contracts', async () => {
+    const message = {
+      id: 'notification /一', userId: 'user-1', associationId: null, notificationType: 'POLICY',
+      title: '政策更新', body: '政策内容已更新', resourceType: 'POLICY_DOCUMENT', resourceId: null,
+      status: 'DELIVERED', readAt: null, createdAt: '2026-08-31T00:00:00Z', deliveredAt: null,
+    }
+    const page = { items: [message], total: 1, page: 0, size: 20 }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: page }))
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: { ...message, status: 'READ', readAt: '2026-08-31T01:00:00Z' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await expect(platformApi.notificationMessages(true)).resolves.toEqual(page)
+    await expect(platformApi.markNotificationRead(message.id)).resolves.toMatchObject({ status: 'READ' })
+
+    expect(fetchMock.mock.calls.map(([url, init]) => ({
+      url,
+      method: (init as RequestInit).method ?? 'GET',
+    }))).toEqual([
+      { url: '/api/v1/notifications/messages?unreadOnly=true&page=0&size=20', method: 'GET' },
+      { url: '/api/v1/notifications/messages/notification%20%2F%E4%B8%80/read', method: 'PUT' },
+    ])
+  })
+
   it('uses exact create, review, preview and template contracts', async () => {
     const created = { ...profile, version: 0 }
     const reviewed = { ...profile, version: 1 }

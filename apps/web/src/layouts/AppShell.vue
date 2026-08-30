@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView } from 'vue-router'
 import NavIcon from '../components/NavIcon.vue'
+import NotificationPopover from '../components/NotificationPopover.vue'
 import { navigationForRole } from '../config/navigation'
 import { useAuth } from '../services/auth'
 import type { UserRole } from '../types/domain'
@@ -12,11 +13,15 @@ const auth = useAuth()
 const mobileOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const profileOpen = ref(false)
+const notificationOpen = ref(false)
+const notificationUnreadCount = ref(0)
 const roleMenuOpen = ref(false)
 const themeMenuOpen = ref(false)
 const appearanceMenuOpen = ref(false)
 const profileButtonRef = ref<HTMLElement | null>(null)
 const profileMenuRef = ref<HTMLElement | null>(null)
+const notificationButtonRef = ref<HTMLElement | null>(null)
+const notificationPopoverRef = ref<HTMLElement | null>(null)
 const primaryTheme = ref('teal')
 const neutralTheme = ref('slate')
 const appearance = ref<'light' | 'dark'>('light')
@@ -61,6 +66,7 @@ function switchRole(role: UserRole) {
 
 function toggleProfile() {
   profileOpen.value = !profileOpen.value
+  if (profileOpen.value) notificationOpen.value = false
   if (!profileOpen.value) {
     roleMenuOpen.value = false
     themeMenuOpen.value = false
@@ -68,11 +74,20 @@ function toggleProfile() {
   }
 }
 
+function toggleNotification() {
+  notificationOpen.value = !notificationOpen.value
+  if (notificationOpen.value) closeProfile()
+}
+
 function closeProfile() {
   profileOpen.value = false
   roleMenuOpen.value = false
   themeMenuOpen.value = false
   appearanceMenuOpen.value = false
+}
+
+function closeNotification() {
+  notificationOpen.value = false
 }
 
 function applyPreferences() {
@@ -101,14 +116,24 @@ function setAppearance(value: 'light' | 'dark') {
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
-  if (!profileOpen.value) return
   const target = event.target as Node
-  if (profileButtonRef.value?.contains(target) || profileMenuRef.value?.contains(target)) return
-  closeProfile()
+  if (
+    profileOpen.value
+    && !profileButtonRef.value?.contains(target)
+    && !profileMenuRef.value?.contains(target)
+  ) closeProfile()
+  if (
+    notificationOpen.value
+    && !notificationButtonRef.value?.contains(target)
+    && !notificationPopoverRef.value?.contains(target)
+  ) closeNotification()
 }
 
 function handleDocumentKeyDown(event: KeyboardEvent) {
-  if (event.key === 'Escape') closeProfile()
+  if (event.key === 'Escape') {
+    closeProfile()
+    closeNotification()
+  }
 }
 
 onMounted(() => {
@@ -130,6 +155,7 @@ onBeforeUnmount(() => {
 
 async function logout() {
   closeProfile()
+  closeNotification()
   await auth.logout()
   if (auth.isDemoMode) await router.push('/login')
 }
@@ -164,9 +190,24 @@ async function logout() {
           <span class="avatar">{{ initials }}</span>
           <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
         </button>
-        <button class="icon-button notification-button" type="button" aria-label="消息通知">
-          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i />
+        <button
+          ref="notificationButtonRef"
+          class="icon-button notification-button"
+          type="button"
+          aria-label="消息通知"
+          aria-haspopup="dialog"
+          :aria-expanded="notificationOpen"
+          @click="toggleNotification"
+        >
+          <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><i v-if="notificationUnreadCount > 0" />
         </button>
+        <div v-if="notificationOpen" ref="notificationPopoverRef" class="notification-popover-shell">
+          <NotificationPopover
+            :open="notificationOpen"
+            @close="closeNotification"
+            @unread-count="notificationUnreadCount = $event"
+          />
+        </div>
         <div v-if="profileOpen" ref="profileMenuRef" class="profile-menu">
           <div class="profile-menu-user">
             <span class="avatar">{{ initials }}</span>
