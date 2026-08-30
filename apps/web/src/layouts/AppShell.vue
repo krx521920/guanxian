@@ -13,8 +13,27 @@ const mobileOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const profileOpen = ref(false)
 const roleMenuOpen = ref(false)
+const themeMenuOpen = ref(false)
+const appearanceMenuOpen = ref(false)
 const profileButtonRef = ref<HTMLElement | null>(null)
 const profileMenuRef = ref<HTMLElement | null>(null)
+const primaryTheme = ref('teal')
+const neutralTheme = ref('slate')
+const appearance = ref<'light' | 'dark'>('light')
+
+const primaryThemes = [
+  { value: 'teal', label: '青绿', color: '#126b68' },
+  { value: 'blue', label: '蓝色', color: '#2563eb' },
+  { value: 'violet', label: '紫色', color: '#7c3aed' },
+  { value: 'orange', label: '橙色', color: '#ea580c' },
+  { value: 'rose', label: '玫红', color: '#e11d48' }
+]
+const neutralThemes = [
+  { value: 'slate', label: '蓝灰', color: '#64748b' },
+  { value: 'gray', label: '灰色', color: '#6b7280' },
+  { value: 'zinc', label: '锌灰', color: '#71717a' },
+  { value: 'stone', label: '暖灰', color: '#78716c' }
+]
 
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
@@ -42,12 +61,43 @@ function switchRole(role: UserRole) {
 
 function toggleProfile() {
   profileOpen.value = !profileOpen.value
-  if (!profileOpen.value) roleMenuOpen.value = false
+  if (!profileOpen.value) {
+    roleMenuOpen.value = false
+    themeMenuOpen.value = false
+    appearanceMenuOpen.value = false
+  }
 }
 
 function closeProfile() {
   profileOpen.value = false
   roleMenuOpen.value = false
+  themeMenuOpen.value = false
+  appearanceMenuOpen.value = false
+}
+
+function applyPreferences() {
+  const root = document.documentElement
+  root.dataset.primary = primaryTheme.value
+  root.dataset.neutral = neutralTheme.value
+  root.dataset.appearance = appearance.value
+}
+
+function setPrimaryTheme(value: string) {
+  primaryTheme.value = value
+  localStorage.setItem('guanxian-primary-theme', value)
+  applyPreferences()
+}
+
+function setNeutralTheme(value: string) {
+  neutralTheme.value = value
+  localStorage.setItem('guanxian-neutral-theme', value)
+  applyPreferences()
+}
+
+function setAppearance(value: 'light' | 'dark') {
+  appearance.value = value
+  localStorage.setItem('guanxian-appearance', value)
+  applyPreferences()
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
@@ -62,6 +112,13 @@ function handleDocumentKeyDown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  const savedPrimary = localStorage.getItem('guanxian-primary-theme')
+  const savedNeutral = localStorage.getItem('guanxian-neutral-theme')
+  const savedAppearance = localStorage.getItem('guanxian-appearance')
+  if (primaryThemes.some((item) => item.value === savedPrimary)) primaryTheme.value = savedPrimary!
+  if (neutralThemes.some((item) => item.value === savedNeutral)) neutralTheme.value = savedNeutral!
+  if (savedAppearance === 'light' || savedAppearance === 'dark') appearance.value = savedAppearance
+  applyPreferences()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   document.addEventListener('keydown', handleDocumentKeyDown)
 })
@@ -151,16 +208,74 @@ async function logout() {
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
               <span>设置</span>
             </button>
-            <button class="profile-menu-item" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 1 10-10c0 2.76-2.24 5-5 5h-1.8c-.74 0-1.2.8-.82 1.43l.3.5c.44.73-.09 1.67-.94 1.67H12Z"/><circle cx="7.5" cy="10.5" r=".5"/><circle cx="10.5" cy="7.5" r=".5"/><circle cx="14" cy="7" r=".5"/><circle cx="17" cy="10" r=".5"/></svg>
-              <span>主题</span>
-              <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
-            <button class="profile-menu-item" type="button">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5L7 22l-5-5Z"/><path d="m14 5 1.5-1.5M6 3v4M4 5h4M19 13v4M17 15h4"/></svg>
-              <span>外观</span>
-              <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
+            <div
+              class="profile-menu-item-wrap"
+              @mouseenter="themeMenuOpen = true"
+              @mouseleave="themeMenuOpen = false"
+            >
+              <button class="profile-menu-item" type="button" aria-haspopup="menu" :aria-expanded="themeMenuOpen" @click="themeMenuOpen = true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22a10 10 0 1 1 10-10c0 2.76-2.24 5-5 5h-1.8c-.74 0-1.2.8-.82 1.43l.3.5c.44.73-.09 1.67-.94 1.67H12Z"/><circle cx="7.5" cy="10.5" r=".5"/><circle cx="10.5" cy="7.5" r=".5"/><circle cx="14" cy="7" r=".5"/><circle cx="17" cy="10" r=".5"/></svg>
+                <span>主题</span>
+                <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+              <div v-if="themeMenuOpen" class="profile-submenu theme-submenu" role="menu">
+                <div class="theme-option-group">
+                  <span>主色</span>
+                  <div class="theme-swatches">
+                    <button
+                      v-for="item in primaryThemes"
+                      :key="item.value"
+                      class="theme-swatch"
+                      :class="{ active: primaryTheme === item.value }"
+                      type="button"
+                      :title="item.label"
+                      :aria-label="`主色：${item.label}`"
+                      :style="{ '--swatch': item.color }"
+                      @click="setPrimaryTheme(item.value)"
+                    />
+                  </div>
+                </div>
+                <div class="theme-option-group">
+                  <span>中性色</span>
+                  <div class="theme-swatches">
+                    <button
+                      v-for="item in neutralThemes"
+                      :key="item.value"
+                      class="theme-swatch"
+                      :class="{ active: neutralTheme === item.value }"
+                      type="button"
+                      :title="item.label"
+                      :aria-label="`中性色：${item.label}`"
+                      :style="{ '--swatch': item.color }"
+                      @click="setNeutralTheme(item.value)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              class="profile-menu-item-wrap"
+              @mouseenter="appearanceMenuOpen = true"
+              @mouseleave="appearanceMenuOpen = false"
+            >
+              <button class="profile-menu-item" type="button" aria-haspopup="menu" :aria-expanded="appearanceMenuOpen" @click="appearanceMenuOpen = true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 4 5 5L7 22l-5-5Z"/><path d="m14 5 1.5-1.5M6 3v4M4 5h4M19 13v4M17 15h4"/></svg>
+                <span>外观</span>
+                <svg class="menu-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+              <div v-if="appearanceMenuOpen" class="profile-submenu" role="menu">
+                <button class="profile-submenu-item" type="button" role="menuitem" @click="setAppearance('light')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+                  <span>浅色</span>
+                  <svg v-if="appearance === 'light'" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                </button>
+                <button class="profile-submenu-item" type="button" role="menuitem" @click="setAppearance('dark')">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+                  <span>深色</span>
+                  <svg v-if="appearance === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>
+                </button>
+              </div>
+            </div>
           </div>
           <button class="profile-menu-item logout-item" type="button" @click="logout">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
