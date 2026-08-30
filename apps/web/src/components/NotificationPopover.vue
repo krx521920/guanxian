@@ -16,9 +16,10 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const activeTab = ref<NotificationTab>('all')
-const items = ref<NotificationMessage[]>([])
 const fallbackItems = ref(notificationSamples.map((item) => ({ ...item })))
+const items = ref<NotificationMessage[]>(fallbackItems.value.map((item) => ({ ...item })))
 const loading = ref(false)
+const tabCache = new Map<NotificationTab, NotificationMessage[]>()
 let requestSequence = 0
 
 const tabs: Array<{ value: NotificationTab; label: string }> = [
@@ -66,15 +67,22 @@ async function refreshUnreadCount() {
 async function loadNotifications() {
   if (!props.open) return
   const sequence = ++requestSequence
-  loading.value = true
+  const requestedTab = activeTab.value
+  const cachedItems = tabCache.get(requestedTab)
+  items.value = cachedItems || fallbackFor(requestedTab)
+  loading.value = items.value.length === 0
   try {
-    const page = await platformApi.notificationMessages(activeTab.value === 'unread')
+    const page = await platformApi.notificationMessages(requestedTab === 'unread')
     if (sequence !== requestSequence) return
-    items.value = page.items.length > 0 ? page.items : fallbackFor(activeTab.value)
-    if (activeTab.value === 'unread') emit('unreadCount', page.total || fallbackFor('unread').length)
+    const nextItems = page.items.length > 0 ? page.items : fallbackFor(requestedTab)
+    tabCache.set(requestedTab, nextItems)
+    if (activeTab.value === requestedTab) items.value = nextItems
+    if (requestedTab === 'unread') emit('unreadCount', page.total || fallbackFor('unread').length)
   } catch {
     if (sequence !== requestSequence) return
-    items.value = fallbackFor(activeTab.value)
+    const nextItems = fallbackFor(requestedTab)
+    tabCache.set(requestedTab, nextItems)
+    if (activeTab.value === requestedTab) items.value = nextItems
     emitFallbackUnreadCount()
   } finally {
     if (sequence === requestSequence) loading.value = false
@@ -107,6 +115,9 @@ async function openNotification(item: NotificationMessage) {
     try {
       const updated = await platformApi.markNotificationRead(item.id)
       items.value = items.value.map((value) => value.id === updated.id ? updated : value)
+      tabCache.forEach((values, tab) => {
+        tabCache.set(tab, values.map((value) => value.id === updated.id ? updated : value))
+      })
       await refreshUnreadCount()
     } catch {
       const readAt = new Date().toISOString()
@@ -116,6 +127,11 @@ async function openNotification(item: NotificationMessage) {
       items.value = items.value.map((value) => value.id === item.id
         ? { ...value, status: 'READ', readAt }
         : value)
+      tabCache.forEach((values, tab) => {
+        tabCache.set(tab, values.map((value) => value.id === item.id
+          ? { ...value, status: 'READ', readAt }
+          : value))
+      })
       emitFallbackUnreadCount()
     }
   }
@@ -148,7 +164,7 @@ onMounted(refreshUnreadCount)
     </header>
 
     <div class="notification-list" aria-live="polite">
-      <div v-if="loading" class="notification-state">正在加载通知…</div>
+      <div v-if="loading && visibleItems.length === 0" class="notification-state">正在加载通知…</div>
       <div v-else-if="visibleItems.length === 0" class="notification-state">
         {{ activeTab === 'unread' ? '暂无未读通知' : activeTab === 'archived' ? '暂无已归档通知' : '暂无通知' }}
       </div>
