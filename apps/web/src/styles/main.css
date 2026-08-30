@@ -121,7 +121,7 @@ h1, h2, h3, p { margin-top: 0; }
 .theme-swatch:hover { transform: scale(1.08); }
 .theme-swatch.active { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--primary); }
 .profile-menu-item.logout-item { border-top: 1px solid var(--line); border-radius: 0 0 6px 6px; color: #a34c4c; }
-.page-container { max-width: 1560px; margin: 0 auto; padding: 30px 32px 48px; }
+.page-container { max-width: 1560px; margin: 0 auto; padding: 30px 24px 48px; }
 
 @media (min-width: 781px) {
   .sidebar-collapsed .sidebar { width: 72px; }
@@ -382,7 +382,7 @@ h1, h2, h3, p { margin-top: 0; }
 
 .page-container {
   max-width: 1520px;
-  padding: 28px 32px 52px;
+  padding: 28px 24px 52px;
 }
 
 .page-heading {
