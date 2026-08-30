@@ -18,7 +18,7 @@ services/
   ai/           FastAPI 独立 AI 能力服务
 infra/
   postgres/     PostgreSQL 初始化脚本
-tests/          正反向、模糊、压力、渗透与故障注入工具
+tests/          常规功能、权限、数据隔离、身份协议与运行时验收工具
 docs/
   architecture.md  软件架构与模块边界
 compose.yaml    本地 PostgreSQL、Redis、MinIO 编排
@@ -63,10 +63,10 @@ docker compose --profile app up --build -d
 
 容器模式默认从 `http://localhost:8081` 访问。执行 `./scripts/verify.ps1` 可统一校验 Compose、Web、AI 服务和 Java 后端。
 
-## 测试与安全验证
+## 测试与质量验证
 
-仓库已配置单元/集成、反向与异常、变异、OpenAPI 模糊、k6 高压、OWASP ZAP 渗透基线、Trivy 供应链扫描和 Toxiproxy 故障注入。所有主动测试脚本默认只允许本机或 Compose 内部服务地址，避免误扫外部系统。
+仓库默认只执行单元测试、集成测试、权限与数据隔离回归、类型检查和构建。变异测试与隔离的 OIDC/PKCE 验收仅可手动触发；模糊请求、高压/负载、ZAP 主动扫描和网络故障注入已退出 CI，不得重新加入自动或手动工作流。
 
-快速入口和本轮实测结果见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，耗时和主动扫描任务按周或手动执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
+快速入口和当前可复验基线见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，手动质量检查执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
 
 > 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、执行 V1–V12 迁移/恢复演练，并用协会真实语料完成效果和费用验收。

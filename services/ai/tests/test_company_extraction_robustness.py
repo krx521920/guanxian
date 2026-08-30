@@ -1,3 +1,4 @@
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -119,6 +120,7 @@ def test_extract_rejects_malformed_json(client):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
+@pytest.mark.fuzz
 @given(text=SAFE_TEXT)
 @settings(max_examples=50, deadline=None, derandomize=True)
 def test_extraction_fuzz_is_deterministic_bounded_and_deduplicated(text):

@@ -28,17 +28,18 @@ dev = [
 include = ["app*"]
 
 [tool.pytest.ini_options]
-addopts = "-q --disable-warnings -m 'not stress'"
+addopts = "-q --disable-warnings -m 'not stress and not fuzz'"
 testpaths = ["tests"]
 pythonpath = ["."]
 markers = [
+  "fuzz: opt-in generated-input tests excluded from project automation",
   "stress: opt-in high-load and concurrency tests",
 ]
 
 [tool.mutmut]
 source_paths = ["app/"]
 only_mutate = ["app/services/*"]
-pytest_add_cli_args = ["-q", "-m", "not stress"]
+pytest_add_cli_args = ["-q", "-m", "not stress and not fuzz"]
 pytest_add_cli_args_test_selection = ["tests/"]
 mutate_only_covered_lines = true
 

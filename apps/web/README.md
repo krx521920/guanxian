@@ -87,7 +87,7 @@ npm run mutation
 
 - 正向测试：验证标准 API 包装解包、直接 JSON 响应、安全请求 ID 传播、异步资源成功与重试恢复、五类账号登录及其默认工作台、各身份可见导航。
 - 反向测试：验证企业账号不可见协会工作台与采集功能、企业业务人员不能编辑、企业管理员只能维护绑定企业、缺少角色声明时默认拒绝，且网络错误不会生成任何伪数据。
-- 异常测试：验证 HTTP 4xx/5xx、HTTP 200 但业务码失败、无效 JSON/错误码类型、缺少 `data`、不安全/重复请求 ID、页面安全错误映射、重试去重、卸载后晚到结果、超时与取消竞态、并发请求隔离、伪造会话和浏览器存储被禁用。
+- 错误合同测试：验证 HTTP 4xx/5xx、业务码失败、无效响应、请求 ID、页面错误映射、重试去重、卸载后晚到结果、超时与取消竞态、并发请求隔离和失效会话清理。
 
 主要测试文件：
 
@@ -98,9 +98,12 @@ npm run mutation
 | `src/services/auth.test.ts` | 演示模式登录、身份切换、退出、角色白名单、旧会话清理和存储异常 |
 | `src/services/auth-oidc.test.ts` | OIDC 配置、回调校验、后端身份映射、令牌过期、开放重定向防护和退出 |
 | `src/services/platform-api.test.ts` | 强 ETag/If-Match、所有会员采集端点的精确路径与方法、multipart 边界、模板下载、批次提交、412 冲突和网络失败传递 |
+| `src/services/workflow-api.test.ts` | 匹配邀请、应答、洽谈、反馈、成果和协作接口合同 |
 | `src/config/navigation.test.ts` | 五类身份的默认工作台、正向授权与反向隔离 |
 | `src/router/permissions.test.ts` | 受保护页面显式角色声明与默认拒绝基础 |
 | `src/views/policy-display.test.ts` | 政策施行日期为空时的安全展示 |
+| `src/views/business-form.test.ts` | 业务表单状态、日期和错误消息转换 |
+| `src/views/interaction-contract.test.ts` | 原生按钮行为、生产 API 去模拟数据和匹配全流程入口 |
 
 ### 变异测试
 
@@ -120,7 +123,7 @@ npm run mutation
 
 质量阈值为：80 分以上绿色、60–79.99 分黄色、低于 60 分红色，低于 50 分时命令失败。变异测试比普通单元测试耗时明显更长，适合在提交合并前或 CI 的独立质量任务中运行；日常开发优先运行 `npm run test`。
 
-当前基线（2026-08-26）：125 项 Vitest 测试全部通过。Stryker 变异评分以最新一次 `npm run mutation` 输出及本地 `reports/mutation/` 产物为准。
+当前基线（2026-08-30）：11 个测试文件、137 项 Vitest 测试全部通过。最近一次 Stryker 报告生成于 2026-08-26，共 937 个变异体，其中 664 个被杀死、79 个存活、194 个无覆盖；只能将与当前提交对应的报告作为质量依据。
 
 如只想排查一个测试文件，可执行：
 

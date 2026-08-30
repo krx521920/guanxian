@@ -1,27 +1,13 @@
 # 测试工具快速入口
 
-所有主动请求脚本都会加载 `common/SafeTarget.psm1`，只允许 `localhost`、回环地址和 Compose 内部服务名。请只对本仓库的本地或隔离测试环境执行。
+默认验证范围只包含常规功能、权限拒绝、数据隔离、身份协议和运行时契约。模糊请求、高压/负载、ZAP 主动扫描和网络故障注入已退出 CI 与项目执行入口。
 
 ```powershell
-# 常规正向、反向、异常和集成测试
+# 常规功能、权限、数据隔离和集成测试
 ./scripts/verify.ps1
 
-# 启动后端与 AI 服务，验证鉴权、匹配、安全头、请求追踪和 ETag 乐观并发
+# 启动后端与 AI 服务，验证鉴权、匹配、请求追踪和 ETag 乐观并发
 ./tests/smoke/runtime-smoke.ps1
-
-# OpenAPI 结构感知模糊测试（AI 服务需监听 18001）
-./tests/fuzz/run-schemathesis.ps1 -MaxExamples 50
-
-# k6：smoke / load / stress（业务后端需监听 18080）
-./tests/performance/run-k6.ps1 -Profile smoke
-./tests/performance/run-k6.ps1 -Profile stress
-
-# ZAP：Web 被动基线 / OpenAPI 主动扫描（需要 Docker）
-./tests/security/run-zap.ps1 -Mode baseline -Target http://127.0.0.1:8081
-./tests/security/run-zap.ps1 -Mode api -Target http://127.0.0.1:18001/openapi.json
-
-# AI 依赖延迟故障注入（需要 Docker Compose）
-./tests/resilience/run-toxiproxy.ps1
 ```
 
 变异测试分别执行：
@@ -32,4 +18,4 @@ Push-Location apps/web; npm run mutation; Pop-Location
 Push-Location services/ai; ./scripts/run_mutation.ps1; Pop-Location
 ```
 
-详细前置条件、阈值、覆盖矩阵、报告路径和本轮实测基线见 `docs/testing-guide.md`。
+详细前置条件、覆盖矩阵、报告路径和本轮实测基线见 `docs/testing-guide.md`。仓库中遗留的主动测试脚本仅作为历史材料保留，不属于批准的执行范围，也不得由 CI、自动化或开发流程调用。

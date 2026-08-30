@@ -1,3 +1,4 @@
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -129,6 +130,7 @@ def test_policy_qa_prompt_injection_cannot_enable_model_or_escape_documents(clie
     assert "<script>" not in body["answer"]
 
 
+@pytest.mark.fuzz
 @given(question=SAFE_TEXT, content=SAFE_TEXT, top_k=st.integers(min_value=1, max_value=10))
 @settings(max_examples=60, deadline=None, derandomize=True)
 def test_policy_qa_fuzz_is_deterministic_bounded_and_source_grounded(

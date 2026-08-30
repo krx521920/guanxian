@@ -27,7 +27,7 @@ mvn clean verify
 mvn -pl bootstrap -am spring-boot:run
 ```
 
-应用启动时由 Flyway 按顺序执行 V1–V3：基础结构、会员档案扩展、OIDC 数据域/审计/批量导入。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移；迁移使用幂等 DDL，并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+应用启动时由 Flyway 按顺序执行 V1–V12，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除及知识向量持久化。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移；迁移使用幂等 DDL，并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
 
 生产默认 `GUANXIAN_SECURITY_MODE=jwt`。必须配置：
 
@@ -141,7 +141,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-当前基线（2026-08-21）：常规 `verify` 发现 84 项测试，83 项通过，1 项 PostgreSQL/Testcontainers 迁移测试因本机 Docker 不可用而明确跳过；其余失败和错误均为 0。完整 PIT 对 576 个变异体进行验证，杀死 379 个、存活 108 个、无覆盖 89 个，变异得分 65.80%，已覆盖代码的测试强度为 77.82%。权限策略的存活变异已清零；剩余低分主要集中在本机未执行的 PostgreSQL 适配器、XLSX 防御分支及部分基础展示代码。CI 必须提供 Docker 并把迁移测试作为门禁，PIT 报告以本次 `bootstrap/target/pit-reports/` 产物为准。
+当前可读取基线（2026-08-29）：Maven reactor 共生成 45 份 Surefire 报告，173 项测试全部通过，失败、错误和跳过均为 0；其中 `bootstrap` 模块 110 项。真实 PostgreSQL/Testcontainers 共 5 类、10 项，均未跳过。PIT 分数只能引用与当前提交对应的 `bootstrap/target/pit-reports/` 产物，历史分数不得冒充当前结果。
 
 ## Docker
 
@@ -154,7 +154,7 @@ docker run --rm -p 8080:8080 guanxian-server:dev
 ## 下一阶段
 
 1. 将系统管理员的账号绑定接口接入管理页面，并补充绑定停用、离职回收与双人复核。
-2. 在实际 PostgreSQL/Docker 环境执行 V3 迁移演练、备份恢复和批量导入容量测试。
+2. 在实际 PostgreSQL/Docker 环境复验 V1–V12 迁移、备份恢复和批量导入功能合同。
 3. 为会员资料增加附件对象存储、病毒扫描、数据质量评分和导入批次撤销策略。
 4. 将 `ai-adapter` 的规则实现替换为 AI 服务 HTTP 客户端，加入超时、重试、熔断与人工确认。
 5. 将协作事项升级为需求受理、推荐确认、沟通跟进、结果反馈的状态机。
