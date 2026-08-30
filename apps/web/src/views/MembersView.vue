@@ -134,7 +134,7 @@ onMounted(load)
       <template v-if="canCollect">
         <button class="secondary-button" :disabled="importBusy" @click="downloadTemplate">下载调查模板</button>
         <button class="secondary-button" :disabled="importBusy" @click="chooseImportFile">批量导入</button>
-        <button class="primary-button create-member-button" type="button" @click="openCreatePanel"><Plus aria-hidden="true" /><span>新增会员企业</span></button>
+        <button class="primary-button icon-label-button" type="button" @click="openCreatePanel"><Plus aria-hidden="true" /><span>新增会员企业</span></button>
         <input ref="fileInput" class="visually-hidden" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="previewFile" />
       </template>
     </PageHeader>

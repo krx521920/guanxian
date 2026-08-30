@@ -195,7 +195,6 @@ async function logout() {
         <div><strong>管线智联</strong><small>AI 管理协作平台</small></div>
       </div>
 
-      <div class="nav-section-label">工作空间</div>
       <nav class="main-nav">
         <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" @click="mobileOpen = false">
           <NavIcon :name="item.icon" />

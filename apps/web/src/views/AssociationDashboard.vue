@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { Building2, ClipboardCheck, GitCompareArrows, ScrollText } from '@lucide/vue'
+import { Building2, ClipboardCheck, GitCompareArrows, Plus, ScrollText } from '@lucide/vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import MetricCard from '../components/MetricCard.vue'
 import PageHeader from '../components/PageHeader.vue'
@@ -32,7 +32,7 @@ function displayActivityTime(value: string): string {
   <div class="association-page">
     <PageHeader title="协会工作台" description="掌握会员动态、行业资源与生态协作全局">
       <button class="secondary-button">导入企业资料</button>
-      <button class="primary-button">+ 发布协会事项</button>
+      <button class="primary-button icon-label-button" type="button"><Plus aria-hidden="true" /><span>发布协会事项</span></button>
     </PageHeader>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="data">

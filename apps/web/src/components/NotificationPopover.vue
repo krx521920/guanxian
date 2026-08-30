@@ -193,25 +193,25 @@ onMounted(refreshUnreadCount)
 </template>
 
 <style scoped>
-.notification-popover { min-height: 438px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--panel); box-shadow: 0 18px 48px rgba(14, 28, 45, .24); }
-.notification-tabs { height: 58px; padding: 0 16px; border-bottom: 1px solid var(--line); display: flex; align-items: stretch; gap: 24px; }
+.notification-popover { overflow: hidden; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--panel); box-shadow: 0 18px 48px rgba(14, 28, 45, .24); }
+.notification-tabs { height: 52px; padding: 0 14px; border-bottom: 1px solid var(--line); display: flex; align-items: stretch; gap: 24px; }
 .notification-tabs button { position: relative; padding: 0 2px; border: 0; color: var(--muted); background: transparent; font-size: 13px; font-weight: 650; }
 .notification-tabs button::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; }
 .notification-tabs button.active { color: var(--ink); }
 .notification-tabs button.active::after { background: var(--primary); }
-.notification-list { height: 380px; overflow-y: auto; overscroll-behavior: contain; }
-.notification-item { width: 100%; min-height: 94px; padding: 16px; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); background: transparent; display: grid; grid-template-columns: 36px minmax(0, 1fr) 8px; gap: 12px; align-items: start; text-align: left; transition: background-color .16s ease; }
+.notification-list { max-height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.notification-item { width: 100%; min-height: 76px; padding: 11px 14px; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); background: transparent; display: grid; grid-template-columns: 32px minmax(0, 1fr) 8px; gap: 10px; align-items: start; text-align: left; transition: background-color .16s ease; }
 .notification-item:last-child { border-bottom: 0; }
 .notification-item:hover { background: var(--surface-hover); }
 .notification-item.unread { background: color-mix(in srgb, var(--primary-soft) 42%, var(--panel)); }
 .notification-item.unread:hover { background: color-mix(in srgb, var(--primary-soft) 64%, var(--panel)); }
-.notification-type-icon { width: 34px; height: 34px; border-radius: 9px; color: var(--primary); background: var(--primary-soft); display: grid; place-items: center; }
+.notification-type-icon { width: 32px; height: 32px; border-radius: 8px; color: var(--primary); background: var(--primary-soft); display: grid; place-items: center; }
 .notification-type-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.notification-copy { min-width: 0; display: grid; gap: 5px; }
+.notification-copy { min-width: 0; display: grid; gap: 3px; }
 .notification-copy strong { overflow: hidden; color: var(--ink); font-size: 12px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
 .notification-copy > span { overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
 .notification-copy time { color: #929dab; font-size: 9.5px; }
 .unread-indicator { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--primary); }
-.notification-state { min-height: 380px; padding: 28px; color: var(--muted); display: grid; place-content: center; gap: 12px; text-align: center; font-size: 12px; }
+.notification-state { min-height: 220px; padding: 28px; color: var(--muted); display: grid; place-content: center; gap: 12px; text-align: center; font-size: 12px; }
 .notification-state button { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--primary); background: var(--panel); }
 </style>
