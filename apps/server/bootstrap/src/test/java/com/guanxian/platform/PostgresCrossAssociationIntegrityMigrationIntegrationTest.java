@@ -46,6 +46,8 @@ class PostgresCrossAssociationIntegrityMigrationIntegrationTest {
             UUID.fromString("7a000000-0000-0000-0000-000000000006");
     private static final UUID ENTERPRISE_B =
             UUID.fromString("7a000000-0000-0000-0000-000000000007");
+    private static final UUID ENTERPRISE_B_CANDIDATE =
+            UUID.fromString("7a000000-0000-0000-0000-00000000000b");
     private static final UUID DEMAND_B =
             UUID.fromString("7a000000-0000-0000-0000-000000000008");
     private static final UUID MATCH_B =
@@ -627,8 +629,10 @@ class PostgresCrossAssociationIntegrityMigrationIntegrationTest {
         jdbc.update("""
                 INSERT INTO enterprise (id, association_id, name, category, status)
                 VALUES (?, ?, 'V17测试企业甲', '测试企业', 'ACTIVE'),
-                       (?, ?, 'V17测试企业乙', '测试企业', 'ACTIVE')
-                """, ENTERPRISE_A, ASSOCIATION_A, ENTERPRISE_B, ASSOCIATION_B);
+                       (?, ?, 'V17测试企业乙', '测试企业', 'ACTIVE'),
+                       (?, ?, 'V17测试企业乙候选', '测试企业', 'ACTIVE')
+                """, ENTERPRISE_A, ASSOCIATION_A, ENTERPRISE_B, ASSOCIATION_B,
+                ENTERPRISE_B_CANDIDATE, ASSOCIATION_B);
         jdbc.update("""
                 INSERT INTO cooperation_demand
                   (id, enterprise_id, title, description, status)
@@ -640,7 +644,7 @@ class PostgresCrossAssociationIntegrityMigrationIntegrationTest {
                   (id, demand_id, candidate_enterprise_id, score, explanation, review_status)
                 VALUES (?, ?, ?, 80, '{}'::jsonb, 'PENDING'),
                        (?, ?, ?, 82, '{}'::jsonb, 'PENDING')
-                """, MATCH_B, DEMAND_B, ENTERPRISE_B,
+                """, MATCH_B, DEMAND_B, ENTERPRISE_B_CANDIDATE,
                 MATCH_WITH_SOURCE_CANDIDATE, DEMAND_B, ENTERPRISE_A);
     }
 
@@ -650,9 +654,7 @@ class PostgresCrossAssociationIntegrityMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .defaultSchema(schema)
                 .schemas(schema);
-        if (target != null) {
-            configuration.target(target);
-        }
+        configuration.target(target == null ? MigrationVersion.fromVersion("17") : target);
         return configuration.load();
     }
 

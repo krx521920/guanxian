@@ -30,6 +30,11 @@ class EcosystemSystemContextScopeTest {
                 ENTERPRISE_A1, demand("A协会需求"), ownerA);
         DemandView demandB = catalog.createDemand(
                 ENTERPRISE_B1, demand("B协会需求"), ownerB);
+        catalog.createOffering(
+                ENTERPRISE_A2,
+                new OfferingUpsertRequest(
+                        "A协会供应", "SERVICE", "供应说明", List.of(), List.of(), "MEMBERS"),
+                enterprise(ASSOCIATION_A, ENTERPRISE_A2));
 
         ActorScope globalSystem = system(null, null);
         ActorScope systemA = system(ASSOCIATION_A, null);
@@ -55,7 +60,7 @@ class EcosystemSystemContextScopeTest {
 
         assertEquals(2, matches.list(globalSystem).size());
         assertEquals(List.of(matchA), matches.list(systemA));
-        assertEquals(List.of(matchA), matches.list(systemACandidate));
+        assertTrue(matches.list(systemACandidate).isEmpty());
         assertTrue(matches.find(matchB.id(), systemA).isEmpty());
         ApiException matchContext = assertThrows(ApiException.class, () ->
                 matches.upsert(demandA, List.of(candidate(ENTERPRISE_A2, "A供应企业")), globalSystem));
@@ -65,6 +70,9 @@ class EcosystemSystemContextScopeTest {
         assertThrows(ForbiddenException.class, () ->
                 matches.upsert(demandA, List.of(candidate(ENTERPRISE_A2, "A供应企业")), systemACandidate));
         assertTrue(matches.recommend(matchB.id(), matchB.version(), systemA).isEmpty());
+        PersistedMatchView recommendedA = matches.recommend(
+                matchA.id(), matchA.version(), systemA).orElseThrow();
+        assertEquals(List.of(recommendedA), matches.list(systemACandidate));
         assertTrue(matches.confirm(
                 matchA.id(), matchA.version(), ENTERPRISE_A2, ownerA).isEmpty());
 
@@ -94,11 +102,11 @@ class EcosystemSystemContextScopeTest {
         assertEquals("ACCEPTED", workflow.respondInvitation(
                 invitationA.id(), invitationA.version(), true, null, systemACandidate)
                 .orElseThrow().status());
-        assertThrows(ForbiddenException.class, () -> workflow.addNegotiation(
+        assertEquals("INITIAL_CONTACT", workflow.addNegotiation(
                 matchA.id(), ASSOCIATION_A, null,
-                new NegotiationRequest("INITIAL_CONTACT", "联系", null, null), systemA));
+                new NegotiationRequest("INITIAL_CONTACT", "联系", null, null), systemA).stage());
         assertThrows(ForbiddenException.class, () -> workflow.upsertFeedback(
-                matchA.id(), ENTERPRISE_A1,
+                matchA.id(), ENTERPRISE_A1, null,
                 new MatchFeedbackRequest(5, "SUCCESS", null, "反馈"), systemACandidate));
         assertThrows(ForbiddenException.class, () -> workflow.archive(
                 matchB.id(), ASSOCIATION_A,

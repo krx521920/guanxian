@@ -9,7 +9,7 @@
 - 企业工作台：资料完整度、商机、政策提醒和协作概览
 - 会员企业：按数据域检索、状态筛选、调查模板下载、XLSX 逐行预检/提交、新增、编辑、协会审核与 ETag 冲突保护
 - 政策标准：分级筛选、影响摘要与政策列表
-- 生态匹配：匹配依据、推荐理由、匹配状态与供需双方
+- 生态匹配：仅从当前身份可操作的开放需求生成，支持协会推荐、双方确认、定向邀请/应答、逐级洽谈、双方反馈、成果归档与带原因关闭
 - 协作事项：协作闭环、进度、负责人和下一步行动
 
 ## 角色权限
@@ -61,6 +61,14 @@ npm run dev
 | POST | `/api/v1/members/imports/{batchId}/commit` | 只提交预检合法行，统一进入待审核 |
 | GET | `/api/v1/policies` | 政策标准 |
 | GET | `/api/v1/matches` | 生态匹配 |
+| GET | `/api/v1/matches/generation-demands` | 分页读取当前身份真正有权生成匹配的开放需求 |
+| POST | `/api/v1/matches/demand/{demandId}/generate` | 生成并持久化匹配记录；最长等待 60 秒 |
+| POST | `/api/v1/matches/{id}/recommend`、`confirm`、`close` | 携带匹配版本 `If-Match` 推进或关闭 |
+| POST | `/api/v1/matches/{id}/invitations` | 携带匹配版本发送邀请 |
+| POST | `/api/v1/matches/invitations/{id}/respond` | 携带邀请版本应答；过期邀请不能操作 |
+| POST | `/api/v1/matches/{id}/negotiations` | 携带匹配版本按顺序追加洽谈阶段 |
+| POST | `/api/v1/matches/{id}/feedback` | 首次反馈不带版本，更新时携带反馈版本 `If-Match` |
+| POST | `/api/v1/matches/{id}/outcomes` | 双方成功反馈后携带匹配版本归档成果 |
 | GET | `/api/v1/collaborations` | 协作事项 |
 
 
@@ -72,7 +80,7 @@ npm run dev
 
 会员编辑页只接受形如 `"7"` 的强 ETag；接口缺少或返回弱 ETag 时拒绝进入可保存状态。保存成功后替换为响应的新 ETag，收到 412 时要求重新加载，不会静默覆盖其他用户的修改。
 
-协会工作台、企业工作台、会员企业、政策标准、生态匹配和协作事项统一使用 `useAsyncResource` 管理异步页面状态。加载失败时不再永久停留在加载动画，也不会产生未处理 Promise：页面只显示固定的安全中文提示，`ApiRequestError` 额外显示请求编号，普通异常不展示原始消息、响应正文或堆栈。错误态提供“重新加载”；请求尚未结束时的重复点击会复用同一个 Promise，组件卸载后的晚到结果或异常不会再写入 Vue 状态。
+协会工作台、企业工作台、会员企业、政策标准、生态匹配和协作事项均提供明确的加载、失败与重试状态。匹配详情用请求序号隔离晚到结果，组件卸载后不再写入页面；超时写请求会先刷新数据库状态，避免把“响应超时”误报成“业务未保存”。匹配列表当前为前端分页，后端 `GET /matches` 仍返回当前身份可见的完整集合，不宣称数据库分页。
 
 ## 验证
 
@@ -98,12 +106,13 @@ npm run mutation
 | `src/services/auth.test.ts` | 演示模式登录、身份切换、退出、角色白名单、旧会话清理和存储异常 |
 | `src/services/auth-oidc.test.ts` | OIDC 配置、回调校验、后端身份映射、令牌过期、开放重定向防护和退出 |
 | `src/services/platform-api.test.ts` | 强 ETag/If-Match、所有会员采集端点的精确路径与方法、multipart 边界、模板下载、批次提交、412 冲突和网络失败传递 |
-| `src/services/workflow-api.test.ts` | 匹配邀请、应答、洽谈、反馈、成果和协作接口合同 |
+| `src/services/workflow-api.test.ts` | 可生成需求、匹配邀请、应答、洽谈、反馈 ETag、成果和协作接口合同 |
 | `src/config/navigation.test.ts` | 五类身份的默认工作台、正向授权与反向隔离 |
 | `src/router/permissions.test.ts` | 受保护页面显式角色声明与默认拒绝基础 |
 | `src/views/policy-display.test.ts` | 政策施行日期为空时的安全展示 |
-| `src/views/business-form.test.ts` | 业务表单状态、日期和错误消息转换 |
+| `src/views/business-form.test.ts` | 业务表单中文状态、日期、超时与错误消息转换 |
 | `src/views/interaction-contract.test.ts` | 原生按钮行为、生产 API 去模拟数据和匹配全流程入口 |
+| `src/views/match-workflow.test.ts` | 服务端动作许可、洽谈阶段顺序、邀请过期与刷新后安全关闭详情 |
 
 ### 变异测试
 

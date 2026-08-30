@@ -94,16 +94,39 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
-    public void expirePendingInvitations(UUID matchId, ActorScope actor) {
+    public List<MatchInvitationView> expirePendingInvitations(
+            UUID matchId, ActorScope actor) {
         requireMatchWrite(matchId, actor);
-        jdbc.update("""
+        return jdbc.query("""
                 UPDATE match_invitation
                    SET status='EXPIRED', version=version+1, updated_at=now()
                  WHERE match_id=:matchId
                    AND status='PENDING'
                    AND expires_at IS NOT NULL
                    AND expires_at <= now()
-                """, new MapSqlParameterSource("matchId", matchId));
+                RETURNING id, match_id, sender_enterprise_id, recipient_enterprise_id,
+                          invitation_type, status, message, response_comment,
+                          sent_by_subject, responded_by_subject, expires_at,
+                          responded_at, version, created_at, updated_at
+                """, new MapSqlParameterSource("matchId", matchId), this::mapInvitation);
+    }
+
+    @Override
+    public List<MatchInvitationView> cancelPendingInvitations(
+            UUID matchId, String reason, ActorScope actor) {
+        requireMatchWrite(matchId, actor);
+        return jdbc.query("""
+                UPDATE match_invitation
+                   SET status='CANCELLED', response_comment=:reason,
+                       version=version+1, updated_at=now()
+                 WHERE match_id=:matchId AND status='PENDING'
+                RETURNING id, match_id, sender_enterprise_id, recipient_enterprise_id,
+                          invitation_type, status, message, response_comment,
+                          sent_by_subject, responded_by_subject, expires_at,
+                          responded_at, version, created_at, updated_at
+                """, new MapSqlParameterSource()
+                .addValue("matchId", matchId)
+                .addValue("reason", clean(reason)), this::mapInvitation);
     }
 
     @Override
@@ -145,6 +168,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                  WHERE id=:id
                    AND version=:expectedVersion
                    AND status='PENDING'
+                   AND (expires_at IS NULL OR expires_at>transaction_timestamp())
                 """, new MapSqlParameterSource()
                 .addValue("id", invitationId)
                 .addValue("expectedVersion", expectedVersion)
@@ -163,7 +187,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
             ActorScope actor) {
         requireAssociationArgument(associationId, actor);
         requireMatchWrite(matchId, actor);
-        requireSelectedEnterprise(enterpriseId, actor);
+        requireRecorder(matchId, enterpriseId, actor);
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("matchId", matchId)
                 .addValue("associationId", associationId)
@@ -184,7 +208,7 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 """, params, UUID.class);
         return jdbc.query("""
                 SELECT id, match_id, enterprise_id, stage, summary, next_action,
-                       next_action_at, recorded_by_subject, created_at
+                       next_action_at, recorded_by_subject, created_at, version
                   FROM negotiation_record
                  WHERE id=:id
                 """, new MapSqlParameterSource("id", id), this::mapNegotiation).getFirst();
@@ -194,13 +218,13 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     public List<NegotiationView> negotiations(UUID matchId, ActorScope actor) {
         return jdbc.query("""
                 SELECT n.id, n.match_id, n.enterprise_id, n.stage, n.summary, n.next_action,
-                       n.next_action_at, n.recorded_by_subject, n.created_at
+                       n.next_action_at, n.recorded_by_subject, n.created_at, n.version
                   FROM negotiation_record n
                   JOIN ecosystem_match m ON m.id=n.match_id
                   JOIN cooperation_demand d ON d.id=m.demand_id
                   JOIN enterprise de ON de.id=d.enterprise_id
                 """ + matchScope(actor)
-                        + " AND n.match_id=:matchId ORDER BY n.created_at DESC, n.id",
+                        + " AND n.match_id=:matchId ORDER BY n.created_at DESC, n.id DESC",
                 scopeParams(actor).addValue("matchId", matchId), this::mapNegotiation);
     }
 
@@ -210,8 +234,17 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
     }
 
     @Override
-    public MatchFeedbackView upsertFeedback(
-            UUID matchId, UUID enterpriseId, MatchFeedbackRequest request, ActorScope actor) {
+    public Optional<MatchFeedbackView> feedbackByEnterprise(
+            UUID matchId, UUID enterpriseId, ActorScope actor) {
+        return feedback(matchId, actor).stream()
+                .filter(value -> value.enterpriseId().equals(enterpriseId))
+                .findFirst();
+    }
+
+    @Override
+    public Optional<MatchFeedbackView> upsertFeedback(
+            UUID matchId, UUID enterpriseId, Long expectedVersion,
+            MatchFeedbackRequest request, ActorScope actor) {
         requireMatchWrite(matchId, actor);
         requireSelectedEnterprise(enterpriseId, actor);
         MapSqlParameterSource params = new MapSqlParameterSource()
@@ -221,37 +254,52 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 .addValue("outcome", request.outcome().trim())
                 .addValue("closeReason", clean(request.closeReason()))
                 .addValue("comment", clean(request.comment()))
-                .addValue("subject", actor.subject());
-        UUID id = jdbc.queryForObject("""
-                INSERT INTO match_feedback (
-                    match_id, enterprise_id, rating, outcome, close_reason,
-                    comment, submitted_by_subject)
-                VALUES (
-                    :matchId, :enterpriseId, :rating, :outcome, :closeReason,
-                    :comment, :subject)
-                ON CONFLICT (match_id, enterprise_id)
-                DO UPDATE SET
-                    rating=excluded.rating,
-                    outcome=excluded.outcome,
-                    close_reason=excluded.close_reason,
-                    comment=excluded.comment,
-                    submitted_by_subject=excluded.submitted_by_subject,
-                    submitted_at=now()
+                .addValue("subject", actor.subject())
+                .addValue("expectedVersion", expectedVersion);
+        List<UUID> ids = expectedVersion == null ? List.of() : jdbc.query("""
+                UPDATE match_feedback
+                   SET rating=:rating,
+                       outcome=:outcome,
+                       close_reason=:closeReason,
+                       comment=:comment,
+                       submitted_by_subject=:subject,
+                       submitted_at=now(),
+                       version=version+1,
+                       updated_at=now()
+                 WHERE match_id=:matchId
+                   AND enterprise_id=:enterpriseId
+                   AND version=:expectedVersion
                 RETURNING id
-                """, params, UUID.class);
+                """, params, (rs, rowNum) -> rs.getObject("id", UUID.class));
+        if (ids.isEmpty() && (expectedVersion == null || expectedVersion == 0)) {
+            ids = jdbc.query("""
+                    INSERT INTO match_feedback (
+                        match_id, enterprise_id, rating, outcome, close_reason,
+                        comment, submitted_by_subject)
+                    VALUES (
+                        :matchId, :enterpriseId, :rating, :outcome, :closeReason,
+                        :comment, :subject)
+                    ON CONFLICT (match_id, enterprise_id) DO NOTHING
+                    RETURNING id
+                    """, params, (rs, rowNum) -> rs.getObject("id", UUID.class));
+        }
+        if (ids.isEmpty()) {
+            return Optional.empty();
+        }
         return jdbc.query("""
                 SELECT id, match_id, enterprise_id, rating, outcome, close_reason,
-                       comment, submitted_by_subject, submitted_at
+                       comment, submitted_by_subject, submitted_at, version, updated_at
                   FROM match_feedback
                  WHERE id=:id
-                """, new MapSqlParameterSource("id", id), this::mapFeedback).getFirst();
+                """, new MapSqlParameterSource("id", ids.getFirst()), this::mapFeedback)
+                .stream().findFirst();
     }
 
     @Override
     public List<MatchFeedbackView> feedback(UUID matchId, ActorScope actor) {
         return jdbc.query("""
                 SELECT f.id, f.match_id, f.enterprise_id, f.rating, f.outcome, f.close_reason,
-                       f.comment, f.submitted_by_subject, f.submitted_at
+                       f.comment, f.submitted_by_subject, f.submitted_at, f.version, f.updated_at
                   FROM match_feedback f
                   JOIN ecosystem_match m ON m.id=f.match_id
                   JOIN cooperation_demand d ON d.id=m.demand_id
@@ -301,10 +349,22 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                   JOIN ecosystem_match m ON m.id=o.match_id
                   JOIN cooperation_demand d ON d.id=m.demand_id
                   JOIN enterprise de ON de.id=d.enterprise_id
-                """ + matchScope(actor)
+                  JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                """ + outcomeMatchScope(actor)
                         + " AND o.match_id=:matchId AND o.deleted_at IS NULL"
+                        + outcomeVisibilityScope()
                         + " ORDER BY o.archived_at DESC, o.id",
                 scopeParams(actor).addValue("matchId", matchId), this::mapOutcome);
+    }
+
+    @Override
+    public boolean hasActiveOutcome(UUID matchId, ActorScope actor) {
+        requireMatchWrite(matchId, actor);
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM outcome_archive
+                     WHERE match_id=:matchId AND deleted_at IS NULL)
+                """, new MapSqlParameterSource("matchId", matchId), Boolean.class));
     }
 
     private String scope(ActorScope actor) {
@@ -317,17 +377,27 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 return actor.enterpriseId() == null ? " WHERE TRUE" : " WHERE FALSE";
             }
             if (actor.enterpriseId() != null) {
-                return " WHERE de.association_id=:associationId"
-                        + " AND (d.enterprise_id=:enterpriseId"
-                        + " OR m.candidate_enterprise_id=:enterpriseId)";
+                return " WHERE ((de.association_id=:associationId"
+                        + " AND d.enterprise_id=:enterpriseId)"
+                        + " OR (m.state<>'PENDING_CONFIRMATION'"
+                        + " AND m.candidate_enterprise_id=:enterpriseId"
+                        + " AND EXISTS (SELECT 1 FROM enterprise system_candidate"
+                        + " WHERE system_candidate.id=m.candidate_enterprise_id"
+                        + " AND system_candidate.association_id=:associationId)))";
             }
-            return " WHERE de.association_id=:associationId";
+            return " WHERE (de.association_id=:associationId"
+                    + " OR (m.state<>'PENDING_CONFIRMATION'"
+                    + " AND EXISTS (SELECT 1 FROM enterprise system_candidate"
+                    + " WHERE system_candidate.id=m.candidate_enterprise_id"
+                    + " AND system_candidate.association_id=:associationId)))";
         }
         if (actor.isAssociationStaff()) {
             return " WHERE de.association_id=:associationId";
         }
         if (actor.enterpriseId() != null) {
-            return " WHERE (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)"
+            return " WHERE (d.enterprise_id=:enterpriseId"
+                    + " OR (m.state<>'PENDING_CONFIRMATION'"
+                    + " AND m.candidate_enterprise_id=:enterpriseId))"
                     + " AND d.deleted_at IS NULL"
                     + " AND de.status='ACTIVE' AND de.deleted_at IS NULL"
                     + " AND EXISTS (SELECT 1 FROM enterprise read_candidate"
@@ -335,6 +405,80 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                     + " AND read_candidate.status='ACTIVE' AND read_candidate.deleted_at IS NULL)";
         }
         return " WHERE FALSE";
+    }
+
+    private String outcomeMatchScope(ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null) {
+                return actor.enterpriseId() == null ? " WHERE TRUE" : " WHERE FALSE";
+            }
+            if (actor.enterpriseId() != null) {
+                return " WHERE ((de.association_id=:associationId"
+                        + " AND d.enterprise_id=:enterpriseId)"
+                        + " OR (ce.association_id=:associationId"
+                        + " AND m.candidate_enterprise_id=:enterpriseId))";
+            }
+            return " WHERE (de.association_id=:associationId"
+                    + " OR ce.association_id=:associationId)";
+        }
+        if (actor.isAssociationStaff()) {
+            return " WHERE (de.association_id=:associationId OR "
+                    + authorizedPartnerMatchRead() + ")";
+        }
+        if (actor.enterpriseId() != null) {
+            return " WHERE ((d.enterprise_id=:enterpriseId"
+                    + " OR m.candidate_enterprise_id=:enterpriseId) OR "
+                    + authorizedPartnerMatchRead() + ")"
+                    + " AND d.deleted_at IS NULL"
+                    + " AND de.status='ACTIVE' AND de.deleted_at IS NULL"
+                    + " AND ce.status='ACTIVE' AND ce.deleted_at IS NULL";
+        }
+        return " WHERE FALSE";
+    }
+
+    private static String outcomeVisibilityScope() {
+        return " AND ((o.visibility='PRIVATE' AND o.archived_by_subject=:subject)"
+                + " OR (o.visibility='ENTERPRISES' AND :enterpriseId IS NOT NULL"
+                + " AND (d.enterprise_id=:enterpriseId"
+                + " OR m.candidate_enterprise_id=:enterpriseId))"
+                + " OR (o.visibility='ASSOCIATION'"
+                + " AND o.association_id=:associationId)"
+                + " OR o.visibility IN ('PARTNERS','PUBLIC'))";
+    }
+
+    private static String authorizedPartnerMatchRead() {
+        return "(" + authorizedPartnerOwner("de", "d.enterprise_id")
+                + " AND (d.enterprise_id=m.candidate_enterprise_id"
+                + " OR ce.association_id=:associationId OR "
+                + authorizedPartnerOwner("ce", "m.candidate_enterprise_id") + "))";
+    }
+
+    private static String authorizedPartnerOwner(
+            String enterpriseAlias, String enterpriseIdExpression) {
+        return "(" + enterpriseAlias + ".association_id<>:associationId"
+                + " AND " + enterpriseAlias + ".status='ACTIVE'"
+                + " AND " + enterpriseAlias + ".deleted_at IS NULL"
+                + " AND d.deleted_at IS NULL"
+                + " AND EXISTS (SELECT 1 FROM association_relationship ar"
+                + " WHERE ar.status='ACTIVE' AND ar.allow_member_data=TRUE"
+                + " AND ar.suspended_at IS NULL AND ar.revoked_at IS NULL"
+                + " AND (ar.expires_at IS NULL OR ar.expires_at>transaction_timestamp())"
+                + " AND ((ar.source_association_id=" + enterpriseAlias + ".association_id"
+                + " AND ar.target_association_id=:associationId)"
+                + " OR (ar.target_association_id=" + enterpriseAlias + ".association_id"
+                + " AND ar.source_association_id=:associationId)))"
+                + " AND EXISTS (SELECT 1 FROM association_share_policy sp"
+                + " WHERE sp.source_association_id=" + enterpriseAlias + ".association_id"
+                + " AND sp.target_association_id=:associationId"
+                + " AND sp.resource_type='MATCH' AND sp.status='ACTIVE'"
+                + " AND sp.valid_from<=transaction_timestamp()"
+                + " AND (sp.expires_at IS NULL OR sp.expires_at>transaction_timestamp()))"
+                + " AND EXISTS (SELECT 1 FROM enterprise_share_consent esc"
+                + " WHERE esc.enterprise_id=" + enterpriseIdExpression
+                + " AND esc.target_association_id=:associationId"
+                + " AND esc.resource_type='MATCH' AND esc.resource_id=m.id"
+                + " AND esc.status='ACTIVE' AND esc.revoked_at IS NULL"
+                + " AND (esc.expires_at IS NULL OR esc.expires_at>transaction_timestamp())))";
     }
 
     private boolean canReadMatch(UUID matchId, ActorScope actor) {
@@ -393,10 +537,57 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
         }
     }
 
+    private void requireRecorder(UUID matchId, UUID enterpriseId, ActorScope actor) {
+        if (enterpriseId != null) {
+            requireSelectedEnterprise(enterpriseId, actor);
+            if (!isParticipant(matchId, enterpriseId)) {
+                throw new ForbiddenException(
+                        "MATCH_SCOPE_VIOLATION",
+                        "negotiation recorder must participate in the match");
+            }
+            return;
+        }
+        if (!(actor.isAssociationStaff() || actor.isSystemAdmin())
+                || actor.enterpriseId() != null
+                || !isDemandAssociation(matchId, actor.associationId())) {
+            throw new ForbiddenException(
+                    "ASSOCIATION_SCOPE_VIOLATION",
+                    "only the demand association can add an association follow-up record");
+        }
+    }
+
+    private boolean isParticipant(UUID matchId, UUID enterpriseId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                     WHERE m.id=:matchId
+                       AND (d.enterprise_id=:enterpriseId
+                         OR m.candidate_enterprise_id=:enterpriseId))
+                """, new MapSqlParameterSource()
+                .addValue("matchId", matchId)
+                .addValue("enterpriseId", enterpriseId), Boolean.class));
+    }
+
+    private boolean isDemandAssociation(UUID matchId, UUID associationId) {
+        return associationId != null && Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                      JOIN enterprise e ON e.id=d.enterprise_id
+                     WHERE m.id=:matchId AND e.association_id=:associationId)
+                """, new MapSqlParameterSource()
+                .addValue("matchId", matchId)
+                .addValue("associationId", associationId), Boolean.class));
+    }
+
     private static MapSqlParameterSource scopeParams(ActorScope actor) {
         return new MapSqlParameterSource()
                 .addValue("associationId", actor.associationId())
-                .addValue("enterpriseId", actor.enterpriseId());
+                .addValue("enterpriseId", actor.enterpriseId())
+                .addValue("subject", actor.subject());
     }
 
     private MatchInvitationView mapInvitation(ResultSet rs, int rowNum) throws SQLException {
@@ -428,7 +619,8 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 rs.getString("next_action"),
                 instant(rs.getTimestamp("next_action_at")),
                 rs.getString("recorded_by_subject"),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(),
+                rs.getLong("version"));
     }
 
     private MatchFeedbackView mapFeedback(ResultSet rs, int rowNum) throws SQLException {
@@ -442,7 +634,9 @@ class PostgresEcosystemWorkflowStore implements EcosystemWorkflowStore {
                 rs.getString("close_reason"),
                 rs.getString("comment"),
                 rs.getString("submitted_by_subject"),
-                rs.getTimestamp("submitted_at").toInstant());
+                rs.getTimestamp("submitted_at").toInstant(),
+                rs.getLong("version"),
+                rs.getTimestamp("updated_at").toInstant());
     }
 
     private OutcomeArchiveView mapOutcome(ResultSet rs, int rowNum) throws SQLException {

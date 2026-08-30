@@ -12,5 +12,6 @@ public record NegotiationView(
         String nextAction,
         Instant nextActionAt,
         String recordedBySubject,
-        Instant createdAt) {
+        Instant createdAt,
+        long version) {
 }

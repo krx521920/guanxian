@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Collaboration, Demand, MatchInvitation, PersistedMatch } from '../types/domain'
+import type { Collaboration, Demand, MatchFeedback, MatchInvitation, PersistedMatch } from '../types/domain'
 
 const browserWindow = {
   setTimeout: globalThis.setTimeout.bind(globalThis),
@@ -40,6 +40,13 @@ describe('persisted workflow API contract', () => {
     expect(url).toBe('/api/v1/matches/demand/demand-1/generate')
     expect(init.method).toBe('POST')
     expect(JSON.parse(String(init.body))).toEqual({ limit: 5 })
+  })
+
+  it('loads only demands the backend authorizes for match generation', async () => {
+    const page = { items: [], total: 0, page: 2, size: 50 }
+    const { platformApi, fetchMock } = await apiWith(page)
+    await expect(platformApi.matchGenerationDemands(2, 50)).resolves.toEqual(page)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/matches/generation-demands?page=2&size=50')
   })
 
   it('sends persisted match versions as strong If-Match values', async () => {
@@ -101,7 +108,7 @@ describe('persisted workflow API contract', () => {
   it('persists negotiation records on the selected match', async () => {
     const { platformApi, fetchMock } = await apiWith({ id: 'negotiation-1' })
     const match = { id: 'match-1', version: 4 } as PersistedMatch
-    const payload = { stage: 'TECHNICAL_EXCHANGE', summary: '完成方案评审', nextAction: '现场勘查', nextActionAt: null }
+    const payload = { stage: 'TECHNICAL_EXCHANGE' as const, summary: '完成方案评审', nextAction: '现场勘查', nextActionAt: null }
     await platformApi.addMatchNegotiation(match, payload)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/v1/matches/match-1/negotiations')
@@ -112,13 +119,26 @@ describe('persisted workflow API contract', () => {
 
   it('submits participant feedback without fabricating a local result', async () => {
     const result = { id: 'feedback-1', outcome: 'SUCCESS' }
+    const match = { id: 'match-1', version: 8 } as PersistedMatch
     const { platformApi, fetchMock } = await apiWith(result)
-    await expect(platformApi.submitMatchFeedback('match-1', {
+    await expect(platformApi.submitMatchFeedback(match, {
       rating: 5, outcome: 'SUCCESS', closeReason: null, comment: '合作达成',
     })).resolves.toEqual(result)
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/v1/matches/match-1/feedback')
     expect(init.method).toBe('POST')
+    expect(new Headers(init.headers).has('If-Match')).toBe(false)
+  })
+
+  it('updates participant feedback with the persisted feedback version', async () => {
+    const match = { id: 'match-1', version: 8 } as PersistedMatch
+    const feedback = { id: 'feedback-1', version: 3 } as MatchFeedback
+    const { platformApi, fetchMock } = await apiWith({ ...feedback, version: 4 })
+    await platformApi.submitMatchFeedback(match, {
+      rating: 4, outcome: 'SUCCESS', closeReason: null, comment: '更新评价',
+    }, feedback)
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(new Headers(init.headers).get('If-Match')).toBe('"3"')
   })
 
   it('loads and archives persisted outcomes', async () => {

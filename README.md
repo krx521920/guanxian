@@ -41,7 +41,7 @@ compose.yaml    本地 PostgreSQL、Redis、MinIO 编排
 - 生产默认使用 OIDC/JWT；仅显式本地/测试模式可启用 HTTP Basic 演示账号，生产 Profile 会拒绝 demo 模式。
 - ArchUnit 自动保护模块依赖方向，避免业务模块反向耦合启动层或内部实现。
 - Web、业务后端与 AI 服务统一使用安全的 `X-Request-Id`；成功与异常响应均可关联同一次请求，非法或可注入日志的值会被替换。
-- Flyway 当前迁移链为 V1–V17，可追踪处理空库和既有非空 PostgreSQL；V16 固化政策影响分析的同协会约束，V17 固化跨协会授权、推荐和共享策略不变量。会员编辑页读取强 ETag，保存时携带 If-Match，陈旧写入返回 412。
+- Flyway 当前迁移链为 V1–V18，可追踪处理空库和既有非空 PostgreSQL；V16 固化政策影响分析的同协会约束，V17 固化跨协会授权、推荐和共享策略不变量，V18 固化“推荐—双方确认—邀请—洽谈—反馈—成果”闭环、参与方归属和资源版本。会员编辑页读取强 ETag，保存时携带 If-Match，陈旧写入返回 412。
 - AI 输入具备字段、列表、数值和请求体资源上限；Unicode 统一规范化，校验错误不回显原始输入，评分分项与总分严格一致。
 - AI 请求体上限按 ASGI 数据块累计，无 `Content-Length` 或分块传输也不能绕过；Web 六个核心页面具有统一的安全失败态和重试机制。
 - Web 权限默认拒绝，生产构建禁用 mock 回退和演示身份切换；OIDC 登录采用 Authorization Code + PKCE，并回读后端验证身份。
@@ -71,6 +71,6 @@ docker compose --profile app up --build -d
 
 快速入口和当前可复验基线见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，手动质量检查执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
 
-2026-08-30 当前工作区常规基线：Java Surefire 62 个测试套件、279 项测试，失败、错误和跳过均为 0；Web 14 个 Vitest 文件、154 项测试通过，`vue-tsc -b` 类型检查和 Vite 生产构建通过。该基线包含真实 PostgreSQL 16 Testcontainers 的迁移与数据隔离回归，但不代表真实 MinIO、Redis、正式 OIDC 或完整浏览器 E2E 已经完成。
+2026-08-30 当前工作区常规基线：Java Surefire 63 个测试套件、305 项测试，失败、错误和跳过均为 0；Web 15 个 Vitest 文件、167 项测试通过，`vue-tsc -b` 类型检查和 Vite 生产构建通过。该基线包含真实 PostgreSQL 16 Testcontainers 的 Flyway V1–V18 迁移、数据隔离、匹配闭环与 ETag/CAS 回归，但不代表真实 MinIO、Redis、正式 OIDC 或完整浏览器 E2E 已经完成。
 
-> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、在生产数据隔离副本执行 V1–V17 迁移与恢复演练，并用协会真实语料完成效果和费用验收。
+> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、Excel 批量采集、附件知识入库和带出处检索闭环；本地测试仍可显式使用演示身份与内存仓储。独立 Python 智能能力服务目前仍为确定性规则实现；Java 知识链路默认关闭外部模型和 Embedding。生产上线前仍需配置正式 IdP 与真实模型凭据、在生产数据隔离副本执行 V1–V18 迁移与恢复演练，并用协会真实语料完成效果和费用验收。

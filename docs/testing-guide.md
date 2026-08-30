@@ -17,15 +17,15 @@
 
 ## 2. 可追溯基线
 
-当前仓库包含 Flyway `V1` 至 `V17` 共 17 个版本化迁移。Java 普通全量回归包含 62 个 Surefire 测试套件、279 项测试，失败、错误和跳过均为 0。
+当前仓库包含 Flyway `V1` 至 `V18` 共 18 个版本化迁移。当前 Java 普通全量回归包含 63 个 Surefire 测试套件、305 项测试，已经在真实 PostgreSQL 16 Testcontainers 上完成 V18 验证。
 
 2026-08-30 本地常规验证基线：
 
-- Web：14 个 Vitest 文件、154 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
-- Java：62 个 Surefire 测试套件、279 项测试通过，失败、错误和跳过均为 0；Flyway V1–V17 空库迁移、V15→V17 政策影响升级和 V16→V17 跨协会完整性升级通过。
+- Web：15 个 Vitest 文件、167 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
+- Java：63 个 Surefire 测试套件、305 项测试通过，失败、错误和跳过均为 0；Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级和 V17→V18 匹配闭环升级均已在本工作区通过。
 - AI：默认批准范围收集 46 项测试；`stress` 与 `fuzz` 标记均不进入默认执行。
 - 运维配置：`tests/operations` 28 项、`tests/config` 10 项，CI 分目录执行，共 38 项。
-- 真实依赖检查：PostgreSQL 16 Testcontainers 已验证 Flyway V1–V17 空库迁移、V15→V17 与 V16→V17 干净数据升级路径、脏数据迁移失败事务回滚及并发重复授权阻断；Redis、Keycloak、MinIO 仍需在第五阶段完整浏览器 E2E 中联合复验。
+- 真实依赖检查：PostgreSQL 16 Testcontainers 覆盖 Flyway V1–V18 空库迁移、V15→V17、V16→V17 与 V17→V18 干净升级、歧义数据失败事务回滚、并发邀请唯一性和陈旧反馈 CAS；Redis、Keycloak、MinIO 仍需在第五阶段完整浏览器 E2E 中联合复验。
 
 测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V3、89 项、125 项或 47 项基线。
 
@@ -67,6 +67,7 @@ python -m unittest discover -s tests/config -p "test_*.py" -v
 - `PostgresIdentityPolicyNotificationUpgradeIntegrationTest`：V12→V15 身份、政策归属和通知订阅升级合同。
 - `PostgresPolicyImpactAssociationMigrationIntegrationTest`：V15→V17 政策影响同协会回填、复合外键与不一致脏数据失败回滚。
 - `PostgresCrossAssociationIntegrityMigrationIntegrationTest`：V16→V17 跨协会授权/推荐/策略约束、脏数据失败回滚、到期授权原子物化及双事务唯一授权。
+- `PostgresMatchWorkflowIntegrityMigrationIntegrationTest`：V17→V18 干净升级和完整合法路径；同企业供需、旧枚举、非法父状态、残留待应答邀请、待处理邀请提前应答、普通洽谈跳级/终态后追加、成功反馈携带关闭原因、单方成功归档的失败回滚；接受邀请后直接终止、拒绝/取消/终止原因一致性、邀请终态与匹配/成果审计事实不可改写、`MATCH.outcomes` 跨协会字段白名单、运行期非法转移/参与方阻断、反馈关闭原因互斥、并发邀请唯一性和反馈 ETag/CAS。
 - `PostgresSystemContextScopeIntegrationTest` 与 `PostgresEcosystemSystemContextIntegrationTest`：系统管理员全局/协会/企业上下文及写入边界。
 - `PostgresEnterpriseLifecycleIsolationIntegrationTest`：企业停用/删除后的历史只读与写入阻断。
 - `PostgresCollaborationSystemContextIntegrationTest`：协作事项系统上下文与跨租户隔离。
@@ -74,7 +75,7 @@ python -m unittest discover -s tests/config -p "test_*.py" -v
 
 Docker 不可用时，Testcontainers 未执行不能视为通过；应由标准 Ubuntu CI Runner 完成。
 
-V16、V17 的升级测试明确验证“先检查、后约束”：无法无歧义处理的历史数据必须让迁移失败并保留 V15/V16 版本，运维人员根据异常的 `DETAIL` 和 `HINT` 审核修正后再执行。测试不会把迁移中的静默业务数据清洗视为可接受行为。
+V16–V18 的升级测试明确验证“先检查、后约束”：无法无歧义处理的历史数据必须让迁移失败并保留原版本，运维人员根据异常的 `DETAIL` 和 `HINT` 审核修正后再执行。测试不会把迁移中的静默业务数据清洗视为可接受行为；V18 只允许把旧反馈的 `submitted_at` 确定性复制为初始 `updated_at`。
 
 OIDC/PKCE 手动验收：
 

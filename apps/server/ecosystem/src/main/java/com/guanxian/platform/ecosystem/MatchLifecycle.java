@@ -23,8 +23,7 @@ final class MatchLifecycle {
     static final String CONTRACT_SIGNED = "CONTRACT_SIGNED";
     static final String TERMINATED = "TERMINATED";
 
-    private static final Set<String> CONFIRMABLE = Set.of(
-            PENDING_CONFIRMATION, RECOMMENDED, PARTIALLY_CONFIRMED);
+    private static final Set<String> CONFIRMABLE = Set.of(RECOMMENDED, PARTIALLY_CONFIRMED);
     private static final Set<String> CLOSABLE = Set.of(
             PENDING_CONFIRMATION, RECOMMENDED, PARTIALLY_CONFIRMED,
             CONFIRMED, INVITED, NEGOTIATING, OUTCOME_PENDING);
@@ -43,7 +42,7 @@ final class MatchLifecycle {
     }
 
     static void requireRecommendationAllowed(PersistedMatchView match) {
-        requireState(match.state(), Set.of(PENDING_CONFIRMATION, PARTIALLY_CONFIRMED), "recommend");
+        requireState(match.state(), Set.of(PENDING_CONFIRMATION), "recommend");
         if (match.recommendedAt() != null) {
             throw new PreconditionFailedException("match has already been recommended");
         }

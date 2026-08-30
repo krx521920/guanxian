@@ -18,7 +18,10 @@ interface EcosystemWorkflowStore {
 
     Optional<MatchInvitationView> findInvitation(UUID invitationId, ActorScope actor);
 
-    void expirePendingInvitations(UUID matchId, ActorScope actor);
+    List<MatchInvitationView> expirePendingInvitations(UUID matchId, ActorScope actor);
+
+    List<MatchInvitationView> cancelPendingInvitations(
+            UUID matchId, String reason, ActorScope actor);
 
     boolean hasPendingInvitation(UUID matchId, ActorScope actor);
 
@@ -33,13 +36,19 @@ interface EcosystemWorkflowStore {
 
     Optional<NegotiationView> latestNegotiation(UUID matchId, ActorScope actor);
 
-    MatchFeedbackView upsertFeedback(
-            UUID matchId, UUID enterpriseId, MatchFeedbackRequest request, ActorScope actor);
+    Optional<MatchFeedbackView> feedbackByEnterprise(
+            UUID matchId, UUID enterpriseId, ActorScope actor);
+
+    Optional<MatchFeedbackView> upsertFeedback(
+            UUID matchId, UUID enterpriseId, Long expectedVersion,
+            MatchFeedbackRequest request, ActorScope actor);
 
     List<MatchFeedbackView> feedback(UUID matchId, ActorScope actor);
 
     OutcomeArchiveView archive(
             UUID matchId, UUID associationId, OutcomeArchiveRequest request, ActorScope actor);
+
+    boolean hasActiveOutcome(UUID matchId, ActorScope actor);
 
     List<OutcomeArchiveView> outcomes(UUID matchId, ActorScope actor);
 }

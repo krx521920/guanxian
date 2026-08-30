@@ -70,6 +70,7 @@ const shareFieldOptions: Record<AssociationShareResourceType, ShareFieldOption[]
     { value: 'score', label: '匹配分数' },
     { value: 'reasons', label: '匹配依据' },
     { value: 'state', label: '匹配状态' },
+    { value: 'outcomes', label: '合作成果（不含合同金额及内部操作人）' },
   ],
 }
 

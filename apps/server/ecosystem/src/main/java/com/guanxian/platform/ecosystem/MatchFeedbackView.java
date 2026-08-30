@@ -12,5 +12,7 @@ public record MatchFeedbackView(
         String closeReason,
         String comment,
         String submittedBySubject,
-        Instant submittedAt) {
+        Instant submittedAt,
+        long version,
+        Instant updatedAt) {
 }

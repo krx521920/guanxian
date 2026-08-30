@@ -22,4 +22,8 @@ describe('友好协会界面安全契约', () => {
     expect(view).toContain('item.applicantAssociationId === currentAssociationId.value')
     expect(view).toContain('item.sourceAssociationId === currentAssociationId.value')
   })
+
+  it('合作成果必须通过独立字段授权且明确保持敏感信息脱敏', () => {
+    expect(view).toContain("{ value: 'outcomes', label: '合作成果（不含合同金额及内部操作人）' }")
+  })
 })

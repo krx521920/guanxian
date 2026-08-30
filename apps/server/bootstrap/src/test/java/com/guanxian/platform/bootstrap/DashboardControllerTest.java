@@ -5,6 +5,7 @@ import com.guanxian.platform.ecosystem.PersistedMatchView;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,7 +33,8 @@ class DashboardControllerTest {
                 null,
                 null,
                 3,
-                null);
+                null,
+                Set.of());
 
         EcosystemMatch value = DashboardController.legacyMatch(redacted);
 

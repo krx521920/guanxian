@@ -91,7 +91,9 @@ class PostgresEnterpriseLifecycleIsolationIntegrationTest {
         offering = catalogService.reviewOffering(
                 offering.id(), offering.version(), new ReviewDecisionRequest(true, null), reviewer);
 
-        var match = matchService.generate(demand.id(), 5, demandOwner).getFirst();
+        var generatedMatch = matchService.generate(demand.id(), 5, demandOwner).getFirst();
+        var match = matchService.recommend(
+                generatedMatch.id(), generatedMatch.version(), reviewer);
         var collaboration = collaborationService.create(new CollaborationUpsertRequest(
                 "阀门匹配协作", List.of("需求方", "供应方"), "需求负责人", "HIGH",
                 "确认技术参数", LocalDate.of(2026, 9, 1), 0, match.id()), demandOwner);

@@ -4,6 +4,8 @@ import com.guanxian.platform.ai.AiTextService;
 import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import com.guanxian.platform.member.api.MemberDirectory;
 import com.guanxian.platform.member.api.MemberProfile;
+import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
@@ -96,13 +98,7 @@ class EcosystemMatchServiceTest {
         ActorScope externalPartner = new ActorScope(
                 UUID.randomUUID(), "external-partner", "external-partner", UUID.randomUUID(),
                 null, Set.of("ASSOCIATION_ADMIN"), Set.of(ASSOCIATION_ID));
-        PersistedMatchView redacted = redacting.authorizedMatch(
-                generated.getFirst(), externalPartner).orElseThrow();
-        assertEquals(generated.getFirst().demandTitle(), redacted.demandTitle());
-        assertEquals("PENDING_CONFIRMATION", redacted.state());
-        assertTrue(redacted.solution() == null);
-        assertTrue(redacted.score() == null);
-        assertTrue(redacted.reasons().isEmpty());
+        assertTrue(redacting.authorizedMatch(generated.getFirst(), externalPartner).isEmpty());
         EcosystemMatchService denying = new EcosystemMatchService(
                 directory, tags, catalogService, matchStore, catalogStore, lifecycle,
                 (actor, enterpriseId, resourceType, resourceId) -> Optional.empty());
@@ -110,8 +106,9 @@ class EcosystemMatchServiceTest {
 
         operational.remove(SUPPLIER_ENTERPRISE);
         assertEquals(List.of(), service.persisted(demandOwner));
-        assertEquals(generated, service.persisted(reviewer));
-        assertEquals(generated, service.persisted(opened.id(), reviewer));
+        assertEquals(generated.getFirst().id(), service.persisted(reviewer).getFirst().id());
+        assertEquals(generated.getFirst().id(),
+                service.persisted(opened.id(), reviewer).getFirst().id());
         assertThrows(PreconditionFailedException.class, () -> service.recommend(
                 generated.getFirst().id(), generated.getFirst().version(), reviewer));
         assertTrue(matchStore.recommend(
@@ -119,16 +116,27 @@ class EcosystemMatchServiceTest {
         operational.add(SUPPLIER_ENTERPRISE);
         assertEquals(generated, service.persisted(demandOwner));
 
-        PersistedMatchView supplierConfirmed = service.confirm(
-                generated.getFirst().id(), generated.getFirst().version(), supplier);
+        assertThrows(NotFoundException.class, () -> service.confirm(
+                generated.getFirst().id(), generated.getFirst().version(), supplier));
+
         PersistedMatchView recommended = service.recommend(
-                supplierConfirmed.id(), supplierConfirmed.version(), reviewer);
-        assertEquals("PARTIALLY_CONFIRMED", recommended.state());
-        assertTrue(recommended.candidateConfirmedAt() != null);
-        assertTrue(recommended.demandConfirmedAt() == null);
+                generated.getFirst().id(), generated.getFirst().version(), reviewer);
+        PersistedMatchView redacted = redacting.authorizedMatch(
+                recommended, externalPartner).orElseThrow();
+        assertEquals(recommended.demandTitle(), redacted.demandTitle());
+        assertEquals("RECOMMENDED", redacted.state());
+        assertTrue(redacted.solution() == null);
+        assertTrue(redacted.score() == null);
+        assertTrue(redacted.reasons().isEmpty());
+        assertTrue(redacted.allowedActions().isEmpty());
+        PersistedMatchView supplierConfirmed = service.confirm(
+                recommended.id(), recommended.version(), supplier);
+        assertEquals("PARTIALLY_CONFIRMED", supplierConfirmed.state());
+        assertTrue(supplierConfirmed.candidateConfirmedAt() != null);
+        assertTrue(supplierConfirmed.demandConfirmedAt() == null);
 
         PersistedMatchView confirmed = service.confirm(
-                recommended.id(), recommended.version(), demandOwner);
+                supplierConfirmed.id(), supplierConfirmed.version(), demandOwner);
         assertEquals("CONFIRMED", confirmed.state());
         assertTrue(confirmed.demandConfirmedAt() != null);
         assertTrue(confirmed.candidateConfirmedAt() != null);
@@ -167,7 +175,9 @@ class EcosystemMatchServiceTest {
                     return Optional.empty();
                 });
 
-        assertEquals(List.of(raw), service.persisted(actor));
+        PersistedMatchView visible = service.persisted(actor).getFirst();
+        assertEquals(raw.id(), visible.id());
+        assertEquals(Set.of("INVITE", "CLOSE"), visible.allowedActions());
         assertTrue(authorizationCalls.isEmpty());
     }
 
@@ -179,11 +189,13 @@ class EcosystemMatchServiceTest {
         UUID lowerId = UUID.fromString("74000000-0000-0000-0000-000000000201");
         UUID higherId = UUID.fromString("74000000-0000-0000-0000-000000000202");
         PersistedMatchView highScore = matchView(
-                higherId, 99, MatchLifecycle.PENDING_CONFIRMATION, 0,
-                null, null, null, null, Instant.parse("2026-08-30T02:00:00Z"));
+                higherId, 99, MatchLifecycle.RECOMMENDED, 1,
+                Instant.parse("2026-08-30T00:30:00Z"), null, null, null,
+                Instant.parse("2026-08-30T02:00:00Z"));
         PersistedMatchView lowScore = matchView(
-                lowerId, 10, MatchLifecycle.PENDING_CONFIRMATION, 0,
-                null, null, null, null, Instant.parse("2026-08-30T01:00:00Z"));
+                lowerId, 10, MatchLifecycle.RECOMMENDED, 1,
+                Instant.parse("2026-08-30T00:30:00Z"), null, null, null,
+                Instant.parse("2026-08-30T01:00:00Z"));
         when(matchStore.list(actor)).thenReturn(List.of(highScore, lowScore));
 
         EcosystemMatchService missingCandidateConsent = isolatedService(
@@ -218,11 +230,13 @@ class EcosystemMatchServiceTest {
         UUID lowerId = UUID.fromString("74000000-0000-0000-0000-000000000201");
         UUID higherId = UUID.fromString("74000000-0000-0000-0000-000000000202");
         PersistedMatchView highScore = matchView(
-                higherId, 99, MatchLifecycle.PENDING_CONFIRMATION, 0,
-                null, null, null, null, Instant.parse("2026-08-30T02:00:00Z"));
+                higherId, 99, MatchLifecycle.RECOMMENDED, 1,
+                Instant.parse("2026-08-30T00:30:00Z"), null, null, null,
+                Instant.parse("2026-08-30T02:00:00Z"));
         PersistedMatchView lowScore = matchView(
-                lowerId, 10, MatchLifecycle.PENDING_CONFIRMATION, 0,
-                null, null, null, null, Instant.parse("2026-08-30T01:00:00Z"));
+                lowerId, 10, MatchLifecycle.RECOMMENDED, 1,
+                Instant.parse("2026-08-30T00:30:00Z"), null, null, null,
+                Instant.parse("2026-08-30T01:00:00Z"));
 
         ActorScope participant = reviewerAt(ASSOCIATION_ID);
         EcosystemCatalogStore participantCatalog = mock(EcosystemCatalogStore.class);
@@ -274,12 +288,14 @@ class EcosystemMatchServiceTest {
                 Instant.parse("2026-08-30T01:05:00Z"), null, null, null,
                 Instant.parse("2026-08-30T01:05:00Z"));
         PersistedMatchView partiallyConfirmed = matchView(
-                CROSS_MATCH_ID, 88, MatchLifecycle.PARTIALLY_CONFIRMED, 1,
-                null, Instant.parse("2026-08-30T01:06:00Z"), null, null,
+                CROSS_MATCH_ID, 88, MatchLifecycle.PARTIALLY_CONFIRMED, 2,
+                Instant.parse("2026-08-30T01:05:00Z"),
+                Instant.parse("2026-08-30T01:06:00Z"), null, null,
                 Instant.parse("2026-08-30T01:06:00Z"));
         PersistedMatchView closed = matchView(
-                CROSS_MATCH_ID, 88, MatchLifecycle.CLOSED, 2,
-                null, Instant.parse("2026-08-30T01:06:00Z"), null, "不得外泄",
+                CROSS_MATCH_ID, 88, MatchLifecycle.CLOSED, 3,
+                Instant.parse("2026-08-30T01:05:00Z"),
+                Instant.parse("2026-08-30T01:06:00Z"), null, "不得外泄",
                 Instant.parse("2026-08-30T01:07:00Z"));
         when(catalogStore.enterpriseBelongsToAssociation(CROSS_DEMAND_ENTERPRISE, ASSOCIATION_ID))
                 .thenReturn(true);
@@ -294,11 +310,11 @@ class EcosystemMatchServiceTest {
         when(matchStore.find(CROSS_MATCH_ID, reviewer)).thenReturn(Optional.of(pending));
         when(matchStore.recommend(CROSS_MATCH_ID, 0, reviewer)).thenReturn(Optional.of(recommended));
         when(matchStore.find(CROSS_MATCH_ID, demandOwner))
-                .thenReturn(Optional.of(pending), Optional.of(partiallyConfirmed));
-        when(matchStore.confirm(CROSS_MATCH_ID, 0, CROSS_DEMAND_ENTERPRISE, demandOwner))
+                .thenReturn(Optional.of(recommended), Optional.of(partiallyConfirmed));
+        when(matchStore.confirm(CROSS_MATCH_ID, 1, CROSS_DEMAND_ENTERPRISE, demandOwner))
                 .thenReturn(Optional.of(partiallyConfirmed));
         when(matchStore.transition(
-                CROSS_MATCH_ID, 1, MatchLifecycle.CLOSED, "合作终止", demandOwner))
+                CROSS_MATCH_ID, 2, MatchLifecycle.CLOSED, "合作终止", demandOwner))
                 .thenReturn(Optional.of(closed));
 
         List<UUID> authorizationCalls = new ArrayList<>();
@@ -309,13 +325,95 @@ class EcosystemMatchServiceTest {
         EcosystemMatchService service = isolatedService(
                 directory, tags, catalogService, matchStore, catalogStore, denyPreauthorization);
 
-        assertEquals(pending, service.generate(demandId, 5, demandOwner).getFirst());
-        assertEquals(recommended, service.recommend(CROSS_MATCH_ID, 0, reviewer));
-        assertEquals(partiallyConfirmed, service.confirm(CROSS_MATCH_ID, 0, demandOwner));
+        assertEquals(pending.id(), service.generate(demandId, 5, demandOwner).getFirst().id());
+        assertEquals(recommended.state(), service.recommend(CROSS_MATCH_ID, 0, reviewer).state());
+        assertEquals(partiallyConfirmed.state(),
+                service.confirm(CROSS_MATCH_ID, 1, demandOwner).state());
         PersistedMatchView closure = service.close(
-                CROSS_MATCH_ID, 1, new MatchCloseRequest("合作终止"), demandOwner);
-        assertEquals(closed, closure);
+                CROSS_MATCH_ID, 2, new MatchCloseRequest("合作终止"), demandOwner);
+        assertEquals(closed.state(), closure.state());
         assertTrue(authorizationCalls.isEmpty());
+    }
+
+    @Test
+    void candidateAssociationNeedsExplicitAuthorizationAndReadOnlyEnterpriseGetsNoActions() {
+        PersistedMatchView raw = matchView(
+                CROSS_MATCH_ID, 90, MatchLifecycle.CONFIRMED, 3,
+                Instant.parse("2026-08-30T01:00:00Z"),
+                Instant.parse("2026-08-30T01:01:00Z"),
+                Instant.parse("2026-08-30T01:02:00Z"), null,
+                Instant.parse("2026-08-30T01:03:00Z"));
+        EcosystemCatalogStore catalogStore = mock(EcosystemCatalogStore.class);
+        EcosystemMatchStore matchStore = mock(EcosystemMatchStore.class);
+        ActorScope candidateAssociation = reviewerAt(ASSOCIATION_B);
+        when(matchStore.list(candidateAssociation)).thenReturn(List.of(raw));
+        when(catalogStore.enterpriseBelongsToAssociation(
+                CROSS_DEMAND_ENTERPRISE, ASSOCIATION_B)).thenReturn(false);
+        when(catalogStore.enterpriseBelongsToAssociation(
+                CROSS_SUPPLIER_ENTERPRISE, ASSOCIATION_B)).thenReturn(true);
+        EcosystemMatchService denying = isolatedService(
+                mock(MemberDirectory.class), text -> List.of(), mock(EcosystemCatalogService.class),
+                matchStore, catalogStore,
+                (scope, enterpriseId, type, resourceId) -> Optional.empty());
+        assertTrue(denying.persisted(candidateAssociation).isEmpty());
+
+        ActorScope readOnlyDemandUser = new ActorScope(
+                UUID.randomUUID(), "market-manager", "market-manager", ASSOCIATION_ID,
+                CROSS_DEMAND_ENTERPRISE, Set.of("ENTERPRISE_MEMBER"), Set.of());
+        when(matchStore.list(readOnlyDemandUser)).thenReturn(List.of(raw));
+        when(matchStore.find(CROSS_MATCH_ID, readOnlyDemandUser)).thenReturn(Optional.of(raw));
+        PersistedMatchView readOnly = denying.persisted(readOnlyDemandUser).getFirst();
+        assertTrue(readOnly.allowedActions().isEmpty());
+        assertThrows(ForbiddenException.class, () -> denying.close(
+                CROSS_MATCH_ID, raw.version(), new MatchCloseRequest("无写权限"), readOnlyDemandUser));
+    }
+
+    @Test
+    void generationDemandPageContainsOnlyOpenDemandsTheActorCanOwn() {
+        ActorScope owner = enterpriseAt(ASSOCIATION_ID, CROSS_DEMAND_ENTERPRISE);
+        UUID externalEnterprise = UUID.randomUUID();
+        DemandView ownOpen = demandView(UUID.randomUUID(), CROSS_DEMAND_ENTERPRISE, "OPEN");
+        DemandView externalOpen = demandView(UUID.randomUUID(), externalEnterprise, "OPEN");
+        DemandView ownClosed = demandView(UUID.randomUUID(), CROSS_DEMAND_ENTERPRISE, "CLOSED");
+        EcosystemCatalogService catalogService = mock(EcosystemCatalogService.class);
+        when(catalogService.demands(owner, null, false, 0, 100))
+                .thenReturn(new EcosystemPage<>(
+                        List.of(ownOpen, externalOpen, ownClosed), 3, 0, 100));
+        EcosystemMatchService service = isolatedService(
+                mock(MemberDirectory.class), text -> List.of(), catalogService,
+                mock(EcosystemMatchStore.class), mock(EcosystemCatalogStore.class),
+                PartnerFieldAuthorization.allowAll());
+
+        EcosystemPage<DemandView> page = service.generationDemands(owner, 0, 20);
+
+        assertEquals(1, page.total());
+        assertEquals(List.of(ownOpen), page.items());
+    }
+
+    @Test
+    void archiveActionAppearsOnlyAfterBothSuccessFeedbackAndBeforeAnOutcomeExists() {
+        ActorScope owner = enterpriseAt(ASSOCIATION_ID, CROSS_DEMAND_ENTERPRISE);
+        PersistedMatchView outcomePending = matchView(
+                CROSS_MATCH_ID, 95, MatchLifecycle.OUTCOME_PENDING, 8,
+                Instant.parse("2026-08-30T01:00:00Z"),
+                Instant.parse("2026-08-30T01:01:00Z"),
+                Instant.parse("2026-08-30T01:02:00Z"), null,
+                Instant.parse("2026-08-30T01:03:00Z"));
+        EcosystemMatchStore matchStore = mock(EcosystemMatchStore.class);
+        EcosystemWorkflowStore workflowStore = mock(EcosystemWorkflowStore.class);
+        EcosystemCatalogStore catalogStore = mock(EcosystemCatalogStore.class);
+        when(matchStore.list(owner)).thenReturn(List.of(outcomePending));
+        when(workflowStore.feedback(CROSS_MATCH_ID, owner)).thenReturn(List.of(
+                feedback(CROSS_DEMAND_ENTERPRISE), feedback(CROSS_SUPPLIER_ENTERPRISE)));
+        when(workflowStore.hasActiveOutcome(CROSS_MATCH_ID, owner))
+                .thenReturn(false, true);
+        EcosystemMatchService service = new EcosystemMatchService(
+                mock(MemberDirectory.class), text -> List.of(),
+                mock(EcosystemCatalogService.class), matchStore, catalogStore, workflowStore,
+                enterpriseId -> true, PartnerFieldAuthorization.allowAll());
+
+        assertTrue(service.persisted(owner).getFirst().allowedActions().contains("ARCHIVE"));
+        assertTrue(!service.persisted(owner).getFirst().allowedActions().contains("ARCHIVE"));
     }
 
     @Test
@@ -378,7 +476,21 @@ class EcosystemMatchServiceTest {
                 candidateConfirmedAt,
                 closedReason,
                 version,
-                updatedAt);
+                updatedAt,
+                Set.of());
+    }
+
+    private static DemandView demandView(UUID id, UUID enterpriseId, String status) {
+        return new DemandView(
+                id, enterpriseId, "企业", "需求", "说明", List.of(), List.of(),
+                "MEMBERS", null, null, null, status, null, 0, false,
+                Instant.parse("2026-08-30T01:00:00Z"));
+    }
+
+    private static MatchFeedbackView feedback(UUID enterpriseId) {
+        return new MatchFeedbackView(
+                UUID.randomUUID(), CROSS_MATCH_ID, enterpriseId, 5, "SUCCESS", null,
+                "成功", "subject", Instant.now(), 0, Instant.now());
     }
 
     private static ActorScope enterpriseAt(UUID associationId, UUID enterpriseId) {

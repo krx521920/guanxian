@@ -5,5 +5,5 @@ import jakarta.validation.constraints.Size;
 
 public record MatchInvitationResponse(
         @NotNull Boolean accepted,
-        @Size(max = 2000) String comment) {
+        @Size(max = 1000) String comment) {
 }

@@ -80,11 +80,16 @@ public class EcosystemWorkflowController {
 
     @PostMapping("/{matchId}/feedback")
     @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
-    ApiResponse<MatchFeedbackView> feedback(
+    ResponseEntity<ApiResponse<MatchFeedbackView>> feedback(
             @PathVariable UUID matchId,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
             @Valid @RequestBody MatchFeedbackRequest request,
             Authentication authentication) {
-        return ApiResponse.ok(service.feedback(matchId, request, actor(authentication)));
+        MatchFeedbackView value = service.feedback(
+                matchId, VersionEtags.optionalVersion(ifMatch), request, actor(authentication));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.ETAG, VersionEtags.format(value.version()))
+                .body(ApiResponse.ok(value));
     }
 
     @GetMapping("/{matchId}/feedback")

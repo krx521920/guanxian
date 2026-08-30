@@ -120,7 +120,7 @@ class PostgresEcosystemSystemContextIntegrationTest {
         assertEquals(Set.of(matchA.id(), matchB.id()), ids(matches.persisted(global)));
         assertEquals(Set.of(matchA.id()), ids(matches.persisted(systemA)));
         assertEquals(Set.of(matchA.id()), ids(matches.persisted(systemA1)));
-        assertEquals(Set.of(matchA.id()), ids(matches.persisted(systemA2)));
+        assertTrue(matches.persisted(systemA2).isEmpty());
         assertTrue(matches.persisted(systemA3).isEmpty());
         assertThrows(ApiException.class,
                 () -> matches.recommend(matchA.id(), matchA.version(), global));
@@ -202,6 +202,55 @@ class PostgresEcosystemSystemContextIntegrationTest {
                 "SELECT status FROM product_service WHERE id=?", String.class, offering.id()));
         assertEquals("PENDING_REVIEW", jdbc.queryForObject(
                 "SELECT status FROM cooperation_demand WHERE id=?", String.class, demand.id()));
+    }
+
+    @Test
+    void candidateSystemContextCanActForItsEnterpriseButCannotManageTheDemandOwnerWorkflow() {
+        seedScopes();
+        ActorScope demandAssociation = system(ASSOCIATION_A, null);
+        ActorScope candidateAssociation = system(ASSOCIATION_B, null);
+        ActorScope demandEnterprise = system(ASSOCIATION_A, ENTERPRISE_A1);
+        ActorScope candidateEnterprise = system(ASSOCIATION_B, ENTERPRISE_B2);
+        DemandView demand = openDemand(FIXTURE_PREFIX + "-跨协会候选上下文", demandEnterprise);
+        PersistedMatchView pending = matchStore.upsert(
+                demand, List.of(candidate(ENTERPRISE_B2, "B候选企业")), demandAssociation).getFirst();
+
+        assertThrows(NotFoundException.class, () -> matches.recommend(
+                pending.id(), pending.version(), candidateAssociation));
+        PersistedMatchView recommended = matches.recommend(
+                pending.id(), pending.version(), demandAssociation);
+        PersistedMatchView demandConfirmed = matches.confirm(
+                recommended.id(), recommended.version(), demandEnterprise);
+        PersistedMatchView confirmed = matches.confirm(
+                demandConfirmed.id(), demandConfirmed.version(), candidateEnterprise);
+
+        MatchInvitationRequest request = invitation(
+                ENTERPRISE_B2, Instant.now().plus(1, ChronoUnit.DAYS));
+        assertThrows(ForbiddenException.class, () -> workflow.invite(
+                confirmed.id(), confirmed.version(), request, candidateAssociation));
+        assertThrows(ForbiddenException.class, () -> matches.close(
+                confirmed.id(), confirmed.version(),
+                new MatchCloseRequest("候选协会不得关闭"), candidateAssociation));
+        assertThrows(ForbiddenException.class, () -> workflow.archive(
+                confirmed.id(), confirmed.version(),
+                new OutcomeArchiveRequest(
+                        "越权成果", "候选协会不得归档", null,
+                        "COOPERATION", "ASSOCIATION"), candidateAssociation));
+
+        MatchInvitationView invitation = workflow.invite(
+                confirmed.id(), confirmed.version(), request, demandEnterprise);
+        workflow.respond(
+                invitation.id(), invitation.version(),
+                new MatchInvitationResponse(true, "候选企业接受"), candidateEnterprise);
+        PersistedMatchView negotiating = matches.persisted(candidateEnterprise).stream()
+                .filter(value -> value.id().equals(confirmed.id()))
+                .findFirst().orElseThrow();
+        NegotiationView record = workflow.addNegotiation(
+                negotiating.id(), negotiating.version(),
+                new NegotiationRequest(
+                        "INITIAL_CONTACT", "候选企业完成首次联系", null, null),
+                candidateEnterprise);
+        assertEquals(ENTERPRISE_B2, record.enterpriseId());
     }
 
     private void assertCatalogReadScopes(

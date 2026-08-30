@@ -352,7 +352,25 @@ export interface PersistedMatch extends EcosystemMatch {
   candidateConfirmedAt: string | null
   closedReason: string | null
   version: number
+  allowedActions: MatchAction[]
 }
+
+export type MatchAction =
+  | 'RECOMMEND'
+  | 'CONFIRM'
+  | 'INVITE'
+  | 'NEGOTIATE'
+  | 'FEEDBACK'
+  | 'ARCHIVE'
+  | 'CLOSE'
+
+export type MatchNegotiationStage =
+  | 'INITIAL_CONTACT'
+  | 'TECHNICAL_EXCHANGE'
+  | 'COMMERCIAL_NEGOTIATION'
+  | 'CONTRACTING'
+  | 'CONTRACT_SIGNED'
+  | 'TERMINATED'
 
 export interface MatchInvitation {
   id: string
@@ -363,7 +381,7 @@ export interface MatchInvitation {
   status: string
   message: string | null
   responseComment: string | null
-  sentBySubject: string
+  sentBySubject: string | null
   respondedBySubject: string | null
   expiresAt: string | null
   respondedAt: string | null
@@ -380,8 +398,9 @@ export interface MatchNegotiation {
   summary: string
   nextAction: string | null
   nextActionAt: string | null
-  recordedBySubject: string
+  recordedBySubject: string | null
   createdAt: string
+  version: number
 }
 
 export interface MatchFeedback {
@@ -392,8 +411,10 @@ export interface MatchFeedback {
   outcome: string
   closeReason: string | null
   comment: string | null
-  submittedBySubject: string
+  submittedBySubject: string | null
   submittedAt: string
+  version: number
+  updatedAt: string
 }
 
 export interface MatchOutcome {
@@ -404,7 +425,7 @@ export interface MatchOutcome {
   contractAmount: number | null
   resultType: string
   visibility: string
-  archivedBySubject: string
+  archivedBySubject: string | null
   archivedAt: string
   version: number
 }

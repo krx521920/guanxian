@@ -189,9 +189,7 @@ class PostgresPolicyImpactAssociationMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .defaultSchema(schema)
                 .schemas(schema);
-        if (target != null) {
-            configuration.target(target);
-        }
+        configuration.target(target == null ? MigrationVersion.fromVersion("17") : target);
         return configuration.load();
     }
 

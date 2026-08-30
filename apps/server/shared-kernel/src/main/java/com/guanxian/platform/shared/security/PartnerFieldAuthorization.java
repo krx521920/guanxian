@@ -22,7 +22,7 @@ public interface PartnerFieldAuthorization {
             "budgetMin", "budgetMax", "responseDeadline");
     Set<String> MATCH_FIELDS = Set.of(
             "demandCompany", "demandTitle", "scene", "supplierCompany",
-            "solution", "score", "reasons", "state");
+            "solution", "score", "reasons", "state", "outcomes");
 
     Optional<Set<String>> authorizedFields(
             ActorScope actor, UUID enterpriseId, String resourceType, UUID resourceId);

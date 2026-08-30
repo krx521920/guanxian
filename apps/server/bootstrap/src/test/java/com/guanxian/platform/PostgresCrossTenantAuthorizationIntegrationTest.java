@@ -423,12 +423,20 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         UUID candidateConsent = insertConsent(
                 candidateEnterpriseId, fixture.actorAssociationId(), "MATCH", matchId,
                 Instant.now().plusSeconds(1800));
+        assertMatchVisible(fixture, matchId, false);
+        jdbc.update("""
+                UPDATE ecosystem_match
+                   SET state='RECOMMENDED', recommended_by_subject='fixture-reviewer',
+                       recommended_at=now(), review_status='APPROVED',
+                       version=version+1, updated_at=now()
+                 WHERE id=?
+                """, matchId);
         String response = mockMvc.perform(get("/api/v1/matches").with(actor(fixture.subject())))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode match = findById(objectMapper.readTree(response).path("data"), matchId);
         assertEquals("Authorized Demand Title", match.path("demandTitle").asText());
-        assertEquals("PENDING_CONFIRMATION", match.path("state").asText());
+        assertEquals("RECOMMENDED", match.path("state").asText());
         assertTrue(match.path("solution").isNull());
         assertTrue(match.path("supplierCompany").isNull());
         assertTrue(match.path("score").isNull());
@@ -443,6 +451,20 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     void bilateralConfirmationAndWorkflowStagesAreEnforcedByPostgres() throws Exception {
         WorkflowFixture fixture = workflowFixture();
 
+        String supplierPending = mockMvc.perform(get("/api/v1/matches")
+                        .with(enterpriseActor(fixture.supplierSubject())))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertFalse(containsId(objectMapper.readTree(supplierPending).path("data"), fixture.matchId()));
+        mockMvc.perform(post("/api/v1/matches/{id}/confirm", fixture.matchId())
+                        .with(enterpriseActor(fixture.supplierSubject()))
+                        .header(HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isNotFound());
+        for (String child : new String[]{"invitations", "negotiations", "feedback", "outcomes"}) {
+            mockMvc.perform(get("/api/v1/matches/{id}/" + child, fixture.matchId())
+                            .with(enterpriseActor(fixture.supplierSubject())))
+                    .andExpect(status().isNotFound());
+        }
+
         mockMvc.perform(post("/api/v1/matches/{id}/invitations", fixture.matchId())
                         .with(enterpriseActor(fixture.demandSubject()))
                         .header(HttpHeaders.IF_MATCH, "\"0\"")
@@ -450,10 +472,26 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
                         .content(invitationJson(fixture.supplierEnterpriseId())))
                 .andExpect(status().isPreconditionFailed());
 
+        JsonNode recommended = bodyData(mockMvc.perform(
+                        post("/api/v1/matches/{id}/recommend", fixture.matchId())
+                                .with(actor(fixture.reviewerSubject()))
+                                .header(HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertEquals("RECOMMENDED", recommended.path("state").asText());
+        String supplierRecommended = mockMvc.perform(get("/api/v1/matches")
+                        .with(enterpriseActor(fixture.supplierSubject())))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertTrue(containsId(objectMapper.readTree(supplierRecommended).path("data"), fixture.matchId()));
+        for (String child : new String[]{"invitations", "negotiations", "feedback", "outcomes"}) {
+            mockMvc.perform(get("/api/v1/matches/{id}/" + child, fixture.matchId())
+                            .with(enterpriseActor(fixture.supplierSubject())))
+                    .andExpect(status().isOk());
+        }
+
         JsonNode demandConfirmation = bodyData(mockMvc.perform(
                         post("/api/v1/matches/{id}/confirm", fixture.matchId())
                                 .with(enterpriseActor(fixture.demandSubject()))
-                                .header(HttpHeaders.IF_MATCH, "\"0\""))
+                                .header(HttpHeaders.IF_MATCH, "\"1\""))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertEquals("PARTIALLY_CONFIRMED", demandConfirmation.path("state").asText());
         assertFalse(demandConfirmation.path("demandConfirmedAt").isNull());
@@ -461,7 +499,7 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         JsonNode bilateral = bodyData(mockMvc.perform(
                         post("/api/v1/matches/{id}/confirm", fixture.matchId())
                                 .with(enterpriseActor(fixture.supplierSubject()))
-                                .header(HttpHeaders.IF_MATCH, "\"1\""))
+                                .header(HttpHeaders.IF_MATCH, "\"2\""))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertEquals("CONFIRMED", bilateral.path("state").asText());
         assertFalse(bilateral.path("candidateConfirmedAt").isNull());
@@ -469,7 +507,7 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         var inviteResult = mockMvc.perform(
                         post("/api/v1/matches/{id}/invitations", fixture.matchId())
                                 .with(enterpriseActor(fixture.demandSubject()))
-                                .header(HttpHeaders.IF_MATCH, "\"2\"")
+                                .header(HttpHeaders.IF_MATCH, "\"3\"")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(invitationJson(fixture.supplierEnterpriseId())))
                 .andExpect(status().isOk()).andReturn();
@@ -504,11 +542,35 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         }
         assertEquals("OUTCOME_PENDING", matchState(fixture.matchId()));
 
-        mockMvc.perform(post("/api/v1/matches/{id}/feedback", fixture.matchId())
+        var supplierFeedback0 = mockMvc.perform(post("/api/v1/matches/{id}/feedback", fixture.matchId())
                         .with(enterpriseActor(fixture.supplierSubject()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"rating\":5,\"outcome\":\"SUCCESS\",\"comment\":\"合作达成\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk()).andReturn();
+        assertEquals("\"0\"", supplierFeedback0.getResponse().getHeader(HttpHeaders.ETAG));
+        JsonNode supplierFeedbackBody = bodyData(supplierFeedback0.getResponse().getContentAsString());
+        assertTrue(supplierFeedbackBody.path("submittedBySubject").isNull());
+
+        var supplierFeedback1 = mockMvc.perform(post("/api/v1/matches/{id}/feedback", fixture.matchId())
+                        .with(enterpriseActor(fixture.supplierSubject()))
+                        .header(HttpHeaders.IF_MATCH, "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5,\"outcome\":\"SUCCESS\",\"comment\":\"一次复核\"}"))
+                .andExpect(status().isOk()).andReturn();
+        assertEquals("\"1\"", supplierFeedback1.getResponse().getHeader(HttpHeaders.ETAG));
+        var supplierFeedback2 = mockMvc.perform(post("/api/v1/matches/{id}/feedback", fixture.matchId())
+                        .with(enterpriseActor(fixture.supplierSubject()))
+                        .header(HttpHeaders.IF_MATCH, "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5,\"outcome\":\"SUCCESS\",\"comment\":\"二次复核\"}"))
+                .andExpect(status().isOk()).andReturn();
+        assertEquals("\"2\"", supplierFeedback2.getResponse().getHeader(HttpHeaders.ETAG));
+        mockMvc.perform(post("/api/v1/matches/{id}/feedback", fixture.matchId())
+                        .with(enterpriseActor(fixture.supplierSubject()))
+                        .header(HttpHeaders.IF_MATCH, "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rating\":5,\"outcome\":\"SUCCESS\",\"comment\":\"陈旧版本\"}"))
+                .andExpect(status().isPreconditionFailed());
 
         mockMvc.perform(post("/api/v1/matches/{id}/outcomes", fixture.matchId())
                         .with(enterpriseActor(fixture.demandSubject()))
@@ -584,6 +646,7 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         String suffix = UUID.randomUUID().toString();
         String demandSubject = "demand-" + suffix;
         String supplierSubject = "supplier-" + suffix;
+        String reviewerSubject = "reviewer-" + suffix;
         jdbc.update("INSERT INTO association(id,name,status) VALUES (?,?,'ACTIVE')",
                 associationId, "Workflow Association " + suffix);
         jdbc.update("""
@@ -594,10 +657,13 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         jdbc.update("""
                 INSERT INTO user_account(
                     id,association_id,enterprise_id,external_subject,username,display_name,status)
-                VALUES (?,?,?,?,?,?,'ACTIVE'), (?,?,?,?,?,?,'ACTIVE')
+                VALUES (?,?,?,?,?,?,'ACTIVE'), (?,?,?,?,?,?,'ACTIVE'),
+                       (?,?,?,?,?,?,'ACTIVE')
                 """, UUID.randomUUID(), associationId, demandEnterpriseId, demandSubject,
                 demandSubject, "Demand User", UUID.randomUUID(), associationId,
-                supplierEnterpriseId, supplierSubject, supplierSubject, "Supplier User");
+                supplierEnterpriseId, supplierSubject, supplierSubject, "Supplier User",
+                UUID.randomUUID(), associationId, null, reviewerSubject,
+                reviewerSubject, "Association Reviewer");
         jdbc.update("""
                 INSERT INTO cooperation_demand(
                     id,enterprise_id,title,description,visibility,status,version)
@@ -613,7 +679,8 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
                         'PENDING_CONFIRMATION',0)
                 """, matchId, demandId, supplierEnterpriseId);
         return new WorkflowFixture(
-                matchId, demandEnterpriseId, supplierEnterpriseId, demandSubject, supplierSubject);
+                matchId, demandEnterpriseId, supplierEnterpriseId,
+                demandSubject, supplierSubject, reviewerSubject);
     }
 
     private JsonNode bodyData(String response) throws Exception {
@@ -807,6 +874,7 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
             UUID demandEnterpriseId,
             UUID supplierEnterpriseId,
             String demandSubject,
-            String supplierSubject) {
+            String supplierSubject,
+            String reviewerSubject) {
     }
 }

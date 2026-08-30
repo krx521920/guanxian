@@ -42,8 +42,16 @@ final class EcosystemScopeGuard {
         if (actor.associationId() == null) {
             return actor.enterpriseId() == null;
         }
-        if (!catalogStore.enterpriseBelongsToAssociation(
-                match.demandEnterpriseId(), actor.associationId())) {
+        if (actor.enterpriseId() != null
+                && !catalogStore.enterpriseBelongsToAssociation(
+                actor.enterpriseId(), actor.associationId())) {
+            return false;
+        }
+        boolean participantAssociation = catalogStore.enterpriseBelongsToAssociation(
+                match.demandEnterpriseId(), actor.associationId())
+                || catalogStore.enterpriseBelongsToAssociation(
+                match.candidateEnterpriseId(), actor.associationId());
+        if (!participantAssociation) {
             return false;
         }
         return actor.enterpriseId() == null

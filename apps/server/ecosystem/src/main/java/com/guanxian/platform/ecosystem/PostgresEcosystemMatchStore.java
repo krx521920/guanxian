@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.shared.error.ForbiddenException;
+import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.RowMapper;
@@ -55,6 +56,9 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
             DemandView demand, List<MatchCandidateDraft> candidates, ActorScope actor) {
         requireSystemUpsertScope(demand, actor);
         for (MatchCandidateDraft candidate : candidates) {
+            if (demand.enterpriseId().equals(candidate.candidateEnterpriseId())) {
+                throw new PreconditionFailedException("a demand enterprise cannot be matched with itself");
+            }
             MapSqlParameterSource params = new MapSqlParameterSource()
                     .addValue("demandId", demand.id())
                     .addValue("candidateId", candidate.candidateEnterpriseId())
@@ -86,8 +90,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                         reasons=excluded.reasons,
                         version=ecosystem_match.version+1,
                         updated_at=now()
-                    WHERE ecosystem_match.state IN (
-                        'PENDING_CONFIRMATION', 'RECOMMENDED', 'PARTIALLY_CONFIRMED')
+                    WHERE ecosystem_match.state='PENDING_CONFIRMATION'
                     """, params);
         }
         return list(demand.id(), actor);
@@ -133,7 +136,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                        updated_at=now()
                  WHERE id=:id
                    AND version=:expectedVersion
-                   AND state IN ('PENDING_CONFIRMATION', 'PARTIALLY_CONFIRMED')
+                   AND state='PENDING_CONFIRMATION'
                    AND recommended_at IS NULL
                    AND deleted_at IS NULL
                 """ + writeScope("ecosystem_match", actor, false)
@@ -173,7 +176,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                  WHERE m.demand_id=d.id
                    AND m.id=:id
                    AND m.version=:expectedVersion
-                   AND m.state IN ('PENDING_CONFIRMATION', 'RECOMMENDED', 'PARTIALLY_CONFIRMED')
+                   AND m.state IN ('RECOMMENDED', 'PARTIALLY_CONFIRMED')
+                   AND m.recommended_at IS NOT NULL
                    AND (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)
                    AND ((d.enterprise_id=:enterpriseId AND m.demand_confirmed_at IS NULL)
                      OR (m.candidate_enterprise_id=:enterpriseId AND m.candidate_confirmed_at IS NULL))
@@ -216,17 +220,25 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
             if (actor.associationId() == null) {
                 actorScope = actor.enterpriseId() == null ? "TRUE" : "FALSE";
             } else if (actor.enterpriseId() != null) {
-                actorScope = "(de.association_id=:associationId OR ce.association_id=:associationId)"
-                        + " AND (d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)";
+                actorScope = "((de.association_id=:associationId"
+                        + " AND d.enterprise_id=:enterpriseId)"
+                        + " OR (m.state<>'PENDING_CONFIRMATION'"
+                        + " AND ce.association_id=:associationId"
+                        + " AND m.candidate_enterprise_id=:enterpriseId))";
             } else {
-                actorScope = "(de.association_id=:associationId OR ce.association_id=:associationId)";
+                actorScope = "(de.association_id=:associationId"
+                        + " OR (m.state<>'PENDING_CONFIRMATION'"
+                        + " AND ce.association_id=:associationId))";
             }
         } else if (actor.isAssociationStaff()) {
-            actorScope = "((de.association_id=:associationId OR ce.association_id=:associationId)"
-                    + " OR " + authorizedPartnerMatchRead() + ")";
+            actorScope = "(de.association_id=:associationId"
+                    + " OR (m.state<>'PENDING_CONFIRMATION' AND "
+                    + authorizedPartnerMatchRead() + "))";
         } else if (actor.enterpriseId() != null) {
-            actorScope = "((d.enterprise_id=:enterpriseId OR m.candidate_enterprise_id=:enterpriseId)"
-                    + " OR " + authorizedPartnerMatchRead() + ")";
+            actorScope = "(d.enterprise_id=:enterpriseId"
+                    + " OR (m.state<>'PENDING_CONFIRMATION'"
+                    + " AND (m.candidate_enterprise_id=:enterpriseId OR "
+                    + authorizedPartnerMatchRead() + ")))";
         } else {
             actorScope = "FALSE";
         }
@@ -240,7 +252,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
 
     private static String authorizedPartnerMatchRead() {
         return "(" + authorizedPartnerOwner("de", "d.enterprise_id")
-                + " AND (d.enterprise_id=m.candidate_enterprise_id OR "
+                + " AND (d.enterprise_id=m.candidate_enterprise_id"
+                + " OR ce.association_id=:associationId OR "
                 + authorizedPartnerOwner("ce", "m.candidate_enterprise_id") + "))";
     }
 
@@ -291,13 +304,18 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 return " AND FALSE";
             }
             scope = " AND EXISTS (SELECT 1 FROM cooperation_demand scope_demand"
-                    + " JOIN enterprise scope_enterprise"
-                    + " ON scope_enterprise.id=scope_demand.enterprise_id"
+                    + " JOIN enterprise scope_demand_enterprise"
+                    + " ON scope_demand_enterprise.id=scope_demand.enterprise_id"
+                    + " JOIN enterprise scope_candidate_enterprise"
+                    + " ON scope_candidate_enterprise.id=" + matchAlias + ".candidate_enterprise_id"
                     + " WHERE scope_demand.id=" + matchAlias + ".demand_id"
-                    + " AND scope_enterprise.association_id=:associationId"
-                    + (actor.enterpriseId() == null ? ""
-                    : " AND (scope_demand.enterprise_id=:contextEnterpriseId"
-                    + " OR " + matchAlias + ".candidate_enterprise_id=:contextEnterpriseId)")
+                    + (actor.enterpriseId() == null
+                    ? " AND (scope_demand_enterprise.association_id=:associationId"
+                    + " OR scope_candidate_enterprise.association_id=:associationId)"
+                    : " AND ((scope_demand_enterprise.association_id=:associationId"
+                    + " AND scope_demand.enterprise_id=:contextEnterpriseId)"
+                    + " OR (scope_candidate_enterprise.association_id=:associationId"
+                    + " AND " + matchAlias + ".candidate_enterprise_id=:contextEnterpriseId))")
                     + ")";
         } else if (actor.isAssociationStaff()) {
             if (actor.associationId() == null) {
@@ -390,7 +408,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 instant(rs.getTimestamp("candidate_confirmed_at")),
                 rs.getString("closed_reason"),
                 rs.getLong("version"),
-                rs.getTimestamp("updated_at").toInstant());
+                rs.getTimestamp("updated_at").toInstant(),
+                java.util.Set.of());
     }
 
     private static Instant instant(java.sql.Timestamp value) {
