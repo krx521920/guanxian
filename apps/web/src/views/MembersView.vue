@@ -10,6 +10,7 @@ import { useAuth } from '../services/auth'
 import { ApiRequestError } from '../services/http'
 import { platformApi } from '../services/platform-api'
 import type { MemberImportPreview, MemberProfile } from '../types/domain'
+import { formatDateTime } from './business-form'
 
 const auth = useAuth()
 const route = useRoute()
@@ -48,6 +49,7 @@ async function load() {
 
 function changePage(value: number) { page.value = value; void load() }
 function resizePage(value: number) { size.value = value; page.value = 0; void load() }
+function clearFilters() { keyword.value = ''; status.value = '全部'; includeDeleted.value = false }
 
 watch([keyword, status, includeDeleted], () => {
   if (searchTimer !== null) window.clearTimeout(searchTimer)
@@ -171,17 +173,18 @@ onMounted(async () => {
 
     <section class="panel filter-panel">
       <div class="search-box"><span>⌕</span><input v-model="keyword" placeholder="搜索企业名称、业务角色或产品服务" /></div>
-      <select v-model="status" class="filter-select"><option>全部</option><option>已认证</option><option>待完善</option><option>待审核</option><option>已停用</option><option v-if="includeDeleted">已删除</option></select>
+      <select v-model="status" class="filter-select" aria-label="企业状态"><option>全部</option><option>已认证</option><option>待完善</option><option>待审核</option><option>已停用</option><option v-if="includeDeleted">已删除</option></select>
       <label v-if="canManageDeleted" class="checkbox-field"><input v-model="includeDeleted" type="checkbox" /> 包含已删除</label>
       <span class="result-count">共 {{ total }} 家企业</span>
     </section>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else class="panel flush-panel">
-      <div class="data-table-wrap"><table class="data-table member-table"><thead><tr><th>企业</th><th>业务角色 / 场景</th><th>主要产品与服务</th><th>资料完整度</th><th>状态</th><th>更新日期</th><th></th></tr></thead><tbody>
-        <tr v-for="item in filtered" :key="item.id"><td><div class="enterprise-cell"><span class="enterprise-logo">{{ item.shortName.slice(0, 2) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.city || '未填写地址' }} · 联系人：{{ item.contact || '未填写' }}</small></div></div></td><td><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td><td>{{ item.products.join('、') || '—' }}</td><td><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td><td><StatusBadge :value="item.status" /></td><td class="table-muted">{{ item.updatedAt }}</td><td><div class="inline-actions"><button class="text-button" :disabled="viewBusy" @click="viewMember(item.id, Boolean(item.deletedAt))">查看</button><RouterLink v-if="item.canEdit || item.canReview" class="row-action" :to="`/members/${item.id}/edit`">{{ item.canReview && item.status === '待审核' ? '审核' : '编辑' }}</RouterLink><button v-if="canManageDeleted" class="text-button" :class="{ 'danger-text': !item.deletedAt }" :disabled="importBusy" @click="toggleDeleted(item)">{{ item.deletedAt ? '恢复' : '删除' }}</button></div></td></tr>
+      <div v-if="filtered.length" class="data-table-wrap"><table class="data-table member-table"><thead><tr><th>企业</th><th>业务角色 / 场景</th><th>主要产品与服务</th><th>资料完整度</th><th>状态</th><th>更新日期</th><th></th></tr></thead><tbody>
+        <tr v-for="item in filtered" :key="item.id"><td data-label="企业"><div class="enterprise-cell"><span class="enterprise-logo">{{ item.shortName.slice(0, 2) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.city || '未填写地址' }} · 联系人：{{ item.contact || '未填写' }}</small></div></div></td><td data-label="业务角色 / 场景"><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td><td data-label="主要产品与服务">{{ item.products.join('、') || '—' }}</td><td data-label="资料完整度"><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td><td data-label="状态"><StatusBadge :value="item.status" /></td><td data-label="更新日期" class="table-muted">{{ formatDateTime(item.updatedAt) }}</td><td data-label="操作"><div class="inline-actions"><button class="text-button" :disabled="viewBusy" @click="viewMember(item.id, Boolean(item.deletedAt))">查看</button><RouterLink v-if="item.canEdit || item.canReview" class="row-action" :to="`/members/${item.id}/edit`">{{ item.canReview && item.status === '待审核' ? '审核' : '编辑' }}</RouterLink><button v-if="canManageDeleted" class="text-button" :class="{ 'danger-text': !item.deletedAt }" :disabled="importBusy" @click="toggleDeleted(item)">{{ item.deletedAt ? '恢复' : '删除' }}</button></div></td></tr>
       </tbody></table></div>
+      <div v-else class="empty-business-state"><b>暂无符合条件的会员企业</b><span>可以调整关键词或状态筛选后重试。</span><button class="secondary-button small" type="button" @click="clearFilters">清除筛选</button></div>
       <PaginationBar :page="page" :size="size" :total="total" :disabled="loading" @change="changePage" @resize="resizePage" />
     </section>
-    <div v-if="viewing" class="modal-backdrop" @click.self="viewing = null"><section class="panel modal-card"><div class="modal-head"><div><span class="eyebrow">MEMBER PROFILE</span><h2>{{ viewing.name }}</h2></div><button class="icon-button" @click="viewing = null">×</button></div><div class="detail-grid"><div><span>单位类别</span><strong>{{ viewing.category }}</strong></div><div><span>信用代码</span><strong>{{ viewing.unifiedSocialCreditCode || '—' }}</strong></div><div><span>联系人</span><strong>{{ viewing.contactName || '—' }}</strong></div><div><span>联系电话</span><strong>{{ viewing.contactPhone || '—' }}</strong></div></div><div class="modal-copy"><h3>企业简介</h3><p>{{ viewing.introduction || '暂无简介' }}</p><h3>核心能力</h3><div class="tags"><span v-for="value in viewing.capabilities" :key="value">{{ value }}</span></div><h3>产品与服务</h3><div class="tags"><span v-for="value in viewing.products" :key="value">{{ value }}</span></div><h3>合作需求</h3><div class="tags"><span v-for="value in viewing.cooperationNeeds" :key="value">{{ value }}</span></div></div></section></div>
+    <div v-if="viewing" class="modal-backdrop" @click.self="viewing = null"><section class="panel modal-card"><div class="modal-head"><div><span class="eyebrow">MEMBER PROFILE</span><h2>{{ viewing.name }}</h2></div><button class="icon-button" aria-label="关闭会员详情" @click="viewing = null">×</button></div><div class="detail-grid"><div><span>单位类别</span><strong>{{ viewing.category }}</strong></div><div><span>信用代码</span><strong>{{ viewing.unifiedSocialCreditCode || '—' }}</strong></div><div><span>联系人</span><strong>{{ viewing.contactName || '—' }}</strong></div><div><span>联系电话</span><strong>{{ viewing.contactPhone || '—' }}</strong></div></div><div class="modal-copy"><h3>企业简介</h3><p>{{ viewing.introduction || '暂无简介' }}</p><h3>核心能力</h3><div class="tags"><span v-for="value in viewing.capabilities" :key="value">{{ value }}</span></div><h3>产品与服务</h3><div class="tags"><span v-for="value in viewing.products" :key="value">{{ value }}</span></div><h3>合作需求</h3><div class="tags"><span v-for="value in viewing.cooperationNeeds" :key="value">{{ value }}</span></div></div></section></div>
   </div>
 </template>

@@ -13,6 +13,9 @@ describe('business form helpers', () => {
 
   it('maps persisted workflow states for display', () => {
     expect(displayBusinessStatus('PENDING_REVIEW')).toBe('待审核')
+    expect(displayBusinessStatus('HIGH')).toBe('高')
+    expect(displayBusinessStatus('MEDIUM')).toBe('中')
+    expect(displayBusinessStatus('LOW')).toBe('低')
     expect(displayBusinessStatus('CUSTOM')).toBe('CUSTOM')
   })
 })

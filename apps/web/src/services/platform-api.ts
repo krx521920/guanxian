@@ -153,9 +153,10 @@ export const platformApi = {
   previewMemberImport,
   memberImportPreview: (batchId: string) => request<MemberImportPreview>(`/members/imports/${encodeURIComponent(batchId)}`),
   commitMemberImport: (batchId: string) => request<MemberImportCommitResult>(`/members/imports/${encodeURIComponent(batchId)}/commit`, { method: 'POST' }),
-  policies: (query = '', page = 0, size = 20, includeDeleted = false) => request<EcosystemPage<Policy>>(
-    `/policies/page?q=${encodeURIComponent(query)}&page=${page}&size=${size}&includeDeleted=${includeDeleted}`,
+  policies: (query = '', page = 0, size = 20, includeDeleted = false, level = '') => request<EcosystemPage<Policy>>(
+    `/policies/page?q=${encodeURIComponent(query)}&level=${encodeURIComponent(level)}&page=${page}&size=${size}&includeDeleted=${includeDeleted}`,
   ),
+  policyLevels: () => request<string[]>('/policies/levels'),
   policy: (id: string) => request<Policy>(`/policies/${encodeURIComponent(id)}`),
   createPolicy: (payload: PolicyUpsertPayload) => request<Policy>('/policies', { method: 'POST', body: JSON.stringify(payload) }),
   updatePolicy: (id: string, payload: PolicyUpsertPayload, version: number) => request<Policy>(`/policies/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'If-Match': etag(version) }, body: JSON.stringify(payload) }),
@@ -200,8 +201,8 @@ export const platformApi = {
   matchOutcomes: (matchId: string) => request<MatchOutcome[]>(`/matches/${encodeURIComponent(matchId)}/outcomes`),
   archiveMatchOutcome: (item: PersistedMatch, payload: { title: string; summary: string; contractAmount: number | null; resultType: string; visibility: string }) => request<MatchOutcome>(`/matches/${encodeURIComponent(item.id)}/outcomes`, { method: 'POST', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify(payload) }),
 
-  collaborations: (query = '', page = 0, size = 20, includeDeleted = false) => request<EcosystemPage<Collaboration>>(
-    `/collaborations/page?query=${encodeURIComponent(query)}&page=${page}&size=${size}&includeDeleted=${includeDeleted}`,
+  collaborations: (query = '', page = 0, size = 20, includeDeleted = false, stage = '') => request<EcosystemPage<Collaboration>>(
+    `/collaborations/page?query=${encodeURIComponent(query)}&stage=${encodeURIComponent(stage)}&page=${page}&size=${size}&includeDeleted=${includeDeleted}`,
   ),
   collaboration: (id: string) => request<Collaboration>(`/collaborations/${encodeURIComponent(id)}`),
   createCollaboration: (payload: CollaborationUpsertPayload) => request<Collaboration>('/collaborations', { method: 'POST', body: JSON.stringify(payload) }),

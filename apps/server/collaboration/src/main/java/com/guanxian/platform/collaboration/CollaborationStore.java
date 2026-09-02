@@ -8,9 +8,10 @@ import java.util.UUID;
 
 interface CollaborationStore {
     List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit);
+            ActorScope actor, String query, String stageGroup,
+            boolean includeDeleted, int offset, int limit);
 
-    long count(ActorScope actor, String query, boolean includeDeleted);
+    long count(ActorScope actor, String query, String stageGroup, boolean includeDeleted);
 
     Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted);
 

@@ -113,9 +113,22 @@ class CollaborationServiceTest {
         assertTrue(service.findAll(enterprise()).stream()
                 .anyMatch(item -> item.id().equals(created.id())));
         CollaborationPage<CollaborationView> page =
-                service.page(enterprise(), "唯一检索词", false, 0, 20);
+                service.page(enterprise(), "唯一检索词", null, false, 0, 20);
         assertEquals(1, page.total());
         assertEquals(created.id(), page.items().getFirst().id());
+    }
+
+    @Test
+    void stageGroupsAreFilteredBeforePaginationAndCounting() {
+        CollaborationPage<CollaborationView> active =
+                service.page(reviewer(), "", "ACTIVE", false, 0, 20);
+        CollaborationPage<CollaborationView> completed =
+                service.page(reviewer(), "", "COMPLETED", false, 0, 20);
+
+        assertEquals(3, active.total());
+        assertTrue(active.items().stream().noneMatch(item -> "COMPLETED".equals(item.stage())));
+        assertEquals(1, completed.total());
+        assertTrue(completed.items().stream().allMatch(item -> "COMPLETED".equals(item.stage())));
     }
 
     private static CollaborationUpsertRequest request(String title) {

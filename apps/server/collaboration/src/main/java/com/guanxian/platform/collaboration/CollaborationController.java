@@ -42,19 +42,20 @@ public class CollaborationController {
             @RequestParam(required = false) String query,
             Authentication authentication) {
         return ApiResponse.ok(collaborationService.page(
-                actor(authentication), query, false, 0, 100).items());
+                actor(authentication), query, null, false, 0, 100).items());
     }
 
     @GetMapping("/page")
     @PreAuthorize("hasAuthority('COLLABORATION_READ')")
     ApiResponse<CollaborationPage<CollaborationView>> page(
             @RequestParam(required = false) String query,
+            @RequestParam(required = false) String stage,
             @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication) {
         return ApiResponse.ok(collaborationService.page(
-                actor(authentication), query, includeDeleted, page, size));
+                actor(authentication), query, stage, includeDeleted, page, size));
     }
 
     @GetMapping("/{id}")

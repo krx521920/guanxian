@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -59,11 +60,13 @@ class InMemoryCollaborationStore implements CollaborationStore {
 
     @Override
     public List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, String stageGroup,
+            boolean includeDeleted, int offset, int limit) {
         return items.values().stream()
                 .filter(item -> includeDeleted || !item.deleted())
                 .filter(item -> canRead(actor, item))
                 .filter(item -> matches(query, item))
+                .filter(item -> matchesStageGroup(stageGroup, item))
                 .sorted(Comparator.comparing(CollaborationView::updatedAt).reversed()
                         .thenComparing(CollaborationView::id))
                 .skip(offset)
@@ -72,12 +75,22 @@ class InMemoryCollaborationStore implements CollaborationStore {
     }
 
     @Override
-    public long count(ActorScope actor, String query, boolean includeDeleted) {
+    public long count(ActorScope actor, String query, String stageGroup, boolean includeDeleted) {
         return items.values().stream()
                 .filter(item -> includeDeleted || !item.deleted())
                 .filter(item -> canRead(actor, item))
                 .filter(item -> matches(query, item))
+                .filter(item -> matchesStageGroup(stageGroup, item))
                 .count();
+    }
+
+    private static boolean matchesStageGroup(String stageGroup, CollaborationView item) {
+        if (stageGroup == null) {
+            return true;
+        }
+        return "COMPLETED".equals(stageGroup)
+                ? "COMPLETED".equals(item.stage())
+                : !Set.of("COMPLETED", "DISABLED").contains(item.stage()) && !item.disabled();
     }
 
     @Override

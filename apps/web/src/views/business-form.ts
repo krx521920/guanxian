@@ -27,6 +27,7 @@ export function displayBusinessStatus(value: string): string {
     SUCCESS: '已达成合作', NO_DEAL: '未达成合作', WITHDRAWN: '主动退出',
     COMPLETED: '已完成', OPEN: '已开放',
     IN_PROGRESS: '进行中', PENDING: '待处理', SUSPENDED: '已暂停', REVOKED: '已撤销',
+    HIGH: '高', MEDIUM: '中', LOW: '低',
   }
   return labels[value] || value || '未知'
 }

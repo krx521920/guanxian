@@ -220,9 +220,9 @@ describe('member ETag API contract', () => {
       { url: '/api/v1/members/page?q=&status=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80/commit', method: 'POST' },
-      { url: '/api/v1/policies/page?q=&page=0&size=20&includeDeleted=false', method: 'GET' },
+      { url: '/api/v1/policies/page?q=&level=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/matches', method: 'GET' },
-      { url: '/api/v1/collaborations/page?query=&page=0&size=20&includeDeleted=false', method: 'GET' },
+      { url: '/api/v1/collaborations/page?query=&stage=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/notifications/messages?unreadOnly=true&page=2&size=15', method: 'GET' },
       { url: '/api/v1/notifications/messages/message%20%2F%E4%B8%80/read', method: 'PUT' },
     ])

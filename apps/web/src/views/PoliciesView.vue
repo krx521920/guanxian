@@ -24,6 +24,7 @@ const error = ref<PageResourceError | null>(null)
 const message = ref('')
 const activeLevel = ref('全部')
 const keyword = ref('')
+const policyLevels = ref<string[]>([])
 const selected = ref<Policy | null>(null)
 const createOpen = ref(false)
 const subscriptionOpen = ref(false)
@@ -32,22 +33,23 @@ const qaQuestion = ref('')
 const qaAnswer = ref<PolicyQuestionAnswer | null>(null)
 const qaBusy = ref(false)
 const qaError = ref('')
-const levels = computed(() => ['全部', ...new Set(items.value.map((item) => item.level).filter(Boolean))])
+const levels = computed(() => ['全部', ...policyLevels.value])
 const canWrite = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR'].includes(auth.user.value?.role || ''))
 const canReview = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'].includes(auth.user.value?.role || ''))
 const affectedEnterprises = computed(() => new Set(impacts.value.map((item) => item.enterpriseId)).size)
-const filtered = computed(() => items.value.filter((item) => {
-  const text = `${item.title}${item.authority}${item.summary || ''}${(item.tags || []).join('')}`
-  return (activeLevel.value === '全部' || item.level === activeLevel.value) && (!keyword.value || text.includes(keyword.value))
-}))
+const filtered = computed(() => items.value)
 const form = reactive({ title: '', authority: '', documentNumber: '', level: '', category: '', publishDate: '', effectiveDate: '', sourceUrl: '', summary: '', tags: '', visibility: 'MEMBERS' })
 let searchTimer: number | null = null
 
 async function load() {
   loading.value = true; error.value = null
   try {
-    const [policies, impactPage] = await Promise.all([platformApi.policies(keyword.value.trim(), page.value, size.value), platformApi.policyImpacts()])
-    items.value = policies.items; total.value = policies.total; page.value = policies.page; size.value = policies.size; impacts.value = impactPage.items
+    const [policies, impactPage, visibleLevels] = await Promise.all([
+      platformApi.policies(keyword.value.trim(), page.value, size.value, false, activeLevel.value === '全部' ? '' : activeLevel.value),
+      platformApi.policyImpacts(),
+      platformApi.policyLevels(),
+    ])
+    items.value = policies.items; total.value = policies.total; page.value = policies.page; size.value = policies.size; impacts.value = impactPage.items; policyLevels.value = visibleLevels
     if (!policies.items.length && policies.total > 0 && page.value > 0) { page.value -= 1; await load() }
   } catch (reason) { error.value = safePageResourceError(reason) }
   finally { loading.value = false }
@@ -89,7 +91,7 @@ function replace(saved: Policy) { items.value = items.value.map((item) => item.i
 function changePage(value: number) { page.value = value; void load() }
 function resizePage(value: number) { size.value = value; page.value = 0; void load() }
 
-watch(keyword, () => {
+watch([keyword, activeLevel], () => {
   if (searchTimer !== null) window.clearTimeout(searchTimer)
   searchTimer = window.setTimeout(() => { page.value = 0; void load() }, 300)
 })

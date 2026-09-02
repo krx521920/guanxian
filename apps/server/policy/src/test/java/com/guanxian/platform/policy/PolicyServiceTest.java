@@ -78,11 +78,22 @@ class PolicyServiceTest {
         PolicyView deleted = service.delete(UUID.fromString(created.id()), 0, admin);
 
         assertThat(deleted.deleted()).isTrue();
-        assertThat(service.page(admin, "可恢复政策", false, 0, 20).items()).isEmpty();
+        assertThat(service.page(admin, "可恢复政策", null, false, 0, 20).items()).isEmpty();
         PolicyView restored = service.restore(UUID.fromString(created.id()), 1, admin);
         assertThat(restored.deleted()).isFalse();
         assertThat(restored.status()).isEqualTo("DRAFT");
         assertThat(restored.version()).isEqualTo(2);
+    }
+
+    @Test
+    void levelFilterIsAppliedBeforePaginationAndExposesVisibleFacets() {
+        ActorScope admin = associationAdmin(ASSOCIATION_A);
+
+        PolicyPage page = service.page(admin, "", "北京市", false, 0, 20);
+
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.items()).extracting(PolicyView::level).containsOnly("北京市");
+        assertThat(service.levels(admin)).containsExactly("北京市", "国家");
     }
 
     private static PolicyUpsertRequest request(String title, String visibility) {

@@ -47,11 +47,14 @@ class InMemoryPolicyStore implements PolicyStore {
     }
 
     @Override
-    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+    public List<PolicyView> list(
+            ActorScope actor, String query, String level,
+            boolean includeDeleted, int offset, int limit) {
         return policies.values().stream()
                 .filter(policy -> includeDeleted || !policy.deleted())
                 .filter(policy -> canRead(actor, policy))
                 .filter(policy -> matches(query, policy))
+                .filter(policy -> level == null || level.equals(policy.level()))
                 .sorted(Comparator.comparing(PolicyView::updatedAt).reversed().thenComparing(PolicyView::id))
                 .skip(offset)
                 .limit(limit)
@@ -59,12 +62,25 @@ class InMemoryPolicyStore implements PolicyStore {
     }
 
     @Override
-    public long count(ActorScope actor, String query, boolean includeDeleted) {
+    public long count(ActorScope actor, String query, String level, boolean includeDeleted) {
         return policies.values().stream()
                 .filter(policy -> includeDeleted || !policy.deleted())
                 .filter(policy -> canRead(actor, policy))
                 .filter(policy -> matches(query, policy))
+                .filter(policy -> level == null || level.equals(policy.level()))
                 .count();
+    }
+
+    @Override
+    public List<String> levels(ActorScope actor) {
+        return policies.values().stream()
+                .filter(policy -> !policy.deleted())
+                .filter(policy -> canRead(actor, policy))
+                .map(PolicyView::level)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     @Override

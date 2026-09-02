@@ -42,18 +42,28 @@ public class CollaborationService {
 
     @Transactional(readOnly = true)
     public List<CollaborationView> findAll(ActorScope actor) {
-        return store.list(actor, null, false, 0, 100);
+        return store.list(actor, null, null, false, 0, 100);
     }
 
     @Transactional(readOnly = true)
     public CollaborationPage<CollaborationView> page(
-            ActorScope actor, String query, boolean includeDeleted, int page, int size) {
+            ActorScope actor, String query, String stageGroup,
+            boolean includeDeleted, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         boolean allowedDeleted = includeDeleted && canManageDeleted(actor);
+        String safeStageGroup = normalizeStageGroup(stageGroup);
         return new CollaborationPage<>(
-                store.list(actor, query, allowedDeleted, safePage * safeSize, safeSize),
-                store.count(actor, query, allowedDeleted), safePage, safeSize);
+                store.list(actor, query, safeStageGroup, allowedDeleted, safePage * safeSize, safeSize),
+                store.count(actor, query, safeStageGroup, allowedDeleted), safePage, safeSize);
+    }
+
+    private static String normalizeStageGroup(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        return Set.of("ACTIVE", "COMPLETED").contains(normalized) ? normalized : null;
     }
 
     @Transactional(readOnly = true)

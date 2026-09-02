@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import StatusBadge from '../components/StatusBadge.vue'
@@ -261,11 +261,11 @@ onMounted(load)
         <div class="match-actions"><StatusBadge :value="displayBusinessStatus(item.state)" /><small>{{ formatDateTime(item.updatedAt) }}</small><button class="primary-button small" @click="openDetail(item)">查看匹配详情</button></div>
         <div class="match-reasons"><b>推荐理由</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span></div>
       </article>
-      <div v-if="!filtered.length" class="panel empty-business-state"><b>暂无匹配记录</b><span>企业管理员可选择已发布需求生成匹配；数据不足时系统会如实显示空状态。</span></div>
+      <div v-if="!filtered.length" class="panel empty-business-state"><b>暂无匹配记录</b><span>请先发布需求并完善在架能力，系统才有可用于匹配的真实数据。</span><RouterLink class="secondary-button small row-action" to="/ecosystem">前往供需信息</RouterLink></div>
     </section>
 
     <div v-if="rulesOpen" class="modal-backdrop" @click.self="rulesOpen = false"><section class="panel modal-card compact-modal"><div class="modal-head"><div><span class="eyebrow">MATCH EXPLAINABILITY</span><h2>匹配依据</h2></div><button class="icon-button" @click="rulesOpen = false">×</button></div><div class="modal-copy"><p>系统从需求场景、所需能力、供给方产品/服务、资质与数据可见性中生成候选。</p><p>分数和推荐理由以后端每条记录为准，页面不伪造固定权重。</p><p>匹配不会自动对外推送：必须经协会推荐、企业确认后才进入洽谈。</p></div><div class="form-actions"><button class="primary-button" @click="rulesOpen = false">我知道了</button></div></section></div>
-    <div v-if="generatorOpen" class="modal-backdrop" @click.self="generatorOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="generate()"><div class="modal-head"><div><span class="eyebrow">GENERATE MATCHES</span><h2>选择真实需求</h2></div><button type="button" class="icon-button" @click="generatorOpen = false">×</button></div><div class="form-grid modal-form"><label class="form-span-2"><span>需求 *</span><select v-model="selectedDemandId" required><option value="" disabled>请选择</option><option v-for="demand in demands" :key="demand.id" :value="demand.id">{{ demand.title }} · {{ demand.enterpriseName }}</option></select></label></div><div class="form-actions"><button type="button" class="secondary-button" @click="generatorOpen = false">取消</button><button class="primary-button" :disabled="busy">{{ busy ? '正在匹配…' : '生成并保存匹配' }}</button></div></form></div>
+    <div v-if="generatorOpen" class="modal-backdrop" @click.self="generatorOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="generate()"><div class="modal-head"><div><span class="eyebrow">GENERATE MATCHES</span><h2>选择真实需求</h2></div><button type="button" class="icon-button" aria-label="关闭匹配生成窗口" @click="generatorOpen = false">×</button></div><div class="form-grid modal-form"><label v-if="demands.length" class="form-span-2"><span>需求 *</span><select v-model="selectedDemandId" required><option value="" disabled>请选择</option><option v-for="demand in demands" :key="demand.id" :value="demand.id">{{ demand.title }} · {{ demand.enterpriseName }}</option></select></label><div v-else class="form-span-2 empty-business-state"><b>暂无可匹配需求</b><span>请先在供需信息中发布并审核需求。</span><RouterLink class="secondary-button small row-action" to="/ecosystem">前往供需信息</RouterLink></div></div><div class="form-actions"><button type="button" class="secondary-button" @click="generatorOpen = false">取消</button><button class="primary-button" :disabled="busy || !selectedDemandId">{{ busy ? '正在匹配…' : '生成并保存匹配' }}</button></div></form></div>
     <div v-if="selected" class="modal-backdrop" @click.self="selected = null">
       <section class="panel modal-card match-detail-modal">
         <div class="modal-head">

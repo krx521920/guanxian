@@ -46,24 +46,27 @@ class PostgresCollaborationStore implements CollaborationStore {
 
     @Override
     public List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
-        MapSqlParameterSource values = params(actor, query).addValue("offset", offset).addValue("limit", limit);
-        return jdbc.query(SELECT + where(actor, query, includeDeleted)
+            ActorScope actor, String query, String stageGroup,
+            boolean includeDeleted, int offset, int limit) {
+        MapSqlParameterSource values = params(actor, query, stageGroup)
+                .addValue("offset", offset).addValue("limit", limit);
+        return jdbc.query(SELECT + where(actor, query, stageGroup, includeDeleted)
                 + " ORDER BY c.updated_at DESC, c.id LIMIT :limit OFFSET :offset", values, mapper);
     }
 
     @Override
-    public long count(ActorScope actor, String query, boolean includeDeleted) {
+    public long count(ActorScope actor, String query, String stageGroup, boolean includeDeleted) {
         Long count = jdbc.queryForObject("SELECT count(*) FROM collaboration_task c"
-                + where(actor, query, includeDeleted), params(actor, query), Long.class);
+                + where(actor, query, stageGroup, includeDeleted),
+                params(actor, query, stageGroup), Long.class);
         return count == null ? 0 : count;
     }
 
     @Override
     public Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted) {
         List<CollaborationView> values = jdbc.query(
-                SELECT + where(actor, null, includeDeleted) + " AND c.id=:id",
-                params(actor, null).addValue("id", id), mapper);
+                SELECT + where(actor, null, null, includeDeleted) + " AND c.id=:id",
+                params(actor, null, null).addValue("id", id), mapper);
         return values.stream().findFirst();
     }
 
@@ -255,7 +258,7 @@ class PostgresCollaborationStore implements CollaborationStore {
                 """, values);
     }
 
-    private String where(ActorScope actor, String query, boolean includeDeleted) {
+    private String where(ActorScope actor, String query, String stageGroup, boolean includeDeleted) {
         StringBuilder sql = new StringBuilder(" WHERE ");
         if (actor.isSystemAdmin()) {
             sql.append("TRUE");
@@ -282,13 +285,19 @@ class PostgresCollaborationStore implements CollaborationStore {
                     .append(" OR lower(coalesce(c.owner_subject,'')) LIKE :query")
                     .append(" OR lower(c.participants::text) LIKE :query)");
         }
+        if ("COMPLETED".equals(stageGroup)) {
+            sql.append(" AND c.status='COMPLETED'");
+        } else if ("ACTIVE".equals(stageGroup)) {
+            sql.append(" AND c.status NOT IN ('COMPLETED','DISABLED') AND c.disabled_at IS NULL");
+        }
         return sql.toString();
     }
 
-    private MapSqlParameterSource params(ActorScope actor, String query) {
+    private MapSqlParameterSource params(ActorScope actor, String query, String stageGroup) {
         return new MapSqlParameterSource().addValue("associationId", actor.associationId())
                 .addValue("enterpriseId", actor.enterpriseId())
-                .addValue("query", query == null ? null : "%" + query.trim().toLowerCase() + "%");
+                .addValue("query", query == null ? null : "%" + query.trim().toLowerCase() + "%")
+                .addValue("stageGroup", stageGroup);
     }
 
     private MapSqlParameterSource valueParams(CollaborationUpsertRequest request, ActorScope actor) {
