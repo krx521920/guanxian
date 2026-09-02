@@ -8,9 +8,12 @@ import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
+import com.guanxian.platform.shared.notification.BusinessNotification;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +29,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MemberServiceInvariantTest {
     private static final UUID ASSOCIATION = UUID.fromString("71000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_ASSOCIATION = UUID.fromString("71000000-0000-0000-0000-000000000002");
+
+    @Test
+    void memberReviewPublishesARecipientScopedNotification() {
+        List<BusinessNotification> notifications = new ArrayList<>();
+        MemberService service = new MemberService(
+                new InMemoryMemberRepository(), new InMemoryAuditTrail(),
+                PartnerFieldAuthorization.allowAll(),
+                (event, actor) -> { notifications.add(event); return 1; });
+        var pending = service.create(request("待审核通知企业", "NOTICE001", "PENDING_REVIEW"));
+        ActorScope reviewer = new ActorScope(
+                UUID.randomUUID(), "reviewer", "reviewer", pending.associationId(), null,
+                Set.of("ASSOCIATION_ADMIN"), Set.of());
+
+        var reviewed = service.review(
+                pending.id(), pending.version(), new MemberReviewRequest("ACTIVE", "资料完整"), reviewer);
+
+        assertEquals(1, notifications.size());
+        assertEquals("MEMBER_REVIEWED", notifications.getFirst().notificationType());
+        assertEquals(List.of(reviewed.id()), notifications.getFirst().enterpriseIds());
+        assertEquals(reviewed.version(), notifications.getFirst().resourceVersion());
+    }
 
     @Test
     void allMutationsShareTheSameIntrinsicLock() throws Exception {

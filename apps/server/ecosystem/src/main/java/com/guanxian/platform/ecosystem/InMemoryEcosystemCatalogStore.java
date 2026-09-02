@@ -302,6 +302,11 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
+    public boolean enterpriseHistoricallyBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return associationId != null && associationId.equals(enterpriseAssociations.get(enterpriseId));
+    }
+
+    @Override
     public void recordChange(
             ActorScope actor,
             String action,

@@ -19,6 +19,9 @@ const auditSize = ref(20)
 const auditTotal = ref(0)
 const auditSnapshotId = ref<number | null>(null)
 const bindings = ref<AccessBinding[]>([])
+const bindingPage = ref(0)
+const bindingSize = ref(20)
+const bindingTotal = ref(0)
 const enterprises = ref<SystemEnterpriseOption[]>([])
 const auditLoading = ref(false)
 const bindingLoading = ref(false)
@@ -82,13 +85,16 @@ async function loadBindings() {
   bindingError.value = null
   try {
     const [values, enterpriseValues] = await Promise.all([
-      platformApi.accessBindings(),
+      platformApi.accessBindingPage(bindingPage.value, bindingSize.value),
       currentAssociationId.value
         ? platformApi.systemEnterprises(currentAssociationId.value)
         : Promise.resolve([]),
     ])
     if (!bindingRequestGate.isCurrent(requestEpoch)) return
-    bindings.value = values
+    bindings.value = values.items
+    bindingPage.value = values.page
+    bindingSize.value = values.size
+    bindingTotal.value = values.total
     enterprises.value = enterpriseValues
   } catch (reason) {
     if (bindingRequestGate.isCurrent(requestEpoch)) bindingError.value = safePageResourceError(reason)
@@ -184,6 +190,8 @@ function details(value: Record<string, unknown>): string {
 function refreshAudit() { selectedAudit.value = null; auditSnapshotId.value = null; auditPage.value = 0; void loadAudit() }
 function changeAuditPage(value: number) { auditPage.value = value; void loadAudit() }
 function resizeAuditPage(value: number) { auditSize.value = value; auditPage.value = 0; void loadAudit() }
+function changeBindingPage(value: number) { bindingPage.value = value; void loadBindings() }
+function resizeBindingPage(value: number) { bindingSize.value = value; bindingPage.value = 0; void loadBindings() }
 
 watch(
   () => `${currentAssociationId.value || ''}:${currentEnterpriseId.value || ''}`,
@@ -194,6 +202,8 @@ watch(
     auditItems.value = []
     selectedAudit.value = null
     bindings.value = []
+    bindingPage.value = 0
+    bindingTotal.value = 0
     enterprises.value = []
     auditPage.value = 0
     auditSnapshotId.value = null
@@ -231,6 +241,7 @@ onMounted(loadAll)
       <AsyncResourceState v-if="bindingLoading || bindingError" :loading="bindingLoading" :error="bindingError" @retry="loadBindings" />
       <div v-else-if="bindings.length" class="data-table-wrap"><table class="data-table"><thead><tr><th>用户</th><th>外部身份</th><th>数据范围</th><th>状态</th><th>版本</th><th>更新时间</th><th></th></tr></thead><tbody><tr v-for="item in bindings" :key="item.id"><td><strong>{{ item.displayName }}</strong><small class="table-subline">{{ item.username }} · {{ item.email || '未登记邮箱' }}</small></td><td>{{ item.externalSubject || '已解绑' }}</td><td>{{ item.associationName || item.associationId || '—' }}<small class="table-subline">{{ item.enterpriseName || item.enterpriseId || '协会级账号' }}</small></td><td><StatusBadge :value="displayBusinessStatus(item.status)" /></td><td>{{ item.version }}</td><td>{{ formatDateTime(item.updatedAt) }}</td><td><div v-if="item.externalSubject !== auth.user.value?.id" class="inline-actions"><button v-if="canWriteBindings" class="text-button" type="button" :disabled="busy" @click="openEdit(item)">{{ item.bound ? '编辑' : '重新绑定' }}</button><button v-if="canWriteBindings && item.status === 'ACTIVE'" class="text-button danger-text" type="button" :disabled="busy" @click="changeBinding(item, 'disable')">停用</button><button v-if="canWriteBindings && item.status !== 'ACTIVE' && item.bound" class="text-button" type="button" :disabled="busy" @click="changeBinding(item, 'restore')">恢复</button><button v-if="canWriteBindings && item.bound" class="text-button danger-text" type="button" :disabled="busy" @click="changeBinding(item, 'unbind')">解绑</button></div><span v-else>当前账号不可自改</span></td></tr></tbody></table></div>
       <div v-else class="empty-business-state"><b>当前范围暂无账号绑定</b><span>正式 JWT 模式下，可在选定协会上下文内建立绑定。</span></div>
+      <PaginationBar v-if="!bindingError" :page="bindingPage" :size="bindingSize" :total="bindingTotal" :disabled="bindingLoading" @change="changeBindingPage" @resize="resizeBindingPage" />
     </section>
 
     <div v-if="editorOpen" class="modal-backdrop" @click.self="editorOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="saveBinding"><div class="modal-head"><div><span class="eyebrow">IDENTITY BINDING</span><h2>{{ editing ? '编辑账号绑定' : '绑定 OIDC 账号' }}</h2></div><button class="icon-button" type="button" @click="editorOpen = false">×</button></div><div class="form-grid modal-form"><label class="form-span-2"><span>外部身份 Subject *</span><input v-model="form.externalSubject" required maxlength="200" /></label><label><span>登录名 *</span><input v-model="form.username" required maxlength="100" /></label><label><span>显示名称 *</span><input v-model="form.displayName" required maxlength="100" /></label><label><span>邮箱</span><input v-model="form.email" type="email" maxlength="254" /></label><label><span>企业范围</span><select v-model="form.enterpriseId" :disabled="Boolean(currentEnterpriseId)"><option value="">协会级账号</option><option v-for="item in enterprises" :key="item.id" :value="item.id">{{ item.name }}</option></select></label></div><p class="form-hint">当前协会：{{ auth.user.value?.organization }}。企业管理员或企业成员应选择具体企业；协会角色应保留“协会级账号”。</p><div class="form-actions"><button class="secondary-button" type="button" @click="editorOpen = false">取消</button><button class="primary-button" :disabled="busy">{{ busy ? '正在保存…' : '保存绑定' }}</button></div></form></div>

@@ -96,7 +96,7 @@ class PostgresEcosystemStoreScopeSqlTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void matchListAndCountUseTheSameActiveParticipantScope() {
+    void matchListAndCountKeepAssociationHistoryWhileSystemScopeRequiresActiveParticipants() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         PostgresEcosystemMatchStore store = new PostgresEcosystemMatchStore(jdbc, new ObjectMapper());
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
@@ -104,13 +104,13 @@ class PostgresEcosystemStoreScopeSqlTest {
 
         store.list(associationAdmin, null, 0, 20);
         verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
-        assertActiveDemandOwnerScope(sql.getValue());
+        assertHistoricalDemandOwnerScope(sql.getValue());
 
         clearInvocations(jdbc);
         store.count(associationAdmin, null);
         verify(jdbc).queryForObject(
                 sql.capture(), any(SqlParameterSource.class), eq(Long.class));
-        assertActiveDemandOwnerScope(sql.getValue());
+        assertHistoricalDemandOwnerScope(sql.getValue());
 
         clearInvocations(jdbc);
         store.list(actor("SYSTEM_ADMIN", null), null, 0, 20);
@@ -229,5 +229,10 @@ class PostgresEcosystemStoreScopeSqlTest {
     private static void assertActiveDemandOwnerScope(String sql) {
         assertTrue(sql.contains("de.association_id=:associationId"));
         assertTrue(sql.contains("de.status='ACTIVE' AND de.deleted_at IS NULL"));
+    }
+
+    private static void assertHistoricalDemandOwnerScope(String sql) {
+        assertTrue(sql.contains("de.association_id=:associationId"));
+        assertFalse(sql.contains("de.status='ACTIVE' AND de.deleted_at IS NULL"));
     }
 }

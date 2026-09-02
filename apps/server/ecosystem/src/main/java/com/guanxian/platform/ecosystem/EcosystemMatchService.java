@@ -438,8 +438,13 @@ public class EcosystemMatchService {
             return true;
         }
         return actor.associationId() != null
-                && catalogStore.enterpriseBelongsToAssociation(
-                value.demandEnterpriseId(), actor.associationId());
+                && (actor.isAssociationStaff()
+                ? catalogStore.enterpriseHistoricallyBelongsToAssociation(
+                        value.demandEnterpriseId(), actor.associationId())
+                        || catalogStore.enterpriseBelongsToAssociation(
+                        value.demandEnterpriseId(), actor.associationId())
+                : catalogStore.enterpriseBelongsToAssociation(
+                        value.demandEnterpriseId(), actor.associationId()));
     }
 
     private List<PersistedMatchView> outboundMatches(

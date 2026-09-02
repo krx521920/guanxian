@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -39,36 +40,58 @@ class CrossAssociationController {
         return ApiResponse.ok(service.accessRequests(actor(authentication)));
     }
 
+    @GetMapping("/access-requests/page")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
+    ApiResponse<CrossAssociationPage<CrossAssociationDtos.AccessRequestView>> accessRequestsPage(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(service.accessRequestsPage(actor(authentication), page, size));
+    }
+
     @PostMapping("/access-requests")
     @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
     ResponseEntity<ApiResponse<CrossAssociationDtos.AccessRequestView>> createAccessRequest(
             @Valid @RequestBody CrossAssociationDtos.AccessRequestCreate request, Authentication authentication) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(service.createAccessRequest(request, actor(authentication))));
+        var value = service.createAccessRequest(request, actor(authentication));
+        return ResponseEntity.status(HttpStatus.CREATED).eTag(etag(value.version())).body(ApiResponse.ok(value));
     }
 
     @PutMapping("/access-requests/{id}/review")
     @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
-    ApiResponse<CrossAssociationDtos.AccessRequestView> reviewAccessRequest(
+    ResponseEntity<ApiResponse<CrossAssociationDtos.AccessRequestView>> reviewAccessRequest(
             @PathVariable UUID id,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
             @Valid @RequestBody CrossAssociationDtos.AccessRequestReview request,
             Authentication authentication) {
-        return ApiResponse.ok(service.reviewAccessRequest(id, request, actor(authentication)));
+        var value = service.reviewAccessRequest(
+                id, VersionEtags.requiredVersion(ifMatch), request, actor(authentication));
+        return versioned(value.version(), value);
     }
 
     @PutMapping("/access-requests/{id}/cancel")
     @PreAuthorize("hasAuthority('MEMBER_REVIEW')")
-    ApiResponse<CrossAssociationDtos.AccessRequestView> cancelAccessRequest(
+    ResponseEntity<ApiResponse<CrossAssociationDtos.AccessRequestView>> cancelAccessRequest(
             @PathVariable UUID id,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
             @Valid @RequestBody CrossAssociationDtos.AccessRequestCancel request,
             Authentication authentication) {
-        return ApiResponse.ok(service.cancelAccessRequest(id, request, actor(authentication)));
+        var value = service.cancelAccessRequest(
+                id, VersionEtags.requiredVersion(ifMatch), request, actor(authentication));
+        return versioned(value.version(), value);
     }
 
     @GetMapping("/relationships")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
     ApiResponse<List<CrossAssociationDtos.RelationshipView>> relationships(Authentication authentication) {
         return ApiResponse.ok(service.relationships(actor(authentication)));
+    }
+
+    @GetMapping("/relationships/page")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
+    ApiResponse<CrossAssociationPage<CrossAssociationDtos.RelationshipView>> relationshipsPage(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(service.relationshipsPage(actor(authentication), page, size));
     }
 
     @PutMapping("/relationships/{source}/{target}")
@@ -88,6 +111,14 @@ class CrossAssociationController {
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
     ApiResponse<List<CrossAssociationDtos.SharePolicyView>> sharePolicies(Authentication authentication) {
         return ApiResponse.ok(service.sharePolicies(actor(authentication)));
+    }
+
+    @GetMapping("/share-policies/page")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR')")
+    ApiResponse<CrossAssociationPage<CrossAssociationDtos.SharePolicyView>> sharePoliciesPage(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(service.sharePoliciesPage(actor(authentication), page, size));
     }
 
     @PostMapping("/share-policies")
@@ -127,6 +158,14 @@ class CrossAssociationController {
         return ApiResponse.ok(service.consents(actor(authentication)));
     }
 
+    @GetMapping("/consents/page")
+    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    ApiResponse<CrossAssociationPage<CrossAssociationDtos.ConsentView>> consentsPage(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(service.consentsPage(actor(authentication), page, size));
+    }
+
     @GetMapping("/consent-targets")
     @PreAuthorize("hasAuthority('MEMBER_READ')")
     ApiResponse<List<CrossAssociationDtos.ConsentTargetView>> consentTargets(Authentication authentication) {
@@ -137,21 +176,32 @@ class CrossAssociationController {
     @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
     ResponseEntity<ApiResponse<CrossAssociationDtos.ConsentView>> grantConsent(
             @Valid @RequestBody CrossAssociationDtos.ConsentCreate request, Authentication authentication) {
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok(service.grantConsent(request, actor(authentication))));
+        var value = service.grantConsent(request, actor(authentication));
+        return ResponseEntity.status(HttpStatus.CREATED).eTag(etag(value.version())).body(ApiResponse.ok(value));
     }
 
     @DeleteMapping("/consents/{id}")
     @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
-    ApiResponse<CrossAssociationDtos.ConsentView> revokeConsent(
-            @PathVariable UUID id, Authentication authentication) {
-        return ApiResponse.ok(service.revokeConsent(id, actor(authentication)));
+    ResponseEntity<ApiResponse<CrossAssociationDtos.ConsentView>> revokeConsent(
+            @PathVariable UUID id,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
+            Authentication authentication) {
+        var value = service.revokeConsent(id, VersionEtags.requiredVersion(ifMatch), actor(authentication));
+        return versioned(value.version(), value);
     }
 
     @GetMapping("/recommendations")
     @PreAuthorize("hasAuthority('MEMBER_READ')")
     ApiResponse<List<CrossAssociationDtos.RecommendationView>> recommendations(Authentication authentication) {
         return ApiResponse.ok(service.recommendations(actor(authentication)));
+    }
+
+    @GetMapping("/recommendations/page")
+    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    ApiResponse<CrossAssociationPage<CrossAssociationDtos.RecommendationView>> recommendationsPage(
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(service.recommendationsPage(actor(authentication), page, size));
     }
 
     @PostMapping("/recommendations")

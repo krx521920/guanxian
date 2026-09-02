@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.notification.BusinessNotification;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.RowMapper;
@@ -250,6 +251,52 @@ class PostgresNotificationStore implements NotificationStore {
                 .addValue("policyId", request.policyId())
                 .addValue("idempotencyKey", eventKey));
         return new PolicyNotificationResult(request.policyId(), associationId, recipients, false);
+    }
+
+    @Override
+    public int publishBusiness(BusinessNotification notification, ActorScope actor) {
+        String key = "business-notification:" + notification.idempotencyKey();
+        List<UUID> enterpriseIds = notification.enterpriseIds().isEmpty()
+                ? List.of(new UUID(0, 0)) : notification.enterpriseIds();
+        MapSqlParameterSource params = new MapSqlParameterSource("associationId", notification.associationId())
+                .addValue("enterpriseIds", enterpriseIds)
+                .addValue("includeAssociationStaff", notification.includeAssociationStaff())
+                .addValue("actorUserId", actor.userId())
+                .addValue("type", notification.notificationType())
+                .addValue("title", notification.title()).addValue("body", notification.body())
+                .addValue("resourceType", notification.resourceType())
+                .addValue("resourceId", notification.resourceId())
+                .addValue("resourceVersion", notification.resourceVersion())
+                .addValue("idempotencyKey", key);
+        List<UUID> inserted = jdbc.query("""
+                INSERT INTO outbox_event (
+                    aggregate_type, aggregate_id, event_type, payload, idempotency_key)
+                VALUES (:resourceType, :resourceId, :type,
+                        jsonb_build_object('associationId', :associationId,
+                                           'resourceVersion', :resourceVersion), :idempotencyKey)
+                ON CONFLICT (idempotency_key) DO NOTHING
+                RETURNING id
+                """, params, (rs, row) -> rs.getObject("id", UUID.class));
+        if (inserted.isEmpty()) {
+            return 0;
+        }
+        return jdbc.update("""
+                INSERT INTO notification_message (
+                    user_id, association_id, notification_type, title, body,
+                    resource_type, resource_id, status, idempotency_key, delivered_at)
+                SELECT u.id, u.association_id, :type, :title, :body,
+                       :resourceType, :resourceId, 'DELIVERED',
+                       :idempotencyKey || ':' || u.id::text, now()
+                  FROM user_account u
+                 WHERE u.status = 'ACTIVE'
+                   AND (CAST(:actorUserId AS uuid) IS NULL OR u.id <> CAST(:actorUserId AS uuid))
+                   AND (u.enterprise_id IN (:enterpriseIds)
+                        OR (:includeAssociationStaff AND u.association_id = :associationId
+                            AND EXISTS (SELECT 1 FROM user_role r
+                                         WHERE r.user_id = u.id
+                                           AND r.role_code IN ('ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR'))))
+                ON CONFLICT (idempotency_key) DO NOTHING
+                """, params);
     }
 
     @Override

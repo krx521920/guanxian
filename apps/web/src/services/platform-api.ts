@@ -1,7 +1,8 @@
 import type {
-  AccessBinding,
+  AccessBinding, AccessBindingPage,
   AccessBindingPayload,
   AssociationAccessRequest,
+  AssociationPage,
   AssociationConsent,
   AssociationConsentPayload,
   AssociationConsentTarget,
@@ -155,6 +156,7 @@ export const platformApi = {
   systemAssociations: () => request<SystemAssociationOption[]>('/system-context/associations'),
   systemEnterprises: (associationId: string) => request<SystemEnterpriseOption[]>(`/system-context/enterprises?associationId=${encodeURIComponent(associationId)}`),
   accessBindings: () => request<AccessBinding[]>('/access-bindings'),
+  accessBindingPage: (page = 0, size = 20) => request<AccessBindingPage>(`/access-bindings/page?page=${page}&size=${size}`),
   saveAccessBinding: (payload: AccessBindingPayload, version?: number) => request<AccessBinding>('/access-bindings', {
     method: 'POST',
     headers: version === undefined ? undefined : { 'If-Match': etag(version) },
@@ -343,13 +345,15 @@ export const platformApi = {
   ),
 
   associationAccessRequests: () => request<AssociationAccessRequest[]>('/cross-associations/access-requests'),
+  associationAccessRequestPage: (page = 0, size = 20) => request<AssociationPage<AssociationAccessRequest>>(`/cross-associations/access-requests/page?page=${page}&size=${size}`),
   createAssociationAccessRequest: (targetAssociationId: string, reason: string) => request<AssociationAccessRequest>('/cross-associations/access-requests', { method: 'POST', body: JSON.stringify({ targetAssociationId, reason: reason.trim() || null }) }),
-  cancelAssociationAccessRequest: (item: AssociationAccessRequest, reason: string) => request<AssociationAccessRequest>(`/cross-associations/access-requests/${encodeURIComponent(item.id)}/cancel`, { method: 'PUT', body: JSON.stringify({ reason: reason.trim() || null }) }),
+  cancelAssociationAccessRequest: (item: AssociationAccessRequest, reason: string) => request<AssociationAccessRequest>(`/cross-associations/access-requests/${encodeURIComponent(item.id)}/cancel`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify({ reason: reason.trim() || null }) }),
   reviewAssociationAccessRequest: (
     item: AssociationAccessRequest,
     payload: { approved: boolean; comment: string; relationshipExpiresAt: string | null; allowMemberData: boolean },
   ) => request<AssociationAccessRequest>(`/cross-associations/access-requests/${encodeURIComponent(item.id)}/review`, {
     method: 'PUT',
+    headers: { 'If-Match': etag(item.version) },
     body: JSON.stringify({
       decision: payload.approved ? 'APPROVE' : 'REJECT',
       comment: payload.comment.trim() || null,
@@ -358,16 +362,20 @@ export const platformApi = {
     }),
   }),
   associationRelationships: () => request<AssociationRelationship[]>('/cross-associations/relationships'),
+  associationRelationshipPage: (page = 0, size = 20) => request<AssociationPage<AssociationRelationship>>(`/cross-associations/relationships/page?page=${page}&size=${size}`),
   changeAssociationRelationship: (item: AssociationRelationship, action: 'ACTIVATE' | 'SUSPEND' | 'REVOKE' | 'EXPIRE', reason: string) => request<AssociationRelationship>(`/cross-associations/relationships/${encodeURIComponent(item.sourceAssociationId)}/${encodeURIComponent(item.targetAssociationId)}`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify({ action, expiresAt: null, reason: reason.trim() || null }) }),
   associationSharePolicies: () => request<AssociationSharePolicy[]>('/cross-associations/share-policies'),
+  associationSharePolicyPage: (page = 0, size = 20) => request<AssociationPage<AssociationSharePolicy>>(`/cross-associations/share-policies/page?page=${page}&size=${size}`),
   createAssociationSharePolicy: (payload: AssociationSharePolicyPayload) => request<AssociationSharePolicy>('/cross-associations/share-policies', { method: 'POST', body: JSON.stringify(payload) }),
   updateAssociationSharePolicy: (item: AssociationSharePolicy, payload: AssociationSharePolicyPayload) => request<AssociationSharePolicy>(`/cross-associations/share-policies/${encodeURIComponent(item.id)}`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify(payload) }),
   changeAssociationSharePolicyStatus: (item: AssociationSharePolicy, status: 'ACTIVE' | 'SUSPENDED') => request<AssociationSharePolicy>(`/cross-associations/share-policies/${encodeURIComponent(item.id)}/status`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify({ status }) }),
   associationConsents: () => request<AssociationConsent[]>('/cross-associations/consents'),
+  associationConsentPage: (page = 0, size = 20) => request<AssociationPage<AssociationConsent>>(`/cross-associations/consents/page?page=${page}&size=${size}`),
   associationConsentTargets: () => request<AssociationConsentTarget[]>('/cross-associations/consent-targets'),
   grantAssociationConsent: (payload: AssociationConsentPayload) => request<AssociationConsent>('/cross-associations/consents', { method: 'POST', body: JSON.stringify(payload) }),
-  revokeAssociationConsent: (item: AssociationConsent) => request<AssociationConsent>(`/cross-associations/consents/${encodeURIComponent(item.id)}`, { method: 'DELETE' }),
+  revokeAssociationConsent: (item: AssociationConsent) => request<AssociationConsent>(`/cross-associations/consents/${encodeURIComponent(item.id)}`, { method: 'DELETE', headers: { 'If-Match': etag(item.version) } }),
   associationRecommendations: () => request<AssociationRecommendation[]>('/cross-associations/recommendations'),
+  associationRecommendationPage: (page = 0, size = 20) => request<AssociationPage<AssociationRecommendation>>(`/cross-associations/recommendations/page?page=${page}&size=${size}`),
   createAssociationRecommendation: (targetAssociationId: string, demandId: string | null, matchId: string | null, summary: string) => request<AssociationRecommendation>('/cross-associations/recommendations', { method: 'POST', body: JSON.stringify({ targetAssociationId, demandId, matchId, summary: summary.trim() }) }),
   reviewAssociationRecommendation: (item: AssociationRecommendation, approved: boolean, comment: string) => request<AssociationRecommendation>(`/cross-associations/recommendations/${encodeURIComponent(item.id)}/review`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify({ decision: approved ? 'APPROVE' : 'REJECT', comment: comment.trim() || null }) }),
   notifications: (options: { unreadOnly?: boolean; status?: string; page?: number; size?: number } = {}) => {

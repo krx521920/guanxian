@@ -120,6 +120,19 @@ describe('生产界面交互契约', () => {
     expect(matchingView).toContain('platformApi.revokeAssociationConsent(item)')
   })
 
+  it('友好协会、知识文档和账号绑定均使用服务端分页入口', () => {
+    const federation = readFileSync(join(sourceRoot, 'views', 'FederationView.vue'), 'utf8')
+    const attachments = readFileSync(join(sourceRoot, 'views', 'AttachmentCenterView.vue'), 'utf8')
+    const operations = readFileSync(join(sourceRoot, 'views', 'OperationsView.vue'), 'utf8')
+    expect(federation).toContain('platformApi.associationAccessRequestPage(')
+    expect(federation).toContain('platformApi.associationRecommendationPage(')
+    expect(federation.match(/<PaginationBar/g)?.length).toBe(5)
+    expect(attachments).toContain('platformApi.knowledgeDocuments(\n      includeDeletedKnowledge.value, knowledgePage.value, knowledgeSize.value')
+    expect(attachments).toContain(':page="knowledgePage"')
+    expect(operations).toContain('platformApi.accessBindingPage(bindingPage.value, bindingSize.value)')
+    expect(operations).toContain(':page="bindingPage"')
+  })
+
   it('政策影响分析具备创建、详情、重分析、审核、历史和服务端分页入口', () => {
     const policiesView = readFileSync(join(sourceRoot, 'views', 'PoliciesView.vue'), 'utf8')
     expect(policiesView).toContain('platformApi.createPolicyImpact(')

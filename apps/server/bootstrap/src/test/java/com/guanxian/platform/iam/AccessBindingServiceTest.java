@@ -70,6 +70,28 @@ class AccessBindingServiceTest {
     }
 
     @Test
+    void pagesBindingsWithinTheSelectedSystemContext() {
+        for (int index = 0; index < 3; index++) {
+            jdbc.update("""
+                    INSERT INTO user_account(id, association_id, username, display_name, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, UUID.randomUUID(), ASSOCIATION, "page.user." + index, "分页账号" + index);
+        }
+        jdbc.update("""
+                INSERT INTO user_account(id, association_id, username, display_name, status, created_at, updated_at)
+                VALUES (?, ?, 'foreign.user', '外协会账号', 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """, UUID.randomUUID(), OTHER_ASSOCIATION);
+
+        AccessBindingPage first = service.page(systemActor(), 0, 2);
+        AccessBindingPage second = service.page(systemActor(), 1, 2);
+
+        assertEquals(3, first.total());
+        assertEquals(2, first.items().size());
+        assertEquals(1, second.items().size());
+        assertEquals(1, second.page());
+    }
+
+    @Test
     void bindsAnExistingLocalAccountToTheExactOidcSubjectAndEnterpriseWithAudit() {
         UUID localId = UUID.randomUUID();
         jdbc.update("""

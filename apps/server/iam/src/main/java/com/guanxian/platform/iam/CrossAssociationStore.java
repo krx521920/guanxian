@@ -17,10 +17,10 @@ interface CrossAssociationStore {
             UUID applicantAssociationId, UUID targetAssociationId, String reason, ActorScope actor, Instant now);
 
     CrossAssociationDtos.AccessRequestView reviewAccessRequest(
-            UUID id, String status, String comment, ActorScope actor, Instant now);
+            UUID id, long expectedVersion, String status, String comment, ActorScope actor, Instant now);
 
     CrossAssociationDtos.AccessRequestView cancelAccessRequest(
-            UUID id, String reason, ActorScope actor, Instant now);
+            UUID id, long expectedVersion, String reason, ActorScope actor, Instant now);
 
     List<CrossAssociationDtos.RelationshipView> relationships();
 
@@ -52,7 +52,7 @@ interface CrossAssociationStore {
     CrossAssociationDtos.ConsentView insertConsent(
             UUID enterpriseId, CrossAssociationDtos.ConsentCreate request, ActorScope actor, Instant now);
 
-    CrossAssociationDtos.ConsentView revokeConsent(UUID id, ActorScope actor, Instant now);
+    CrossAssociationDtos.ConsentView revokeConsent(UUID id, long expectedVersion, ActorScope actor, Instant now);
 
     List<CrossAssociationDtos.ConsentView> materializeExpiredConsents(
             UUID enterpriseId, UUID targetAssociationId, String resourceType, UUID resourceId, Instant now);

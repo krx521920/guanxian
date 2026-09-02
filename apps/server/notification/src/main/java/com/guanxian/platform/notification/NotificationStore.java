@@ -1,6 +1,7 @@
 package com.guanxian.platform.notification;
 
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.notification.BusinessNotification;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ interface NotificationStore {
     boolean policyBelongsToAssociation(UUID policyId, UUID associationId);
     PolicyNotificationResult publishPolicy(
             UUID associationId, PolicyNotificationRequest request, ActorScope actor);
+    int publishBusiness(BusinessNotification notification, ActorScope actor);
     default void audit(ActorScope actor, UUID associationId, String action,
                        String resourceType, UUID resourceId, Map<String, Object> details) {
         audit(actor, associationId, action, resourceType, resourceId, null, details);

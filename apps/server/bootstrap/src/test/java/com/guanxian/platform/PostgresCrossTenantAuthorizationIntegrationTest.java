@@ -328,6 +328,8 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
 
         mockMvc.perform(put("/api/v1/cross-associations/access-requests/{id}/review", requestId)
                         .with(actor(targetSubject))
+                        .header(HttpHeaders.IF_MATCH,
+                                requestResult.getResponse().getHeader(HttpHeaders.ETAG))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{" +
                                 "\"decision\":\"APPROVE\",\"allowMemberData\":true}"))

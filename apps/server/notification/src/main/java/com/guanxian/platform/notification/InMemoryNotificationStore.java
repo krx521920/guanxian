@@ -1,6 +1,7 @@
 package com.guanxian.platform.notification;
 
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.notification.BusinessNotification;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -206,6 +207,12 @@ class InMemoryNotificationStore implements NotificationStore {
             }
         }
         return new PolicyNotificationResult(request.policyId(), associationId, count, false);
+    }
+
+    @Override
+    public synchronized int publishBusiness(BusinessNotification notification, ActorScope actor) {
+        outboxKeys.add("business:" + notification.idempotencyKey());
+        return 0;
     }
 
     @Override

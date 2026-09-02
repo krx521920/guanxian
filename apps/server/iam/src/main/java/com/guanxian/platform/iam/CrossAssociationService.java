@@ -4,6 +4,7 @@ import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ConflictException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
+import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,11 @@ class CrossAssociationService {
                 || item.targetAssociationId().equals(actor.associationId())).toList();
     }
 
+    CrossAssociationPage<CrossAssociationDtos.AccessRequestView> accessRequestsPage(
+            ActorScope actor, int page, int size) {
+        return page(accessRequests(actor), page, size);
+    }
+
     @Transactional
     CrossAssociationDtos.AccessRequestView createAccessRequest(
             CrossAssociationDtos.AccessRequestCreate request, ActorScope actor) {
@@ -56,16 +62,17 @@ class CrossAssociationService {
         }
         var created = store.insertAccessRequest(source, request.targetAssociationId(), clean(request.reason()), actor, now);
         store.audit(actor, source, null, "ASSOCIATION_ACCESS_REQUEST_CREATE", "ASSOCIATION_ACCESS_REQUEST",
-                created.id(), created);
+                created.id(), created.version(), created);
         return created;
     }
 
     @Transactional
     CrossAssociationDtos.AccessRequestView reviewAccessRequest(
-            UUID id, CrossAssociationDtos.AccessRequestReview request, ActorScope actor) {
+            UUID id, long expectedVersion, CrossAssociationDtos.AccessRequestReview request, ActorScope actor) {
         requireReviewer(actor);
         var existing = store.accessRequest(id).orElseThrow(() -> new NotFoundException("access request", id));
         requireTargetAssociation(actor, existing.targetAssociationId());
+        requireVersion(existing.version(), expectedVersion);
         if (!"PENDING".equals(existing.status())) {
             throw new ConflictException("access request has already been reviewed");
         }
@@ -78,9 +85,9 @@ class CrossAssociationService {
                 && !request.relationshipExpiresAt().isAfter(now)) {
             throw invalid("relationshipExpiresAt must be in the future");
         }
-        var reviewed = store.reviewAccessRequest(id, status, clean(request.comment()), actor, now);
+        var reviewed = store.reviewAccessRequest(id, expectedVersion, status, clean(request.comment()), actor, now);
         store.audit(actor, existing.targetAssociationId(), null, "ASSOCIATION_ACCESS_REQUEST_" + status,
-                "ASSOCIATION_ACCESS_REQUEST", id, reviewed);
+                "ASSOCIATION_ACCESS_REQUEST", id, reviewed.version(), reviewed);
         if ("APPROVED".equals(status)) {
             if (previousRelationship != null) {
                 invalidateRelationshipConsents(
@@ -100,17 +107,18 @@ class CrossAssociationService {
 
     @Transactional
     CrossAssociationDtos.AccessRequestView cancelAccessRequest(
-            UUID id, CrossAssociationDtos.AccessRequestCancel request, ActorScope actor) {
+            UUID id, long expectedVersion, CrossAssociationDtos.AccessRequestCancel request, ActorScope actor) {
         requireReviewer(actor);
         var existing = store.accessRequest(id)
                 .orElseThrow(() -> new NotFoundException("access request", id));
         requireSourceAssociation(actor, existing.applicantAssociationId());
+        requireVersion(existing.version(), expectedVersion);
         if (!"PENDING".equals(existing.status())) {
             throw new ConflictException("only a pending access request can be cancelled");
         }
-        var cancelled = store.cancelAccessRequest(id, clean(request.reason()), actor, Instant.now());
+        var cancelled = store.cancelAccessRequest(id, expectedVersion, clean(request.reason()), actor, Instant.now());
         store.audit(actor, existing.applicantAssociationId(), null, "ASSOCIATION_ACCESS_REQUEST_CANCEL",
-                "ASSOCIATION_ACCESS_REQUEST", id, cancelled);
+                "ASSOCIATION_ACCESS_REQUEST", id, cancelled.version(), cancelled);
         return cancelled;
     }
 
@@ -121,6 +129,11 @@ class CrossAssociationService {
                 || item.sourceAssociationId().equals(actor.associationId())
                 || item.targetAssociationId().equals(actor.associationId()))
                 .map(item -> effectiveRelationship(item, now)).toList();
+    }
+
+    CrossAssociationPage<CrossAssociationDtos.RelationshipView> relationshipsPage(
+            ActorScope actor, int page, int size) {
+        return page(relationships(actor), page, size);
     }
 
     @Transactional
@@ -212,6 +225,11 @@ class CrossAssociationService {
                 || item.targetAssociationId().equals(actor.associationId())).toList();
     }
 
+    CrossAssociationPage<CrossAssociationDtos.SharePolicyView> sharePoliciesPage(
+            ActorScope actor, int page, int size) {
+        return page(sharePolicies(actor), page, size);
+    }
+
     @Transactional
     CrossAssociationDtos.SharePolicyView createSharePolicy(
             CrossAssociationDtos.SharePolicyUpsert request, ActorScope actor) {
@@ -301,6 +319,11 @@ class CrossAssociationService {
         throw forbidden("cross-association consent visibility is restricted");
     }
 
+    CrossAssociationPage<CrossAssociationDtos.ConsentView> consentsPage(
+            ActorScope actor, int page, int size) {
+        return page(consents(actor), page, size);
+    }
+
     List<CrossAssociationDtos.ConsentTargetView> consentTargets(ActorScope actor) {
         UUID enterpriseId = ownedEnterprise(actor, null);
         UUID source = store.enterpriseAssociation(enterpriseId)
@@ -386,22 +409,23 @@ class CrossAssociationService {
                 enterpriseId, request.targetAssociationId(), resourceType, request.resourceId(), request.expiresAt());
         var created = store.insertConsent(enterpriseId, normalizedRequest, actor, now);
         store.audit(actor, source, enterpriseId, "ENTERPRISE_SHARE_CONSENT_GRANT", "ENTERPRISE_SHARE_CONSENT",
-                created.id(), created);
+                created.id(), created.version(), created);
         return created;
     }
 
     @Transactional
-    CrossAssociationDtos.ConsentView revokeConsent(UUID id, ActorScope actor) {
+    CrossAssociationDtos.ConsentView revokeConsent(UUID id, long expectedVersion, ActorScope actor) {
         var existing = store.consent(id).orElseThrow(() -> new NotFoundException("share consent", id));
         ownedEnterprise(actor, existing.enterpriseId());
+        requireVersion(existing.version(), expectedVersion);
         if (!"ACTIVE".equals(existing.status())) {
             throw new ConflictException("share consent is not active");
         }
         Instant now = Instant.now();
-        var revoked = store.revokeConsent(id, actor, now);
+        var revoked = store.revokeConsent(id, expectedVersion, actor, now);
         UUID source = store.enterpriseAssociation(existing.enterpriseId()).orElse(null);
         store.audit(actor, source, existing.enterpriseId(), "ENTERPRISE_SHARE_CONSENT_REVOKE",
-                "ENTERPRISE_SHARE_CONSENT", id, revoked);
+                "ENTERPRISE_SHARE_CONSENT", id, revoked.version(), revoked);
         return revoked;
     }
 
@@ -418,6 +442,19 @@ class CrossAssociationService {
                     || item.targetAssociationId().equals(actor.associationId())).toList();
         }
         throw forbidden("cross-association recommendation visibility is restricted");
+    }
+
+    CrossAssociationPage<CrossAssociationDtos.RecommendationView> recommendationsPage(
+            ActorScope actor, int page, int size) {
+        return page(recommendations(actor), page, size);
+    }
+
+    private static <T> CrossAssociationPage<T> page(List<T> values, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        int from = Math.min(safePage * safeSize, values.size());
+        int to = Math.min(from + safeSize, values.size());
+        return new CrossAssociationPage<>(List.copyOf(values.subList(from, to)), values.size(), safePage, safeSize);
     }
 
     @Transactional
@@ -772,6 +809,13 @@ class CrossAssociationService {
     private static void requireCurrent(String actual, String required) {
         if (!required.equals(actual)) {
             throw new ConflictException("relationship must currently be " + required);
+        }
+    }
+
+    private static void requireVersion(long actual, long expected) {
+        if (actual != expected) {
+            throw new PreconditionFailedException(
+                    "resource version is stale; reload and retry with the latest ETag");
         }
     }
 

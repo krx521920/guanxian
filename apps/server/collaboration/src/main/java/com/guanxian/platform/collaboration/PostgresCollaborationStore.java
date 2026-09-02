@@ -79,6 +79,27 @@ class PostgresCollaborationStore implements CollaborationStore {
         return matchScopeExists(matchId, associationId, enterpriseId, false);
     }
 
+    @Override
+    public boolean linkedMatchParticipantsOperational(UUID matchId) {
+        if (matchId == null) {
+            return true;
+        }
+        Boolean operational = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                      JOIN enterprise de ON de.id=d.enterprise_id
+                      JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                     WHERE m.id=:matchId
+                       AND d.enterprise_id<>m.candidate_enterprise_id
+                       AND de.status='ACTIVE' AND de.deleted_at IS NULL
+                       AND ce.status='ACTIVE' AND ce.deleted_at IS NULL
+                )
+                """, new MapSqlParameterSource("matchId", matchId), Boolean.class);
+        return Boolean.TRUE.equals(operational);
+    }
+
     private boolean matchScopeExists(
             UUID matchId, UUID associationId, UUID enterpriseId, boolean requireLinkableState) {
         if (matchId == null) {
@@ -346,7 +367,14 @@ class PostgresCollaborationStore implements CollaborationStore {
                 + "ON scope_demand_enterprise.id=scope_demand.enterprise_id "
                 + "JOIN enterprise scope_candidate_enterprise "
                 + "ON scope_candidate_enterprise.id=scope_match.candidate_enterprise_id "
-                + "WHERE scope_match.id=c.match_id AND " + participantScope + ")";
+                + "WHERE scope_match.id=c.match_id AND " + participantScope
+                + (enterpriseScoped
+                    ? " AND scope_demand_enterprise.status='ACTIVE' "
+                      + "AND scope_demand_enterprise.deleted_at IS NULL "
+                      + "AND scope_candidate_enterprise.status='ACTIVE' "
+                      + "AND scope_candidate_enterprise.deleted_at IS NULL"
+                    : "")
+                + ")";
     }
 
     private MapSqlParameterSource params(ActorScope actor, String query, String stage) {

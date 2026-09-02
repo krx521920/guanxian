@@ -27,7 +27,7 @@ mvn clean verify
 mvn -pl bootstrap -am spring-boot:run
 ```
 
-应用启动时由 Flyway 按顺序执行 V1–V22，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除、知识向量持久化、身份生命周期约束、政策协会归属约束及分协会通知订阅唯一键。V16–V20 固化政策影响、跨协会协作、匹配闭环、通知和附件状态不变量；V21 增加会员正式模板版本、来源文件 SHA-256、提交单位及企业、产品/服务/场景字段，并为知识文档增加审核、软删除、生命周期版本与历史；V22 持久化分协会 RAG 评测指标、逐例结果、执行人、费用和发布结论。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移并保留已有企业记录。后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+应用启动时由 Flyway 按顺序执行 V1–V23，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除、知识向量持久化、身份生命周期约束、政策协会归属约束及分协会通知订阅唯一键。V16–V20 固化政策影响、跨协会协作、匹配闭环、通知和附件状态不变量；V21 增加会员正式模板版本、来源文件 SHA-256、提交单位及企业、产品/服务/场景字段，并为知识文档增加审核、软删除、生命周期版本与历史；V22 持久化分协会 RAG 评测；V23 为接入申请和企业共享同意补齐 ETag 版本。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移并保留已有企业记录。后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
 
 V16–V18 会在 DDL 生效前检查历史数据。除 V16/V17 的协会与跨协会授权约束外，V18 会拒绝同企业供需、绕过推荐或双方确认的父状态、错绑参与方/协会、状态与应答字段矛盾或提前携带应答文本的邀请、普通洽谈跳级或终态后追加、非参与企业反馈、成功反馈携带关闭原因、失败反馈缺少原因、单方成功即归档及非法结果类型/可见范围；接受邀请后首条 `TERMINATED` 是允许的明确终止路径。邀请请求字段和终态、匹配推荐/确认事实、成果归档主体/时间均不可通过增加版本号改写；拒绝、取消或终止原因必须与父匹配关闭原因一致。`MATCH` 跨协会字段白名单在 V18 中仅新增 `outcomes`，其他未声明字段继续拒绝。歧义数据会以可操作的 `DETAIL`/`HINT` 失败并整体回滚；不得用 `flyway repair`、修改迁移历史或无审核批量更新来绕过。V17 不会在迁移时静默改写单个已过期但仍标记 `ACTIVE` 的旧授权；V18 也不会替存量匹配伪造推荐、确认、邀请或成果事实。能从旧字段唯一确定的反馈 `updated_at` 仅取原 `submitted_at`，其余业务事实必须由负责人核验后修正。
 
@@ -70,8 +70,12 @@ curl http://localhost:8080/api/v1/health
 | GET/POST | `/api/v1/knowledge/readiness` / `/api/v1/knowledge/evaluations` | 查看对外名称闸门 / 用真实协会资料执行评测 |
 | GET | `/api/v1/audit-logs` | `AUDIT_READ`，按协会数据域过滤 |
 | GET/POST | `/api/v1/access-bindings` | JWT 模式系统管理员查询/绑定 OIDC 身份；修改既有账号必须携带 `If-Match` |
+| GET | `/api/v1/access-bindings/page` | 系统管理员按当前协会/企业上下文分页查看账号绑定 |
 | PUT | `/api/v1/access-bindings/{id}/disable` / `.../restore` | 显式停用/恢复账号绑定，必须携带 `If-Match` |
 | DELETE | `/api/v1/access-bindings/{id}` | 解绑 OIDC `sub` 并冻结账号，必须携带 `If-Match` |
+| GET | `/api/v1/cross-associations/{resource}/page` | 接入申请、关系、字段策略、企业同意和推荐台账分页查询 |
+| PUT | `/api/v1/cross-associations/access-requests/{id}/review` / `.../cancel` | 必须携带 `If-Match`；成功返回新 ETag |
+| DELETE | `/api/v1/cross-associations/consents/{id}` | 企业撤销逐资源授权，必须携带 `If-Match` |
 | 同上 | `/api/v1/enterprises/**` | 企业 CRUD 兼容别名 |
 | GET | `/api/v1/policies` | `POLICY_READ` |
 | GET/POST | `/api/v1/matches` | `MATCH_REQUEST` |
@@ -168,7 +172,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-2026-09-02 当前变更的普通全量回归生成 69 份 Surefire 报告，共定义 346 项测试，实际执行并通过 284 项，失败 0、错误 0。本次本机 Docker daemon 不可用，62 项 Testcontainers 用例被跳过；跳过不等于通过，因此 Flyway V1–V22、PostgreSQL/MinIO/Redis/OIDC/ClamAV 真实依赖和当前版本浏览器 E2E 必须在 Docker 可用的 CI 或预生产环境重新执行。早期 PostgreSQL 16 Testcontainers 与 Playwright 5/5 联合环境结果只是历史基线，不得冒充当前变更的验收证据。正式 IdP、生产网络、备份恢复、真实告警和真实语料评测完成前，不得声明生产闭环或对外使用“AI 平台”名称。
+2026-09-02 当前变更的普通全量回归生成 69 份 Surefire 报告，共 349 项测试全部通过，失败 0、错误 0、跳过 0；其中 62 项 Testcontainers 已连接真实 Docker 执行。前端 210 项单测、类型检查和构建通过，Playwright 的 8 条真实业务 E2E 也已在 PostgreSQL、MinIO、Redis、隔离 Keycloak/OIDC 联合环境全部通过。Flyway V1–V23 已完成本轮复验；正式 IdP、ClamAV、生产编排与网络、备份恢复、真实告警和真实语料评测完成前，仍不得声明生产闭环或对外使用“AI 平台”名称。
 
 ## Docker
 
@@ -182,6 +186,6 @@ docker run --rm -p 8080:8080 guanxian-server:dev
 
 1. 将系统管理员账号绑定、停用、恢复、解绑和代管上下文接入管理页面，并落实高权限操作双人复核。
 2. 使用正式 IdP（不是隔离 Keycloak）完成生产域浏览器 OIDC/PKCE 登录与各身份权限验收，关闭全部演示身份。
-3. 在生产数据隔离副本完成 V12→V22 升级、V16–V22 存量数据处置、备份恢复和回滚兼容演练。
+3. 在生产数据隔离副本完成 V12→V23 升级、V16–V23 存量数据处置、备份恢复和回滚兼容演练。
 4. 在预生产接通真实 PostgreSQL、MinIO、Redis、OIDC 与私网 ClamAV，完成当前版本浏览器 E2E；继续完善数据质量治理和导入批次撤销策略。
 5. 收齐并逐家审核 106 家正式调查表，配置合规的真实模型与 Embedding 供应商，使用协会真实语料完成召回、引用、拒答、费用和数据出境验收；通过前继续使用“管理协作平台”名称。

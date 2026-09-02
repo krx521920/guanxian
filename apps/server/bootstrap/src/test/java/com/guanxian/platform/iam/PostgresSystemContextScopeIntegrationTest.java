@@ -87,11 +87,11 @@ class PostgresSystemContextScopeIntegrationTest {
                 new CrossAssociationDtos.AccessRequestCreate(
                         ASSOCIATION_C, ASSOCIATION_B, "body must not replace header"), associationA));
         assertThrows(ForbiddenException.class, () -> crossAssociations.reviewAccessRequest(
-                requestA.id(), rejected(), global));
+                requestA.id(), requestA.version(), rejected(), global));
         assertThrows(ForbiddenException.class, () -> crossAssociations.reviewAccessRequest(
-                requestA.id(), rejected(), associationA));
+                requestA.id(), requestA.version(), rejected(), associationA));
         assertEquals("REJECTED", crossAssociations.reviewAccessRequest(
-                requestA.id(), rejected(), associationB).status());
+                requestA.id(), requestA.version(), rejected(), associationB).status());
         assertThrows(ForbiddenException.class, () -> crossAssociations.grantConsent(
                 new CrossAssociationDtos.ConsentCreate(
                         ENTERPRISE_A2, ASSOCIATION_B, "PRODUCT", UUID.randomUUID(), null),

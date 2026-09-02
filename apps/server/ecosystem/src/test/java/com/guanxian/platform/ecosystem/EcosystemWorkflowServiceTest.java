@@ -6,10 +6,12 @@ import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
+import com.guanxian.platform.shared.notification.BusinessNotification;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -51,8 +53,11 @@ class EcosystemWorkflowServiceTest {
                         SUPPLIER_ENTERPRISE, "供应企业", "零泄漏球阀", 92, List.of("能力匹配"))),
                 owner).getFirst();
         InMemoryEcosystemWorkflowStore workflowStore = new InMemoryEcosystemWorkflowStore(lifecycle);
+        List<BusinessNotification> notifications = new ArrayList<>();
         EcosystemWorkflowService service = new EcosystemWorkflowService(
-                matchStore, workflowStore, catalogStore, lifecycle);
+                matchStore, workflowStore, catalogStore, lifecycle,
+                PartnerFieldAuthorization.allowAll(),
+                (event, actor) -> { notifications.add(event); return 1; });
 
         assertThrows(PreconditionFailedException.class, () -> service.invite(
                 match.id(), match.version(),
@@ -76,6 +81,8 @@ class EcosystemWorkflowServiceTest {
                         Instant.now().plusSeconds(3600)),
                 owner);
         assertNull(invitation.sentBySubject());
+        assertEquals("MATCH_INVITATION", notifications.getLast().notificationType());
+        assertEquals(List.of(SUPPLIER_ENTERPRISE), notifications.getLast().enterpriseIds());
         MatchInvitationView accepted = service.respond(
                 invitation.id(), invitation.version(),
                 new MatchInvitationResponse(true, "同意进入洽谈"), supplier);
@@ -101,6 +108,9 @@ class EcosystemWorkflowServiceTest {
         assertEquals(1, service.negotiations(match.id(), owner).size());
         assertEquals("INITIAL_CONTACT", negotiation.stage());
         assertNull(negotiation.recordedBySubject());
+        assertEquals("MATCH_NEGOTIATION", notifications.getLast().notificationType());
+        assertTrue(notifications.getLast().enterpriseIds().containsAll(
+                List.of(DEMAND_ENTERPRISE, SUPPLIER_ENTERPRISE)));
 
         PersistedMatchView afterInitialContact = matchStore.find(match.id(), reviewer).orElseThrow();
         NegotiationView associationFollowUp = service.addNegotiation(

@@ -25,6 +25,8 @@ const knowledgeItem = ref<Attachment | null>(null)
 const knowledgeTitle = ref('')
 const knowledgeDocuments = ref<KnowledgeDocument[]>([])
 const knowledgeTotal = ref(0)
+const knowledgePage = ref(0)
+const knowledgeSize = ref(20)
 const includeDeletedKnowledge = ref(false)
 const visibility = ref('PRIVATE')
 const keyword = ref('')
@@ -56,9 +58,17 @@ async function loadKnowledge() {
     return
   }
   try {
-    const result = await platformApi.knowledgeDocuments(includeDeletedKnowledge.value, 0, 50)
+    const result = await platformApi.knowledgeDocuments(
+      includeDeletedKnowledge.value, knowledgePage.value, knowledgeSize.value,
+    )
     knowledgeDocuments.value = result.items
     knowledgeTotal.value = result.total
+    knowledgePage.value = result.page
+    knowledgeSize.value = result.size
+    if (!result.items.length && result.total > 0 && result.page > 0) {
+      knowledgePage.value = Math.max(0, Math.ceil(result.total / result.size) - 1)
+      await loadKnowledge()
+    }
   } catch (reason) {
     message.value = apiActionMessage(reason, '知识文档列表加载失败。')
   }
@@ -196,6 +206,8 @@ function sizeLabel(value: number): string {
 
 function changePage(value: number) { page.value = value; void load() }
 function resizePage(value: number) { size.value = value; page.value = 0; void load() }
+function changeKnowledgePage(value: number) { knowledgePage.value = value; void loadKnowledge() }
+function resizeKnowledgePage(value: number) { knowledgeSize.value = value; knowledgePage.value = 0; void loadKnowledge() }
 
 onMounted(async () => { await Promise.all([load(), loadKnowledge()]) })
 </script>
@@ -217,9 +229,10 @@ onMounted(async () => { await Promise.all([load(), loadKnowledge()]) })
       <PaginationBar :page="page" :size="size" :total="total" :disabled="loading" @change="changePage" @resize="resizePage" />
     </section>
     <section v-if="canIngestKnowledge" class="panel flush-panel knowledge-document-panel">
-      <div class="section-heading"><div><span class="eyebrow">KNOWLEDGE GOVERNANCE</span><h2>知识文档审核与版本</h2><p>共 {{ knowledgeTotal }} 份；只有已发布且未删除的当前版本会参与当前协会问答。</p></div><label class="checkbox-field"><input v-model="includeDeletedKnowledge" type="checkbox" @change="loadKnowledge" /> 包含已删除</label></div>
+      <div class="section-heading"><div><span class="eyebrow">KNOWLEDGE GOVERNANCE</span><h2>知识文档审核与版本</h2><p>共 {{ knowledgeTotal }} 份；只有已发布且未删除的当前版本会参与当前协会问答。</p></div><label class="checkbox-field"><input v-model="includeDeletedKnowledge" type="checkbox" @change="knowledgePage = 0; loadKnowledge()" /> 包含已删除</label></div>
       <div v-if="knowledgeDocuments.length" class="data-table-wrap"><table class="data-table"><thead><tr><th>文档</th><th>版本 / 分段</th><th>Embedding</th><th>审核状态</th><th>更新时间</th><th></th></tr></thead><tbody><tr v-for="item in knowledgeDocuments" :key="item.id"><td><strong>{{ item.title }}</strong><small class="table-subline">{{ item.sourceFilename || item.sourceType }} · {{ item.visibility }}</small></td><td>内容 v{{ item.currentVersion }} · {{ item.chunkCount }} 段<small class="table-subline">控制版本 {{ item.lifecycleVersion }}</small></td><td><StatusBadge :value="item.embeddingStatus" /></td><td><StatusBadge :value="item.deletedAt ? '已删除' : item.status" /><small v-if="item.reviewComment" class="table-subline">{{ item.reviewComment }}</small></td><td>{{ formatDateTime(item.updatedAt) }}</td><td><div class="inline-actions"><button v-if="!item.deletedAt && item.status === 'DRAFT'" class="text-button" :disabled="busy" @click="knowledgeAction(item, 'submit')">提交审核</button><button v-if="!item.deletedAt && item.status === 'PENDING_REVIEW'" class="text-button" :disabled="busy" @click="knowledgeAction(item, 'approve')">审核通过</button><button v-if="!item.deletedAt && item.status === 'PENDING_REVIEW'" class="text-button danger-text" :disabled="busy" @click="knowledgeAction(item, 'reject')">退回</button><button v-if="!item.deletedAt && item.status === 'PUBLISHED'" class="text-button" :disabled="busy" @click="knowledgeAction(item, 'disable')">停用</button><button v-if="!item.deletedAt && ['PUBLISHED', 'DISABLED'].includes(item.status)" class="text-button" :disabled="busy" @click="knowledgeAction(item, 'archive')">归档</button><button v-if="!item.deletedAt && item.sourceFileId" class="text-button" :disabled="busy" @click="knowledgeAction(item, 'reparse')">重新解析</button><button v-if="!item.deletedAt" class="text-button" :disabled="busy" @click="knowledgeAction(item, 'reembed')">重建向量</button><button v-if="!item.deletedAt" class="text-button danger-text" :disabled="busy" @click="knowledgeAction(item, 'delete')">删除</button><button v-else class="text-button" :disabled="busy" @click="knowledgeAction(item, 'restore')">恢复为草稿</button></div></td></tr></tbody></table></div>
       <div v-else class="empty-business-state"><b>暂无知识文档</b><span>请先从已完成内容扫描的附件创建知识草稿。</span></div>
+      <PaginationBar :page="knowledgePage" :size="knowledgeSize" :total="knowledgeTotal" :disabled="busy" @change="changeKnowledgePage" @resize="resizeKnowledgePage" />
     </section>
     <div v-if="knowledgeItem && canIngestKnowledge" class="modal-backdrop" @click.self="knowledgeItem = null"><form class="panel modal-card compact-modal" @submit.prevent="ingestKnowledge"><div class="modal-head"><div><span class="eyebrow">KNOWLEDGE INGESTION</span><h2>创建知识草稿</h2></div><button type="button" class="icon-button" @click="knowledgeItem = null">×</button></div><div class="modal-copy"><p>系统将解析 {{ knowledgeItem.originalFilename }}，保存分段及来源关系；新文档先进入草稿，审核发布后才能参与问答。</p><label><span>资料标题 *</span><input v-model="knowledgeTitle" required maxlength="300" /></label><small>支持 PDF、DOCX、XLSX、TXT 和 CSV，最大 20 MiB。</small></div><div class="form-actions"><button type="button" class="secondary-button" @click="knowledgeItem = null">取消</button><button class="primary-button" :disabled="busy || !knowledgeTitle.trim()">{{ busy ? '解析中…' : '创建草稿' }}</button></div></form></div>
   </div>

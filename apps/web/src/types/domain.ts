@@ -216,6 +216,13 @@ export interface AccessBindingPayload {
   enterpriseId: string | null
 }
 
+export interface AccessBindingPage {
+  items: AccessBinding[]
+  total: number
+  page: number
+  size: number
+}
+
 export interface AuditRecord {
   id: number
   actorSubject: string
@@ -649,6 +656,7 @@ export interface AssociationAccessRequest {
   reviewComment: string | null
   requestedAt: string
   reviewedAt: string | null
+  version: number
 }
 
 export interface AssociationRelationship {
@@ -706,6 +714,7 @@ export interface AssociationConsent {
   expiresAt: string | null
   revokedAt: string | null
   createdAt: string
+  version: number
 }
 
 export interface AssociationConsentTarget {
@@ -736,6 +745,13 @@ export interface AssociationRecommendation {
   createdAt: string
   reviewedAt: string | null
   version: number
+}
+
+export interface AssociationPage<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
 }
 
 export interface NotificationMessage {

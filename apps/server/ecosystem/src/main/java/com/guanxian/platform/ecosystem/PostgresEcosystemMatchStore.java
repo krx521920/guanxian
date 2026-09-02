@@ -277,10 +277,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
             }
         } else if (actor.isAssociationStaff()) {
             actorScope = actor.partnerAssociationIds().isEmpty()
-                    ? "(de.association_id=:associationId"
-                    + " AND de.status='ACTIVE' AND de.deleted_at IS NULL)"
-                    : "((de.association_id=:associationId"
-                    + " AND de.status='ACTIVE' AND de.deleted_at IS NULL)"
+                    ? "(de.association_id=:associationId)"
+                    : "((de.association_id=:associationId)"
                     + " OR (m.state<>'PENDING_CONFIRMATION' AND "
                     + authorizedPartnerMatchRead() + "))";
         } else if (actor.enterpriseId() != null) {

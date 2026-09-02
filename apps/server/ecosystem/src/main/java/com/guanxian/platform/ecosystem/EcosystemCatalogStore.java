@@ -51,6 +51,10 @@ interface EcosystemCatalogStore {
 
     boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId);
 
+    default boolean enterpriseHistoricallyBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return enterpriseBelongsToAssociation(enterpriseId, associationId);
+    }
+
     void recordChange(
             ActorScope actor,
             String action,

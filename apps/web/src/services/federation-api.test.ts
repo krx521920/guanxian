@@ -46,18 +46,36 @@ describe('cross-association API contract', () => {
   })
 
   it('lets only the server cancel a persisted pending access request', async () => {
-    const item = { id: 'request/1' } as AssociationAccessRequest
+    const item = { id: 'request/1', version: 3 } as AssociationAccessRequest
     const { platformApi, fetchMock } = await apiWith(item)
     await platformApi.cancelAssociationAccessRequest(item, '项目暂停')
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/v1/cross-associations/access-requests/request%2F1/cancel')
     expect(init.method).toBe('PUT')
+    expect(new Headers(init.headers).get('If-Match')).toBe('"3"')
     expect(JSON.parse(String(init.body))).toEqual({ reason: '项目暂停' })
   })
 
+  it('uses server pagination for every federation management ledger', async () => {
+    const { platformApi, fetchMock } = await apiWith({ items: [], total: 0, page: 2, size: 10 })
+    await platformApi.associationAccessRequestPage(2, 10)
+    await platformApi.associationRelationshipPage(2, 10)
+    await platformApi.associationSharePolicyPage(2, 10)
+    await platformApi.associationConsentPage(2, 10)
+    await platformApi.associationRecommendationPage(2, 10)
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      '/api/v1/cross-associations/access-requests/page?page=2&size=10',
+      '/api/v1/cross-associations/relationships/page?page=2&size=10',
+      '/api/v1/cross-associations/share-policies/page?page=2&size=10',
+      '/api/v1/cross-associations/consents/page?page=2&size=10',
+      '/api/v1/cross-associations/recommendations/page?page=2&size=10',
+    ])
+  })
+
   it('sends bilateral approval scope and an explicit authorization deadline', async () => {
-    const item = { id: 'request-1' } as AssociationAccessRequest
+    const item = { id: 'request-1', version: 4 } as AssociationAccessRequest
     const { platformApi, fetchMock } = await apiWith(item)
     await platformApi.reviewAssociationAccessRequest(item, {
       approved: true,
@@ -69,6 +87,7 @@ describe('cross-association API contract', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/v1/cross-associations/access-requests/request-1/review')
     expect(init.method).toBe('PUT')
+    expect(new Headers(init.headers).get('If-Match')).toBe('"4"')
     expect(JSON.parse(String(init.body))).toEqual({
       decision: 'APPROVE',
       comment: '同意接入',
@@ -98,7 +117,7 @@ describe('cross-association API contract', () => {
   })
 
   it('drops relationship scope when an access request is rejected', async () => {
-    const item = { id: 'request-2' } as AssociationAccessRequest
+    const item = { id: 'request-2', version: 5 } as AssociationAccessRequest
     const { platformApi, fetchMock } = await apiWith(item)
     await platformApi.reviewAssociationAccessRequest(item, {
       approved: false,
@@ -168,7 +187,7 @@ describe('cross-association API contract', () => {
   })
 
   it('grants and revokes persisted resource consent without local simulation', async () => {
-    const consent = { id: 'consent/1' } as AssociationConsent
+    const consent = { id: 'consent/1', version: 9 } as AssociationConsent
     const { platformApi, fetchMock } = await apiWith(consent)
     await platformApi.grantAssociationConsent({
       enterpriseId: null,
@@ -188,5 +207,6 @@ describe('cross-association API contract', () => {
     const [revokeUrl, revokeInit] = fetchMock.mock.calls[1] as [string, RequestInit]
     expect(revokeUrl).toBe('/api/v1/cross-associations/consents/consent%2F1')
     expect(revokeInit.method).toBe('DELETE')
+    expect(new Headers(revokeInit.headers).get('If-Match')).toBe('"9"')
   })
 })

@@ -28,6 +28,10 @@ interface CollaborationStore {
 
     boolean canAccessLinkedMatch(UUID matchId, UUID associationId, UUID enterpriseId);
 
+    default boolean linkedMatchParticipantsOperational(UUID matchId) {
+        return true;
+    }
+
     CollaborationView create(
             UUID associationId,
             UUID enterpriseId,

@@ -68,28 +68,31 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
 
     @Override
     public CrossAssociationDtos.AccessRequestView reviewAccessRequest(
-            UUID id, String status, String comment, ActorScope actor, Instant now) {
+            UUID id, long expectedVersion, String status, String comment, ActorScope actor, Instant now) {
         int changed = jdbc.update("""
                 UPDATE association_access_request
-                SET status=:status, reviewed_by_subject=:subject, review_comment=:comment, reviewed_at=:now
-                WHERE id=:id AND status='PENDING'
+                SET status=:status, reviewed_by_subject=:subject, review_comment=:comment, reviewed_at=:now,
+                    version=version+1
+                WHERE id=:id AND status='PENDING' AND version=:expectedVersion
                 """, params("id", id).addValue("status", status).addValue("subject", actor.subject())
-                .addValue("comment", comment).addValue("now", sqlTimestamp(now)));
-        if (changed != 1) throw new ConflictException("access request is no longer pending");
+                .addValue("comment", comment).addValue("now", sqlTimestamp(now))
+                .addValue("expectedVersion", expectedVersion));
+        requireUpdated(changed);
         return accessRequest(id).orElseThrow();
     }
 
     @Override
     public CrossAssociationDtos.AccessRequestView cancelAccessRequest(
-            UUID id, String reason, ActorScope actor, Instant now) {
+            UUID id, long expectedVersion, String reason, ActorScope actor, Instant now) {
         int changed = jdbc.update("""
                 UPDATE association_access_request
                    SET status='CANCELLED', reviewed_by_subject=:subject,
-                       review_comment=:reason, reviewed_at=:now
-                 WHERE id=:id AND status='PENDING'
+                       review_comment=:reason, reviewed_at=:now, version=version+1
+                 WHERE id=:id AND status='PENDING' AND version=:expectedVersion
                 """, params("id", id).addValue("subject", actor.subject())
-                .addValue("reason", reason).addValue("now", sqlTimestamp(now)));
-        if (changed != 1) throw new ConflictException("access request is no longer pending");
+                .addValue("reason", reason).addValue("now", sqlTimestamp(now))
+                .addValue("expectedVersion", expectedVersion));
+        requireUpdated(changed);
         return accessRequest(id).orElseThrow();
     }
 
@@ -254,12 +257,15 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
     }
 
     @Override
-    public CrossAssociationDtos.ConsentView revokeConsent(UUID id, ActorScope actor, Instant now) {
+    public CrossAssociationDtos.ConsentView revokeConsent(
+            UUID id, long expectedVersion, ActorScope actor, Instant now) {
         int changed = jdbc.update("""
-                UPDATE enterprise_share_consent SET status='REVOKED', revoked_at=:now
-                WHERE id=:id AND status='ACTIVE'
-                """, params("id", id).addValue("now", sqlTimestamp(now)));
-        if (changed != 1) throw new ConflictException("share consent is no longer active");
+                UPDATE enterprise_share_consent
+                   SET status='REVOKED', revoked_at=:now, version=version+1
+                 WHERE id=:id AND status='ACTIVE' AND version=:expectedVersion
+                """, params("id", id).addValue("now", sqlTimestamp(now))
+                .addValue("expectedVersion", expectedVersion));
+        requireUpdated(changed);
         return consent(id).orElseThrow();
     }
 
@@ -272,7 +278,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
             Instant now) {
         return jdbc.query("""
                 UPDATE enterprise_share_consent
-                   SET status='EXPIRED'
+                   SET status='EXPIRED', version=version+1
                  WHERE enterprise_id=:enterpriseId
                    AND target_association_id=:targetAssociationId
                    AND resource_type=:resourceType
@@ -293,7 +299,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
             UUID sourceAssociationId, UUID targetAssociationId, Instant now) {
         return jdbc.query("""
                 UPDATE enterprise_share_consent consent
-                   SET status='REVOKED', revoked_at=:now
+                   SET status='REVOKED', revoked_at=:now, version=consent.version+1
                  WHERE consent.status='ACTIVE' AND consent.revoked_at IS NULL
                    AND EXISTS (
                        SELECT 1 FROM enterprise enterprise
@@ -535,7 +541,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                 rs.getObject("applicant_association_id", UUID.class), rs.getObject("target_association_id", UUID.class),
                 rs.getString("reason"), rs.getString("status"), rs.getString("requested_by_subject"),
                 rs.getString("reviewed_by_subject"), rs.getString("review_comment"),
-                instant(rs, "requested_at"), instant(rs, "reviewed_at"));
+                instant(rs, "requested_at"), instant(rs, "reviewed_at"), rs.getLong("version"));
     }
 
     private CrossAssociationDtos.RelationshipView relationship(ResultSet rs) throws SQLException {
@@ -560,7 +566,7 @@ class PostgresCrossAssociationStore implements CrossAssociationStore {
                 rs.getObject("enterprise_id", UUID.class), rs.getObject("target_association_id", UUID.class),
                 rs.getString("resource_type"), rs.getObject("resource_id", UUID.class), rs.getString("status"),
                 rs.getString("granted_by_subject"), instant(rs, "expires_at"), instant(rs, "revoked_at"),
-                instant(rs, "created_at"));
+                instant(rs, "created_at"), rs.getLong("version"));
     }
 
     private CrossAssociationDtos.RecommendationView recommendation(ResultSet rs) throws SQLException {

@@ -1,5 +1,6 @@
 package com.guanxian.platform;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guanxian.platform.ai.rag.EmbeddingProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import java.util.List;
 
 import static org.hamcrest.Matchers.greaterThan;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -33,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "guanxian.business.repository=postgres",
         "guanxian.member.repository=memory",
         "guanxian.member.seed-demo-data=false",
+        "guanxian.ai.rag.external-model-data-egress-enabled=true",
         "guanxian.security.mode=demo"
 })
 @AutoConfigureMockMvc
@@ -57,9 +60,12 @@ class PostgresKnowledgeIsolationIntegrationTest {
     @Autowired
     JdbcTemplate jdbc;
 
+    @Autowired
+    ObjectMapper objectMapper;
+
     @Test
     void postgresPrivateDocumentIsHiddenFromOrdinarySameAssociationMember() throws Exception {
-        mockMvc.perform(post("/api/v1/knowledge/documents/text")
+        var createResult = mockMvc.perform(post("/api/v1/knowledge/documents/text")
                         .with(httpBasic("association-admin", "admin123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -70,7 +76,35 @@ class PostgresKnowledgeIsolationIntegrationTest {
                                   "content": "白桦编号测试管段只允许资料创建者和协会工作人员检索。"
                                 }
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn();
+        UUID documentId = UUID.fromString(objectMapper.readTree(
+                createResult.getResponse().getContentAsString()).path("data").path("documentId").asText());
+
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/submit", documentId)
+                        .with(httpBasic("association-admin", "admin123"))
+                        .header(org.springframework.http.HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string(org.springframework.http.HttpHeaders.ETAG, "\"1\""));
+        mockMvc.perform(post("/api/v1/knowledge/documents/{documentId}/review", documentId)
+                        .with(httpBasic("association-admin", "admin123"))
+                        .header(org.springframework.http.HttpHeaders.IF_MATCH, "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                        .string(org.springframework.http.HttpHeaders.ETAG, "\"2\""));
+
+        mockMvc.perform(get("/api/v1/knowledge/documents")
+                        .with(httpBasic("association-admin", "admin123"))
+                        .queryParam("includeDeleted", "false")
+                        .queryParam("page", "0")
+                        .queryParam("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items[0].id").value(documentId.toString()))
+                .andExpect(jsonPath("$.data.items[0].title").value("PostgreSQL私有风险研判"));
 
         mockMvc.perform(post("/api/v1/knowledge/questions")
                         .with(httpBasic("enterprise-member", "member123"))

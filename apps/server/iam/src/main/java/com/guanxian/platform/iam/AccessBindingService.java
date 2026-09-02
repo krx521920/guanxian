@@ -62,6 +62,15 @@ class AccessBindingService {
                 contextParameters(actor), this::view);
     }
 
+    AccessBindingPage page(ActorScope actor, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), 100);
+        List<AccessBindingView> all = findAll(actor);
+        int from = Math.min(safePage * safeSize, all.size());
+        int to = Math.min(from + safeSize, all.size());
+        return new AccessBindingPage(List.copyOf(all.subList(from, to)), all.size(), safePage, safeSize);
+    }
+
     @Transactional
     AccessBindingView upsert(AccessBindingRequest request, Long expectedVersion, ActorScope actor) {
         requireWriteContext(actor);

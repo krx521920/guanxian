@@ -56,7 +56,7 @@ class CrossAssociationServiceTest {
     void approvalCreatesActiveRelationshipAndAuditsEveryWrite() {
         var created = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, "cooperation"), reviewer(SOURCE));
-        var reviewed = service.reviewAccessRequest(created.id(), new CrossAssociationDtos.AccessRequestReview(
+        var reviewed = service.reviewAccessRequest(created.id(), created.version(), new CrossAssociationDtos.AccessRequestReview(
                 CrossAssociationDtos.AccessDecision.APPROVE, "approved", Instant.now().plusSeconds(3600), true),
                 reviewer(TARGET));
 
@@ -86,7 +86,7 @@ class CrossAssociationServiceTest {
     void accessReviewIsTargetScoped() {
         var created = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
-        assertThrows(ForbiddenException.class, () -> service.reviewAccessRequest(created.id(),
+        assertThrows(ForbiddenException.class, () -> service.reviewAccessRequest(created.id(), created.version(),
                 new CrossAssociationDtos.AccessRequestReview(
                         CrossAssociationDtos.AccessDecision.REJECT, null, null, null), reviewer(SOURCE)));
     }
@@ -96,24 +96,36 @@ class CrossAssociationServiceTest {
         var created = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, "temporary"), reviewer(SOURCE));
 
-        assertThrows(ForbiddenException.class, () -> service.cancelAccessRequest(created.id(),
+        assertThrows(ForbiddenException.class, () -> service.cancelAccessRequest(created.id(), created.version(),
                 new CrossAssociationDtos.AccessRequestCancel("wrong side"), reviewer(TARGET)));
-        var cancelled = service.cancelAccessRequest(created.id(),
+        var cancelled = service.cancelAccessRequest(created.id(), created.version(),
                 new CrossAssociationDtos.AccessRequestCancel("no longer needed"), reviewer(SOURCE));
 
         assertEquals("CANCELLED", cancelled.status());
         assertEquals("no longer needed", cancelled.reviewComment());
         assertEquals("ASSOCIATION_ACCESS_REQUEST_CANCEL", store.auditEntries().getLast().action());
-        assertThrows(ConflictException.class, () -> service.reviewAccessRequest(created.id(),
+        assertThrows(ConflictException.class, () -> service.reviewAccessRequest(created.id(), cancelled.version(),
                 new CrossAssociationDtos.AccessRequestReview(
                         CrossAssociationDtos.AccessDecision.APPROVE, null, null, true), reviewer(TARGET)));
+    }
+
+    @Test
+    void accessRequestRejectsAStaleVersionBeforeWriting() {
+        var created = service.createAccessRequest(
+                new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
+
+        assertThrows(PreconditionFailedException.class, () -> service.reviewAccessRequest(
+                created.id(), created.version() + 1,
+                new CrossAssociationDtos.AccessRequestReview(
+                        CrossAssociationDtos.AccessDecision.REJECT, null, null, null), reviewer(TARGET)));
+        assertEquals("PENDING", store.accessRequest(created.id()).orElseThrow().status());
     }
 
     @Test
     void omittedMemberDataApprovalDefaultsToFailClosed() {
         var created = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
-        service.reviewAccessRequest(created.id(), new CrossAssociationDtos.AccessRequestReview(
+        service.reviewAccessRequest(created.id(), created.version(), new CrossAssociationDtos.AccessRequestReview(
                 CrossAssociationDtos.AccessDecision.APPROVE, null, null, null), reviewer(TARGET));
 
         assertEquals(false, service.relationships(reviewer(SOURCE)).getFirst().allowMemberData());
@@ -159,7 +171,7 @@ class CrossAssociationServiceTest {
         Instant expiry = Instant.now().plusSeconds(1800);
         var request = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
-        service.reviewAccessRequest(request.id(), new CrossAssociationDtos.AccessRequestReview(
+        service.reviewAccessRequest(request.id(), request.version(), new CrossAssociationDtos.AccessRequestReview(
                 CrossAssociationDtos.AccessDecision.APPROVE, null, expiry, true), reviewer(TARGET));
         var suspended = service.changeRelationship(SOURCE, TARGET, 0,
                 new CrossAssociationDtos.RelationshipChange(
@@ -331,7 +343,7 @@ class CrossAssociationServiceTest {
         Instant relationshipExpiry = now.plusSeconds(1800);
         var request = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
-        service.reviewAccessRequest(request.id(), new CrossAssociationDtos.AccessRequestReview(
+        service.reviewAccessRequest(request.id(), request.version(), new CrossAssociationDtos.AccessRequestReview(
                 CrossAssociationDtos.AccessDecision.APPROVE, null, relationshipExpiry, true), reviewer(TARGET));
         service.createSharePolicy(new CrossAssociationDtos.SharePolicyUpsert(
                 null, TARGET, "PRODUCT", List.of("name"), null, now.plusSeconds(3600), null),
@@ -349,7 +361,7 @@ class CrossAssociationServiceTest {
         assertEquals("REVOKED", store.consent(consent.id()).orElseThrow().status());
         var fresh = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, "reconnect"), reviewer(SOURCE));
-        service.reviewAccessRequest(fresh.id(), new CrossAssociationDtos.AccessRequestReview(
+        service.reviewAccessRequest(fresh.id(), fresh.version(), new CrossAssociationDtos.AccessRequestReview(
                 CrossAssociationDtos.AccessDecision.APPROVE, null, null, true), reviewer(TARGET));
 
         assertTrue(new CrossAssociationFieldAuthorizationService(store).authorizedFields(
@@ -524,14 +536,14 @@ class CrossAssociationServiceTest {
         assertThrows(ForbiddenException.class, () -> service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(OUTSIDER, TARGET, "body override"), sourceContext));
         assertThrows(ForbiddenException.class, () -> service.reviewAccessRequest(
-                created.id(), new CrossAssociationDtos.AccessRequestReview(
+                created.id(), created.version(), new CrossAssociationDtos.AccessRequestReview(
                         CrossAssociationDtos.AccessDecision.REJECT, null, null, null), global));
         assertThrows(ForbiddenException.class, () -> service.reviewAccessRequest(
-                created.id(), new CrossAssociationDtos.AccessRequestReview(
+                created.id(), created.version(), new CrossAssociationDtos.AccessRequestReview(
                         CrossAssociationDtos.AccessDecision.REJECT, null, null, null), sourceContext));
 
         var reviewed = service.reviewAccessRequest(
-                created.id(), new CrossAssociationDtos.AccessRequestReview(
+                created.id(), created.version(), new CrossAssociationDtos.AccessRequestReview(
                         CrossAssociationDtos.AccessDecision.REJECT, null, null, null),
                 systemAdministrator(TARGET, null));
         assertEquals("REJECTED", reviewed.status());
@@ -589,7 +601,7 @@ class CrossAssociationServiceTest {
     private void establishRelationship() {
         var request = service.createAccessRequest(
                 new CrossAssociationDtos.AccessRequestCreate(null, TARGET, null), reviewer(SOURCE));
-        service.reviewAccessRequest(request.id(), new CrossAssociationDtos.AccessRequestReview(
+        service.reviewAccessRequest(request.id(), request.version(), new CrossAssociationDtos.AccessRequestReview(
                 CrossAssociationDtos.AccessDecision.APPROVE, null, null, true), reviewer(TARGET));
     }
 

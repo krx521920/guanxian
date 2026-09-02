@@ -130,6 +130,18 @@ class InMemoryCollaborationStore implements CollaborationStore {
     }
 
     @Override
+    public boolean linkedMatchParticipantsOperational(UUID matchId) {
+        if (matchId == null) {
+            return true;
+        }
+        MatchScope scope = matchScopes.get(matchId);
+        return scope != null
+                && !scope.demandEnterpriseId().equals(scope.candidateEnterpriseId())
+                && enterpriseLifecycle.isOperational(scope.demandEnterpriseId())
+                && enterpriseLifecycle.isOperational(scope.candidateEnterpriseId());
+    }
+
+    @Override
     public synchronized CollaborationView create(
             UUID associationId,
             UUID enterpriseId,

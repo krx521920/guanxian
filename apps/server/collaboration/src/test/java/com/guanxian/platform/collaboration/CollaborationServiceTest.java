@@ -6,9 +6,11 @@ import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.notification.BusinessNotification;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -27,7 +29,10 @@ class CollaborationServiceTest {
     private static final UUID UNRELATED_ENTERPRISE = UUID.fromString("00000000-0000-0000-0000-00000000e003");
 
     private final InMemoryCollaborationStore store = new InMemoryCollaborationStore(true);
-    private final CollaborationService service = new CollaborationService(store, authentication -> enterprise());
+    private final List<BusinessNotification> notifications = new ArrayList<>();
+    private final CollaborationService service = new CollaborationService(
+            store, authentication -> enterprise(), enterpriseId -> true,
+            (event, actor) -> { notifications.add(event); return 1; });
 
     @Test
     void memoryAdapterStartsEmptyWhenDemoSeedIsDisabled() {
@@ -45,6 +50,9 @@ class CollaborationServiceTest {
 
         assertEquals(matchId, created.matchId());
         assertEquals(matchId, submitted.matchId());
+        assertEquals(2, notifications.size());
+        assertEquals("COLLABORATION_CHANGED", notifications.getLast().notificationType());
+        assertEquals(submitted.version(), notifications.getLast().resourceVersion());
     }
 
     @Test

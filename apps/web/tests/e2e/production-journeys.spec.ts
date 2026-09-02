@@ -36,7 +36,7 @@ test('协会通过官方 Excel 完成会员导入、预检和审核', async ({ b
     })
     await expect(page.getByText(/已导入 1 家企业，统一进入待审核/)).toBeVisible()
     await page.getByPlaceholder('搜索企业名称、业务角色或产品服务').fill(enterpriseName)
-    const row = page.locator('tr').filter({ hasText: enterpriseName })
+    const row = page.locator('table.member-table tbody tr').filter({ hasText: enterpriseName })
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('待审核')
     await row.getByRole('link', { name: '审核' }).click()
@@ -130,8 +130,10 @@ test('协会上传原文、审核知识文档并完成带可下载出处的问�
     const answer = page.locator('article.modal-copy').filter({ hasText: '追踪编号' })
     await expect(answer).toContainText(title)
     await expect(answer).toContainText('每七天')
+    const citation = answer.locator('.impact-list > article').filter({ hasText: title })
+    await expect(citation).toHaveCount(1)
     const downloadPromise = page.waitForEvent('download')
-    await answer.getByRole('button', { name: '下载原始附件 ↓' }).click()
+    await citation.getByRole('button', { name: '下载原始附件 ↓' }).click()
     const download = await downloadPromise
     const stream = await download.createReadStream()
     const chunks: Buffer[] = []

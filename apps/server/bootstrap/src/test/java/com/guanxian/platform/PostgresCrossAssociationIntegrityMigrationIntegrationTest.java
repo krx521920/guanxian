@@ -62,13 +62,18 @@ class PostgresCrossAssociationIntegrityMigrationIntegrationTest {
             .withPassword("test-only-password");
 
     @Test
-    void freshDatabaseAppliesV17AndRejectsInvalidCrossAssociationRows() {
+    void freshDatabaseAppliesV23AndRejectsInvalidCrossAssociationRows() {
         String schema = "cross_association_v17_fresh";
-        flyway(schema, null).migrate();
+        flyway(schema, MigrationVersion.fromVersion("23")).migrate();
         JdbcTemplate jdbc = jdbc(schema);
         seedParents(jdbc);
 
-        assertEquals("17", latestVersion(jdbc));
+        assertEquals("23", latestVersion(jdbc));
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT count(*) FROM information_schema.columns
+                 WHERE table_schema=? AND column_name='version'
+                   AND table_name IN ('association_access_request', 'enterprise_share_consent')
+                """, Integer.class, schema));
         assertEquals("NO", jdbc.queryForObject("""
                 SELECT is_nullable
                   FROM information_schema.columns

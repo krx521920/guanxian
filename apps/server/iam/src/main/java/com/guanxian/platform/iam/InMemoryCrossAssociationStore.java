@@ -52,35 +52,38 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
             UUID source, UUID target, String reason, ActorScope actor, Instant now) {
         UUID id = UUID.randomUUID();
         var value = new CrossAssociationDtos.AccessRequestView(
-                id, source, target, reason, "PENDING", actor.subject(), null, null, now, null);
+                id, source, target, reason, "PENDING", actor.subject(), null, null, now, null, 0);
         accessRequests.put(id, value);
         return value;
     }
 
     @Override
     public synchronized CrossAssociationDtos.AccessRequestView reviewAccessRequest(
-            UUID id, String status, String comment, ActorScope actor, Instant now) {
+            UUID id, long expectedVersion, String status, String comment, ActorScope actor, Instant now) {
         var old = accessRequests.get(id);
         if (old == null || !"PENDING".equals(old.status())) {
             throw new ConflictException("access request is no longer pending");
         }
+        requireVersion(old.version(), expectedVersion);
         var value = new CrossAssociationDtos.AccessRequestView(old.id(), old.applicantAssociationId(),
                 old.targetAssociationId(), old.reason(), status, old.requestedBySubject(), actor.subject(),
-                comment, old.requestedAt(), now);
+                comment, old.requestedAt(), now, old.version() + 1);
         accessRequests.put(id, value);
         return value;
     }
 
     @Override
     public synchronized CrossAssociationDtos.AccessRequestView cancelAccessRequest(
-            UUID id, String reason, ActorScope actor, Instant now) {
+            UUID id, long expectedVersion, String reason, ActorScope actor, Instant now) {
         var old = accessRequests.get(id);
         if (old == null || !"PENDING".equals(old.status())) {
             throw new ConflictException("access request is no longer pending");
         }
+        requireVersion(old.version(), expectedVersion);
         var cancelled = new CrossAssociationDtos.AccessRequestView(
                 old.id(), old.applicantAssociationId(), old.targetAssociationId(), old.reason(),
-                "CANCELLED", old.requestedBySubject(), actor.subject(), reason, old.requestedAt(), now);
+                "CANCELLED", old.requestedBySubject(), actor.subject(), reason, old.requestedAt(), now,
+                old.version() + 1);
         accessRequests.put(id, cancelled);
         return cancelled;
     }
@@ -187,20 +190,22 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
         UUID id = UUID.randomUUID();
         var created = new CrossAssociationDtos.ConsentView(id, enterpriseId, request.targetAssociationId(),
                 request.resourceType().trim().toUpperCase(), request.resourceId(), "ACTIVE", actor.subject(),
-                request.expiresAt(), null, now);
+                request.expiresAt(), null, now, 0);
         consents.put(id, created);
         return created;
     }
 
     @Override
-    public synchronized CrossAssociationDtos.ConsentView revokeConsent(UUID id, ActorScope actor, Instant now) {
+    public synchronized CrossAssociationDtos.ConsentView revokeConsent(
+            UUID id, long expectedVersion, ActorScope actor, Instant now) {
         var old = consents.get(id);
         if (old == null || !"ACTIVE".equals(old.status())) {
             throw new ConflictException("share consent is no longer active");
         }
+        requireVersion(old.version(), expectedVersion);
         var revoked = new CrossAssociationDtos.ConsentView(old.id(), old.enterpriseId(), old.targetAssociationId(),
                 old.resourceType(), old.resourceId(), "REVOKED", old.grantedBySubject(), old.expiresAt(), now,
-                old.createdAt());
+                old.createdAt(), old.version() + 1);
         consents.put(id, revoked);
         return revoked;
     }
@@ -225,7 +230,7 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
                     var changed = new CrossAssociationDtos.ConsentView(
                             value.id(), value.enterpriseId(), value.targetAssociationId(), value.resourceType(),
                             value.resourceId(), "EXPIRED", value.grantedBySubject(), value.expiresAt(), null,
-                            value.createdAt());
+                            value.createdAt(), value.version() + 1);
                     consents.put(value.id(), changed);
                     expired.add(changed);
                 });
@@ -249,7 +254,7 @@ class InMemoryCrossAssociationStore implements CrossAssociationStore {
                     var changed = new CrossAssociationDtos.ConsentView(
                             value.id(), value.enterpriseId(), value.targetAssociationId(), value.resourceType(),
                             value.resourceId(), "REVOKED", value.grantedBySubject(), value.expiresAt(), now,
-                            value.createdAt());
+                            value.createdAt(), value.version() + 1);
                     consents.put(value.id(), changed);
                     revoked.add(changed);
                 });

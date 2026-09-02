@@ -11,6 +11,8 @@ import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
+import com.guanxian.platform.shared.notification.BusinessNotification;
+import com.guanxian.platform.shared.notification.BusinessNotificationPublisher;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +40,7 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
     private final MemberRepository repository;
     private final AuditTrail auditTrail;
     private final PartnerFieldAuthorization partnerFieldAuthorization;
+    private final BusinessNotificationPublisher notifications;
     @Value("${guanxian.member.seed-demo-data:false}")
     private boolean seedDemoData;
 
@@ -45,10 +48,19 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
     MemberService(
             MemberRepository repository,
             AuditTrail auditTrail,
-            PartnerFieldAuthorization partnerFieldAuthorization) {
+            PartnerFieldAuthorization partnerFieldAuthorization,
+            BusinessNotificationPublisher notifications) {
         this.repository = repository;
         this.auditTrail = auditTrail;
         this.partnerFieldAuthorization = partnerFieldAuthorization;
+        this.notifications = notifications;
+    }
+
+    MemberService(
+            MemberRepository repository,
+            AuditTrail auditTrail,
+            PartnerFieldAuthorization partnerFieldAuthorization) {
+        this(repository, auditTrail, partnerFieldAuthorization, (event, actor) -> 0);
     }
 
     MemberService(MemberRepository repository, AuditTrail auditTrail) {
@@ -243,6 +255,12 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         auditTrail.recordReview(
                 actor, existing.associationId(), id, reviewed.version(),
                 existing.status(), request.decision(), trimToNull(request.comment()));
+        notifications.publish(new BusinessNotification(
+                reviewed.associationId(), List.of(reviewed.id()), false,
+                "MEMBER_REVIEWED", "会员审核结果",
+                reviewed.name() + " 的会员资料审核结果为 " + reviewed.status(),
+                "ENTERPRISE", reviewed.id(), reviewed.version(),
+                "member-review:" + reviewed.id() + ":" + reviewed.version()), actor);
         return reviewed;
     }
 

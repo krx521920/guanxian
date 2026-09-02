@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
@@ -81,9 +82,15 @@ const resourceTypeLabels: Record<AssociationShareResourceType, string> = {
 const auth = useAuth()
 const requests = ref<AssociationAccessRequest[]>([])
 const relationships = ref<AssociationRelationship[]>([])
+const relationshipRows = ref<AssociationRelationship[]>([])
 const policies = ref<AssociationSharePolicy[]>([])
 const consents = ref<AssociationConsent[]>([])
 const recommendations = ref<AssociationRecommendation[]>([])
+const requestPage = ref(0); const requestSize = ref(20); const requestTotal = ref(0)
+const relationshipPage = ref(0); const relationshipSize = ref(20); const relationshipTotal = ref(0)
+const policyPage = ref(0); const policySize = ref(20); const policyTotal = ref(0)
+const consentPage = ref(0); const consentSize = ref(20); const consentTotal = ref(0)
+const recommendationPage = ref(0); const recommendationSize = ref(20); const recommendationTotal = ref(0)
 const loading = ref(false)
 const busy = ref(false)
 const error = ref<PageResourceError | null>(null)
@@ -212,11 +219,20 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    [requests.value, relationships.value, policies.value, consents.value, recommendations.value] = await Promise.all([
-      platformApi.associationAccessRequests(), platformApi.associationRelationships(),
-      platformApi.associationSharePolicies(), platformApi.associationConsents(),
-      platformApi.associationRecommendations(),
+    const [requestResult, relationshipValues, relationshipResult, policyResult, consentResult, recommendationResult] = await Promise.all([
+      platformApi.associationAccessRequestPage(requestPage.value, requestSize.value),
+      platformApi.associationRelationships(),
+      platformApi.associationRelationshipPage(relationshipPage.value, relationshipSize.value),
+      platformApi.associationSharePolicyPage(policyPage.value, policySize.value),
+      platformApi.associationConsentPage(consentPage.value, consentSize.value),
+      platformApi.associationRecommendationPage(recommendationPage.value, recommendationSize.value),
     ])
+    requests.value = requestResult.items; requestPage.value = requestResult.page; requestSize.value = requestResult.size; requestTotal.value = requestResult.total
+    relationships.value = relationshipValues
+    relationshipRows.value = relationshipResult.items; relationshipPage.value = relationshipResult.page; relationshipSize.value = relationshipResult.size; relationshipTotal.value = relationshipResult.total
+    policies.value = policyResult.items; policyPage.value = policyResult.page; policySize.value = policyResult.size; policyTotal.value = policyResult.total
+    consents.value = consentResult.items; consentPage.value = consentResult.page; consentSize.value = consentResult.size; consentTotal.value = consentResult.total
+    recommendations.value = recommendationResult.items; recommendationPage.value = recommendationResult.page; recommendationSize.value = recommendationResult.size; recommendationTotal.value = recommendationResult.total
   } catch (reason) {
     error.value = safePageResourceError(reason)
   } finally {
@@ -458,6 +474,17 @@ async function submitRecommendationReview() {
   }
 }
 
+function changeRequestPage(value: number) { requestPage.value = value; void load() }
+function resizeRequestPage(value: number) { requestSize.value = value; requestPage.value = 0; void load() }
+function changeRelationshipPage(value: number) { relationshipPage.value = value; void load() }
+function resizeRelationshipPage(value: number) { relationshipSize.value = value; relationshipPage.value = 0; void load() }
+function changePolicyPage(value: number) { policyPage.value = value; void load() }
+function resizePolicyPage(value: number) { policySize.value = value; policyPage.value = 0; void load() }
+function changeConsentPage(value: number) { consentPage.value = value; void load() }
+function resizeConsentPage(value: number) { consentSize.value = value; consentPage.value = 0; void load() }
+function changeRecommendationPage(value: number) { recommendationPage.value = value; void load() }
+function resizeRecommendationPage(value: number) { recommendationSize.value = value; recommendationPage.value = 0; void load() }
+
 onMounted(load)
 </script>
 
@@ -477,10 +504,10 @@ onMounted(load)
           <div><h2>协会关系</h2><p>暂停方可以恢复原关系；撤销或到期后必须重新申请并由对方审批，不允许单方延长授权。</p></div>
           <button class="text-button" @click="load">刷新</button>
         </div>
-        <div v-if="relationships.length" class="data-table-wrap">
+        <div v-if="relationshipRows.length" class="data-table-wrap">
           <table class="data-table">
             <thead><tr><th>合作协会</th><th>状态</th><th>会员数据</th><th>授权截止</th><th>状态说明</th><th></th></tr></thead>
-            <tbody><tr v-for="item in relationships" :key="`${item.sourceAssociationId}-${item.targetAssociationId}`">
+            <tbody><tr v-for="item in relationshipRows" :key="`${item.sourceAssociationId}-${item.targetAssociationId}`">
               <td>{{ otherAssociation(item) }}</td>
               <td><StatusBadge :value="displayBusinessStatus(relationshipState(item))" /></td>
               <td>{{ item.allowMemberData ? '允许' : '不允许' }}</td>
@@ -501,6 +528,7 @@ onMounted(load)
           </table>
         </div>
         <div v-else class="empty-business-state"><b>暂无友好协会关系</b><span>双边审批通过后，关系会显示在这里。</span></div>
+        <PaginationBar :page="relationshipPage" :size="relationshipSize" :total="relationshipTotal" :disabled="loading" @change="changeRelationshipPage" @resize="resizeRelationshipPage" />
       </section>
 
       <section class="panel business-section">
@@ -520,6 +548,7 @@ onMounted(load)
           </table>
         </div>
         <div v-else class="empty-business-state"><b>暂无接入申请</b></div>
+        <PaginationBar :page="requestPage" :size="requestSize" :total="requestTotal" :disabled="loading" @change="changeRequestPage" @resize="resizeRequestPage" />
       </section>
 
       <section class="panel business-section">
@@ -537,6 +566,7 @@ onMounted(load)
           </tr></tbody>
         </table></div>
         <div v-else class="empty-business-state"><b>暂无字段共享策略</b><span>先建立有效关系，再由数据所属协会按字段授权。</span></div>
+        <PaginationBar :page="policyPage" :size="policySize" :total="policyTotal" :disabled="loading" @change="changePolicyPage" @resize="resizePolicyPage" />
       </section>
 
       <section class="panel business-section">
@@ -550,6 +580,7 @@ onMounted(load)
           </tr></tbody>
         </table></div>
         <div v-else class="empty-business-state"><b>暂无企业共享同意记录</b><span>企业对具体产品、服务、需求或会员资料授权后会显示在这里。</span></div>
+        <PaginationBar :page="consentPage" :size="consentSize" :total="consentTotal" :disabled="loading" @change="changeConsentPage" @resize="resizeConsentPage" />
       </section>
 
       <section class="panel business-section">
@@ -566,6 +597,7 @@ onMounted(load)
           </tr></tbody>
         </table></div>
         <div v-else class="empty-business-state"><b>暂无跨协会推荐</b></div>
+        <PaginationBar :page="recommendationPage" :size="recommendationSize" :total="recommendationTotal" :disabled="loading" @change="changeRecommendationPage" @resize="resizeRecommendationPage" />
       </section>
     </template>
 

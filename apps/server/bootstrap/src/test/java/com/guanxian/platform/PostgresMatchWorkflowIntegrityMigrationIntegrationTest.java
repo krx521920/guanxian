@@ -55,7 +55,7 @@ class PostgresMatchWorkflowIntegrityMigrationIntegrationTest {
                 RETURNING id
                 """, UUID.class, fixture.demandAssociationId(), fixture.candidateAssociationId());
 
-        flyway(schema, null).migrate();
+        flyway(schema, MigrationVersion.fromVersion("18")).migrate();
 
         assertEquals("18", latestVersion(jdbc));
         assertEquals("PENDING_CONFIRMATION", jdbc.queryForObject(

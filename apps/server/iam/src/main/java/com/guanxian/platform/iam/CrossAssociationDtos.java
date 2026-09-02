@@ -41,7 +41,8 @@ final class CrossAssociationDtos {
             String reviewedBySubject,
             String reviewComment,
             Instant requestedAt,
-            Instant reviewedAt) {
+            Instant reviewedAt,
+            long version) {
     }
 
     record RelationshipChange(
@@ -118,7 +119,8 @@ final class CrossAssociationDtos {
             String grantedBySubject,
             Instant expiresAt,
             Instant revokedAt,
-            Instant createdAt) {
+            Instant createdAt,
+            long version) {
     }
 
     record ConsentTargetView(

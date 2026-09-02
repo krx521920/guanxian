@@ -5,6 +5,8 @@ import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import com.guanxian.platform.shared.notification.BusinessNotification;
+import com.guanxian.platform.shared.notification.BusinessNotificationPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,7 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-public class NotificationService {
+public class NotificationService implements BusinessNotificationPublisher {
     private static final Set<String> TYPES = Set.of("POLICY");
     private static final Set<String> MESSAGE_STATUSES = Set.of(
             "PENDING", "DELIVERED", "READ", "FAILED", "ARCHIVED");
@@ -159,6 +161,12 @@ public class NotificationService {
                             "idempotencyKey", normalized.idempotencyKey()));
         }
         return result;
+    }
+
+    @Override
+    @Transactional
+    public int publish(BusinessNotification notification, ActorScope actor) {
+        return store.publishBusiness(notification, actor);
     }
 
     private SubscriptionView changeStatus(

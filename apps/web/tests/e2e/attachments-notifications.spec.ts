@@ -51,11 +51,11 @@ test.describe('真实附件与通知闭环', () => {
       const panel = page.getByRole('region', { name: '消息通知' })
       await expect(panel).toContainText('E2E 会员资料待核验')
       await expect(panel).toContainText('1 条未读')
-      const item = panel.getByRole('button').filter({ hasText: 'E2E 会员资料待核验' })
+      const item = panel.locator('article.notification-item').filter({ hasText: 'E2E 会员资料待核验' })
       await expect(item).toHaveClass(/unread/)
 
       await waitForApiWrite(page, /\/api\/v1\/notifications\/messages\/[0-9a-f-]+\/read$/, async () => {
-        await item.click()
+        await item.getByRole('button').filter({ hasText: 'E2E 会员资料待核验' }).click()
       })
       await expect(page).toHaveURL(/\/members(?:[/?#]|$)/)
       await page.getByRole('button', { name: '消息通知' }).click()

@@ -307,7 +307,9 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
         MapSqlParameterSource params = documentScope(scope)
                 .addValue("offset", Math.max(0, offset))
                 .addValue("limit", Math.max(1, Math.min(limit, 100)));
-        String deleted = includeDeleted ? "" : " AND d.deleted_at IS NULL";
+        // Keep a trailing separator because this fragment is concatenated
+        // directly before ORDER BY in the paged query below.
+        String deleted = includeDeleted ? "" : " AND d.deleted_at IS NULL\n";
         List<KnowledgeDocumentView> items = jdbc.query(documentSelect() + """
                 WHERE d.association_id = :associationId
                   AND (:privileged OR d.visibility <> 'PRIVATE' OR d.created_by_subject = :actorSubject)

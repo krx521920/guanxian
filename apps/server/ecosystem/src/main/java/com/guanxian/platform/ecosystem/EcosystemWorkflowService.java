@@ -7,6 +7,8 @@ import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.error.PreconditionRequiredException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
+import com.guanxian.platform.shared.notification.BusinessNotification;
+import com.guanxian.platform.shared.notification.BusinessNotificationPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +25,7 @@ public class EcosystemWorkflowService {
     private final EcosystemCatalogStore catalogStore;
     private final EnterpriseLifecycle enterpriseLifecycle;
     private final PartnerFieldAuthorization partnerFields;
+    private final BusinessNotificationPublisher notifications;
 
     @Autowired
     public EcosystemWorkflowService(
@@ -30,12 +33,23 @@ public class EcosystemWorkflowService {
             EcosystemWorkflowStore workflowStore,
             EcosystemCatalogStore catalogStore,
             EnterpriseLifecycle enterpriseLifecycle,
-            PartnerFieldAuthorization partnerFields) {
+            PartnerFieldAuthorization partnerFields,
+            BusinessNotificationPublisher notifications) {
         this.matchStore = matchStore;
         this.workflowStore = workflowStore;
         this.catalogStore = catalogStore;
         this.enterpriseLifecycle = enterpriseLifecycle;
         this.partnerFields = partnerFields;
+        this.notifications = notifications;
+    }
+
+    public EcosystemWorkflowService(
+            EcosystemMatchStore matchStore,
+            EcosystemWorkflowStore workflowStore,
+            EcosystemCatalogStore catalogStore,
+            EnterpriseLifecycle enterpriseLifecycle,
+            PartnerFieldAuthorization partnerFields) {
+        this(matchStore, workflowStore, catalogStore, enterpriseLifecycle, partnerFields, (event, actor) -> 0);
     }
 
     public EcosystemWorkflowService(
@@ -107,6 +121,11 @@ public class EcosystemWorkflowService {
                 match.id(), actor.associationId(), actor.enterpriseId(), request, actor);
         record(actor, "CREATE_INVITATION", "MATCH_INVITATION", created.id(),
                 match.demandEnterpriseId(), created.version(), created);
+        notifications.publish(new BusinessNotification(
+                actor.associationId(), List.of(created.recipientEnterpriseId()), true,
+                "MATCH_INVITATION", "收到新的生态协作邀请", created.message(),
+                "MATCH_INVITATION", created.id(), created.version(),
+                "match-invitation:" + created.id() + ":" + created.version()), actor);
         return redactInvitationIdentity(created);
     }
 
@@ -224,6 +243,11 @@ public class EcosystemWorkflowService {
                 "ADVANCE_NEGOTIATION", actor);
         record(actor, "ADD_NEGOTIATION", "NEGOTIATION_RECORD", created.id(),
                 match.demandEnterpriseId(), created.version(), created);
+        notifications.publish(new BusinessNotification(
+                actor.associationId(), List.of(match.demandEnterpriseId(), match.candidateEnterpriseId()), true,
+                "MATCH_NEGOTIATION", "生态洽谈进度更新", created.stage() + "：" + created.summary(),
+                "NEGOTIATION_RECORD", created.id(), created.version(),
+                "match-negotiation:" + created.id() + ":" + created.version()), actor);
         return redactNegotiationIdentity(created);
     }
 

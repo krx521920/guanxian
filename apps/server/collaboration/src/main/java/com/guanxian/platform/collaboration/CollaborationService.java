@@ -8,6 +8,8 @@ import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.ActorScopeResolver;
+import com.guanxian.platform.shared.notification.BusinessNotification;
+import com.guanxian.platform.shared.notification.BusinessNotificationPublisher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -39,15 +41,25 @@ public class CollaborationService {
     private final CollaborationStore store;
     private final ActorScopeResolver actorScopeResolver;
     private final EnterpriseLifecycle enterpriseLifecycle;
+    private final BusinessNotificationPublisher notifications;
 
     @Autowired
     public CollaborationService(
             CollaborationStore store,
             ActorScopeResolver actorScopeResolver,
-            EnterpriseLifecycle enterpriseLifecycle) {
+            EnterpriseLifecycle enterpriseLifecycle,
+            BusinessNotificationPublisher notifications) {
         this.store = store;
         this.actorScopeResolver = actorScopeResolver;
         this.enterpriseLifecycle = enterpriseLifecycle;
+        this.notifications = notifications;
+    }
+
+    public CollaborationService(
+            CollaborationStore store,
+            ActorScopeResolver actorScopeResolver,
+            EnterpriseLifecycle enterpriseLifecycle) {
+        this(store, actorScopeResolver, enterpriseLifecycle, (event, actor) -> 0);
     }
 
     CollaborationService(CollaborationStore store, ActorScopeResolver actorScopeResolver) {
@@ -114,6 +126,7 @@ public class CollaborationService {
         requireMatchLink(request.matchId(), associationId, enterpriseId);
         CollaborationView created = store.create(associationId, enterpriseId, request, actor);
         store.recordChange(actor, "CREATE", created, null);
+        notifyChange("CREATE", created, actor);
         return created;
     }
 
@@ -133,6 +146,7 @@ public class CollaborationService {
         CollaborationView updated = store.update(id, expectedVersion, request, actor)
                 .orElseThrow(CollaborationService::stale);
         store.recordChange(actor, "UPDATE", updated, null);
+        notifyChange("UPDATE", updated, actor);
         return updated;
     }
 
@@ -195,6 +209,7 @@ public class CollaborationService {
         CollaborationView deleted = store.softDelete(id, expectedVersion, actor)
                 .orElseThrow(CollaborationService::stale);
         store.recordChange(actor, "SOFT_DELETE", deleted, null);
+        notifyChange("SOFT_DELETE", deleted, actor);
         return deleted;
     }
 
@@ -214,6 +229,7 @@ public class CollaborationService {
             throw new PreconditionFailedException("collaboration is neither deleted nor disabled");
         }
         store.recordChange(actor, "RESTORE", restored, null);
+        notifyChange("RESTORE", restored, actor);
         return restored;
     }
 
@@ -256,7 +272,18 @@ public class CollaborationService {
                 current.id(), expectedVersion, stage, disabled, actor)
                 .orElseThrow(CollaborationService::stale);
         store.recordChange(actor, action, updated, detail);
+        notifyChange(action, updated, actor);
         return updated;
+    }
+
+    private void notifyChange(String action, CollaborationView value, ActorScope actor) {
+        List<UUID> enterprises = value.enterpriseId() == null ? List.of() : List.of(value.enterpriseId());
+        notifications.publish(new BusinessNotification(
+                value.associationId(), enterprises, true,
+                "COLLABORATION_CHANGED", "协作事项发生变更",
+                value.title() + "：" + action + "，当前阶段 " + value.stage(),
+                "COLLABORATION", value.id(), value.version(),
+                "collaboration:" + value.id() + ":" + value.version() + ":" + action), actor);
     }
 
     private static boolean canManageDeleted(ActorScope actor) {
@@ -330,6 +357,11 @@ public class CollaborationService {
         if (!administratorCleanup && !actor.isSystemAdmin() && !actor.isAssociationStaff()
                 && actor.enterpriseId() != null) {
             requireOperational(actor.enterpriseId());
+        }
+        if (!administratorCleanup && item.matchId() != null
+                && !store.linkedMatchParticipantsOperational(item.matchId())) {
+            throw new PreconditionFailedException(
+                    "linked match and both participant enterprises must remain operational");
         }
         if (item.matchId() != null && !store.canAccessLinkedMatch(
                 item.matchId(), item.associationId(), item.enterpriseId())) {

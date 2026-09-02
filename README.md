@@ -8,7 +8,7 @@
 
 当前已形成可运行的首期工程基线，模块边界、OIDC 数据域、会员审核审计和 Excel 调查采集闭环已经接通。企业调查表作为 106 家会员冷启动入口，经过逐行预检、协会审核后进入企业、产品、需求与场景库。
 
-当前代码已接通身份生命周期、系统管理员代管上下文和主要业务数据域。早期基线曾在隔离的 PostgreSQL、MinIO、Redis、Keycloak/OIDC 环境中完成浏览器 E2E，但该历史结果不能代表当前变更已通过真实依赖验收。本次本机 Docker daemon 不可用，所有因此跳过的 Testcontainers 用例均不计入通过。正式 IdP、当前版本浏览器 E2E、TLS/私网、备份恢复、集中日志与真实告警，以及真实模型和协会语料验收仍是生产上线闸门。
+当前代码已接通身份生命周期、系统管理员代管上下文和主要业务数据域。2026-09-02 已在本机 Docker 环境执行当前代码的全部 Testcontainers，并在隔离的 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境完成 8 条浏览器 E2E。该结果证明当前测试环境闭环，不替代正式 IdP、TLS/私网、备份恢复、集中日志与真实告警，以及真实模型和协会语料等生产上线闸门。
 
 ## 工程结构
 
@@ -43,7 +43,7 @@ compose.yaml    本地 PostgreSQL、Redis、MinIO 编排
 - 生产默认使用 OIDC/JWT；仅显式本地/测试模式可启用 HTTP Basic 演示账号，生产 Profile 会拒绝 demo 模式。
 - ArchUnit 自动保护模块依赖方向，避免业务模块反向耦合启动层或内部实现。
 - Web、业务后端与 AI 服务统一使用安全的 `X-Request-Id`；成功与异常响应均可关联同一次请求，非法或可注入日志的值会被替换。
-- Flyway 当前迁移链为 V1–V22，可追踪处理空库和既有非空 PostgreSQL；V16 固化政策影响分析的同协会约束，V17 固化跨协会授权、推荐和共享策略不变量，V18 固化“推荐—双方确认—邀请—洽谈—反馈—成果”闭环，V19/V20 收紧通知与附件状态，V21 冻结会员采集出处字段和知识生命周期，V22 持久化分协会 RAG 评测与发布闸门。会员及知识生命周期写入均使用强 ETag/If-Match，陈旧写入返回 412。
+- Flyway 当前迁移链为 V1–V23，可追踪处理空库和既有非空 PostgreSQL；V16 固化政策影响分析的同协会约束，V17 固化跨协会授权、推荐和共享策略不变量，V18 固化“推荐—双方确认—邀请—洽谈—反馈—成果”闭环，V19/V20 收紧通知与附件状态，V21 冻结会员采集出处字段和知识生命周期，V22 持久化分协会 RAG 评测与发布闸门，V23 为跨协会申请及企业共享同意补齐版本列。会员、知识、跨协会申请、关系、字段策略、企业授权和推荐写入均使用强 ETag/If-Match，陈旧写入返回 412。
 - AI 输入具备字段、列表、数值和请求体资源上限；Unicode 统一规范化，校验错误不回显原始输入，评分分项与总分严格一致。
 - AI 请求体上限按 ASGI 数据块累计，无 `Content-Length` 或分块传输也不能绕过；Web 六个核心页面具有统一的安全失败态和重试机制。
 - Web 权限默认拒绝，生产构建禁用 mock 回退和演示身份切换；OIDC 登录采用 Authorization Code + PKCE，并回读后端验证身份。
@@ -81,6 +81,6 @@ docker compose --profile app up --build -d
 
 快速入口和当前可复验基线见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，手动质量检查执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
 
-2026-09-02 当前变更的本地常规基线：Java 的 69 份 Surefire 报告共定义 346 项测试，实际执行并通过 284 项，失败 0、错误 0；由于本机 Docker daemon 不可用，62 项 Testcontainers 用例被跳过，跳过不计为通过。Web 为 20 个 Vitest 文件、208 项全部通过，`vue-tsc -b` 与 Vite 生产构建通过。因此当前 V1–V22 迁移和真实 PostgreSQL/MinIO/Redis/OIDC/ClamAV 接线仍须在 Docker 可用的 CI 或预生产环境复验。早期版本的 Playwright 5/5 真实依赖结果只是历史基线，不是当前变更的验收证据。
+2026-09-02 当前变更的本地常规基线：Java 的 69 份 Surefire 报告共 349 项测试全部通过，失败 0、错误 0、跳过 0；其中原先因环境缺失而跳过的 62 项 Testcontainers 已连接真实 Docker 执行。Web 为 20 个 Vitest 文件、210 项全部通过，`vue-tsc -b` 与 Vite 生产构建通过；Playwright 4 个文件中的 8 条真实浏览器 E2E 全部通过。Flyway V1–V23、PostgreSQL、MinIO、Redis 和隔离 Keycloak/OIDC 已完成本轮复验；ClamAV、正式 IdP 与生产编排仍需在 CI 或预生产环境单独验收。
 
-> 当前代码提供了生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、正式 Excel 批量采集、附件知识治理、带出处检索和评测闸门；这不等于生产闭环已验收。本地测试仍可显式使用演示身份与内存仓储。Python 政策问答入口固定返回 503，Java 是唯一正式知识问答实现，且外部模型和 Embedding 默认关闭。生产上线前仍需取得 106 家真实回表并在预生产去重审核，配置正式 IdP、ClamAV 与合规模型密钥，完成当前代码的真实浏览器 E2E、V1–V22 迁移及备份恢复演练，并用协会真实语料跑过评测阈值；未通过前只能使用“管理协作平台”名称。
+> 当前代码提供了生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、正式 Excel 批量采集、附件知识治理、带出处检索和评测闸门；这不等于生产闭环已验收。本地测试仍可显式使用演示身份与内存仓储。Python 政策问答入口固定返回 503，Java 是唯一正式知识问答实现，且外部模型和 Embedding 默认关闭。生产上线前仍需取得 106 家真实回表并在预生产去重审核，配置正式 IdP、ClamAV 与合规模型密钥，完成生产编排、备份恢复演练和真实告警验收，并用协会真实语料跑过评测阈值；未通过前只能使用“管理协作平台”名称。

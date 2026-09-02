@@ -87,12 +87,12 @@ async function generateAndRecommend(page: Page, title: string): Promise<void> {
   await waitForApiWrite(page, /\/api\/v1\/matches\/demand\/[0-9a-f-]+\/generate$/, async () => {
     await dialog.getByRole('button', { name: '生成并保存匹配' }).click()
   })
-  await expect(page.getByText(/已为该需求生成 \d+ 条可追踪匹配/)).toBeVisible()
+  await expect(page.getByText(/本轮已新增或刷新 \d+ 条可追踪匹配/)).toBeVisible()
   const card = matchCard(page, title, supplierEnterpriseName)
   await expect(card).toHaveCount(1)
   await card.getByRole('button', { name: '查看匹配详情' }).click()
   await waitForApiWrite(page, /\/api\/v1\/matches\/[0-9a-f-]+\/recommend$/, async () => {
-    await page.getByRole('button', { name: '协会推荐' }).click()
+    await page.locator('.match-detail-modal').getByRole('button', { name: '协会推荐', exact: true }).click()
   })
   await expect(page.locator('.modal-message').getByText(
     '协会已将匹配定向推荐给企业。', { exact: true },
