@@ -45,12 +45,25 @@ public class PolicyService {
 
     @Transactional(readOnly = true)
     public PolicyPage page(ActorScope actor, String query, boolean includeDeleted, int page, int size) {
+        return page(actor, query, null, includeDeleted, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public PolicyPage page(
+            ActorScope actor, String query, String level,
+            boolean includeDeleted, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationStaff());
-        return new PolicyPage(store.list(actor, query, allowedDeleted, offset, safeSize),
-                store.count(actor, query, allowedDeleted), safePage, safeSize);
+        String normalizedLevel = level == null || level.isBlank() ? null : level.trim();
+        return new PolicyPage(store.list(actor, query, normalizedLevel, allowedDeleted, offset, safeSize),
+                store.count(actor, query, normalizedLevel, allowedDeleted), safePage, safeSize);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> levels(ActorScope actor) {
+        return store.levels(actor);
     }
 
     @Transactional(readOnly = true)

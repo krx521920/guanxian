@@ -54,6 +54,8 @@ const busy = ref(false)
 const error = ref<PageResourceError | null>(null)
 const message = ref('')
 const keyword = ref('')
+const activeLevel = ref('')
+const policyLevels = ref<string[]>([])
 const selected = ref<Policy | null>(null)
 const editing = ref<Policy | null>(null)
 const editorOpen = ref(false)
@@ -83,20 +85,24 @@ const impactDetailRequestGate = createLatestRequestGate()
 async function load() {
   const requestEpoch = policyListRequestGate.begin()
   const requestedKeyword = keyword.value.trim()
+  const requestedLevel = activeLevel.value
   const requestedSize = size.value
   const requestedIncludeDeleted = canManageDeleted.value && includeDeleted.value
   let requestedPage = page.value
   loading.value = true
   error.value = null
   try {
-    let policies = await platformApi.policies(
-      requestedKeyword, requestedPage, requestedSize, requestedIncludeDeleted,
-    )
+    let [policies, visibleLevels] = await Promise.all([
+      platformApi.policies(
+        requestedKeyword, requestedPage, requestedSize, requestedIncludeDeleted, requestedLevel,
+      ),
+      platformApi.policyLevels(),
+    ])
     if (!policyListRequestGate.isCurrent(requestEpoch)) return
     if (!policies.items.length && policies.total > 0 && policies.page > 0) {
       requestedPage = Math.max(0, Math.ceil(policies.total / policies.size) - 1)
       policies = await platformApi.policies(
-        requestedKeyword, requestedPage, requestedSize, requestedIncludeDeleted,
+        requestedKeyword, requestedPage, requestedSize, requestedIncludeDeleted, requestedLevel,
       )
       if (!policyListRequestGate.isCurrent(requestEpoch)) return
     }
@@ -104,6 +110,7 @@ async function load() {
     total.value = policies.total
     page.value = policies.page
     size.value = policies.size
+    policyLevels.value = visibleLevels
   } catch (reason) {
     if (policyListRequestGate.isCurrent(requestEpoch)) {
       error.value = safePageResourceError(reason)
@@ -461,7 +468,7 @@ function closeImpactDetail() {
   impactBusy.value = false
 }
 
-watch(keyword, () => {
+watch([keyword, activeLevel], () => {
   policyListRequestGate.invalidate()
   loading.value = true
   error.value = null
@@ -589,6 +596,10 @@ onMounted(async () => {
     </section>
     <section class="panel policy-qa"><div><span class="eyebrow">CITED POLICY Q&amp;A</span><h2>带出处的政策问答</h2><p>回答仅依据当前身份可见且已入库的资料；每条结论都附带片段出处和追踪编号。</p></div><form class="modal-copy" @submit.prevent="askKnowledge"><label><span>请输入政策、标准或协会资料问题</span><textarea v-model="qaQuestion" rows="3" maxlength="2000" placeholder="例如：资料中对地下管线安全监测提出了哪些要求？" required /></label><div class="form-actions"><button class="primary-button" :disabled="qaBusy || !qaQuestion.trim()">{{ qaBusy ? '检索生成中…' : '查询资料' }}</button></div></form><div v-if="qaError" class="save-message" role="alert">{{ qaError }}</div><article v-if="qaAnswer" class="modal-copy"><div class="policy-meta"><StatusBadge :value="qaAnswer.retrievalMode === 'HYBRID_VECTOR' ? '混合向量检索' : '关键词检索'" /><span>追踪编号 {{ qaAnswer.traceId }}</span></div><p>{{ qaAnswer.answer }}</p><div v-if="qaAnswer.citations.length" class="impact-list"><article v-for="citation in qaAnswer.citations" :key="citation.chunkId"><div><strong>[{{ citation.order }}] {{ citation.documentName }}</strong><span>版本 {{ citation.version }} · 片段 {{ citation.chunkIndex + 1 }} · 相关度 {{ citation.score.toFixed(3) }}</span></div><p>{{ citation.quote }}</p><a v-if="citation.source" :href="citation.source" target="_blank" rel="noopener noreferrer">查看外部原始来源 ↗</a><button v-else-if="citation.sourceAttachmentId" class="text-button" type="button" :disabled="qaBusy" @click="downloadCitationSource(citation)">下载原始附件 ↓</button><span v-else>该资料未登记外部链接或原始附件。</span></article></div><p v-else>当前可见资料未检索到足够证据，系统没有生成无出处答案。</p></article></section>
     <section class="panel filter-panel policy-filter">
+      <div class="segmented" aria-label="政策级别筛选">
+        <button type="button" :class="{ active: activeLevel === '' }" @click="activeLevel = ''">全部级别</button>
+        <button v-for="level in policyLevels" :key="level" type="button" :class="{ active: activeLevel === level }" @click="activeLevel = level">{{ level }}</button>
+      </div>
       <div class="search-box compact"><span>⌕</span><input v-model="keyword" placeholder="搜索政策标题、发布单位或关键词" /></div>
       <label v-if="canManageDeleted" class="policy-deleted-toggle"><input v-model="includeDeleted" type="checkbox" @change="toggleDeletedView" /> 包含已删除政策</label>
     </section>

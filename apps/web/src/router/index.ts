@@ -28,6 +28,7 @@ const router = createRouter({
         { path: 'members/new', component: () => import('../views/MemberCreateView.vue'), meta: { title: '新增会员企业', roles: protectedRouteRoles['/members/new'] } },
         { path: 'members/:id/edit', component: () => import('../views/MemberEditView.vue'), meta: { title: '编辑会员企业', roles: protectedRouteRoles['/members/edit'] } },
         { path: 'policies', component: () => import('../views/PoliciesView.vue'), meta: { title: '政策标准', roles: protectedRouteRoles['/policies'] } },
+        { path: 'ecosystem/overview', component: () => import('../views/EcosystemOverviewView.vue'), meta: { title: '生态全景', roles: protectedRouteRoles['/ecosystem/overview'] } },
         { path: 'ecosystem', component: () => import('../views/EcosystemCatalogView.vue'), meta: { title: '产品与需求', roles: protectedRouteRoles['/ecosystem'] } },
         { path: 'matching', component: () => import('../views/MatchingView.vue'), meta: { title: '生态匹配', roles: protectedRouteRoles['/matching'] } },
         { path: 'collaborations', component: () => import('../views/CollaborationsView.vue'), meta: { title: '协作事项', roles: protectedRouteRoles['/collaborations'] } },

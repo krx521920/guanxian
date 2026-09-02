@@ -41,7 +41,7 @@ describe('role navigation', () => {
 
   it.each([...associationRoles, ...enterpriseRoles])('shows shared ecosystem navigation to %s', (role) => {
     const paths = navigationForRole(role).map((item) => item.to)
-    expect(paths).toEqual(expect.arrayContaining(['/policies', '/ecosystem', '/matching', '/collaborations', '/attachments']))
+    expect(paths).toEqual(expect.arrayContaining(['/policies', '/ecosystem/overview', '/ecosystem', '/matching', '/collaborations', '/attachments']))
   })
 
   it('limits observers to member and policy read-only entry points', () => {
@@ -92,6 +92,7 @@ describe('role navigation', () => {
       { label: '企业工作台', to: '/enterprise', icon: 'dashboard', badge: undefined },
       { label: '会员企业', to: '/members', icon: 'enterprise', badge: undefined },
       { label: '政策标准', to: '/policies', icon: 'policy', badge: undefined },
+      { label: '生态全景', to: '/ecosystem/overview', icon: 'ecosystem', badge: undefined },
       { label: '产品与需求', to: '/ecosystem', icon: 'ecosystem', badge: undefined },
       { label: '生态匹配', to: '/matching', icon: 'match', badge: undefined },
       { label: '协作事项', to: '/collaborations', icon: 'task', badge: undefined },

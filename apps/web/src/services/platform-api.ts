@@ -189,9 +189,10 @@ export const platformApi = {
   previewMemberImport,
   memberImportPreview: (batchId: string) => request<MemberImportPreview>(`/members/imports/${encodeURIComponent(batchId)}`),
   commitMemberImport: (batchId: string) => request<MemberImportCommitResult>(`/members/imports/${encodeURIComponent(batchId)}/commit`, { method: 'POST' }),
-  policies: (query = '', page = 0, size = 20, includeDeleted = false) => request<EcosystemPage<Policy>>(
-    `/policies/page?q=${encodeURIComponent(query)}&page=${page}&size=${size}&includeDeleted=${includeDeleted}`,
+  policies: (query = '', page = 0, size = 20, includeDeleted = false, level = '') => request<EcosystemPage<Policy>>(
+    `/policies/page?q=${encodeURIComponent(query)}&level=${encodeURIComponent(level)}&page=${page}&size=${size}&includeDeleted=${includeDeleted}`,
   ),
+  policyLevels: () => request<string[]>('/policies/levels'),
   policy: (id: string, includeDeleted = false) => request<Policy>(
     `/policies/${encodeURIComponent(id)}${includeDeleted ? '?includeDeleted=true' : ''}`,
   ),

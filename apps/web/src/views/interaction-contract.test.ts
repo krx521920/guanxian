@@ -127,7 +127,9 @@ describe('生产界面交互契约', () => {
     expect(federation).toContain('platformApi.associationAccessRequestPage(')
     expect(federation).toContain('platformApi.associationRecommendationPage(')
     expect(federation.match(/<PaginationBar/g)?.length).toBe(5)
-    expect(attachments).toContain('platformApi.knowledgeDocuments(\n      includeDeletedKnowledge.value, knowledgePage.value, knowledgeSize.value')
+    expect(attachments).toMatch(
+      /platformApi\.knowledgeDocuments\(\s*includeDeletedKnowledge\.value,\s*knowledgePage\.value,\s*knowledgeSize\.value/,
+    )
     expect(attachments).toContain(':page="knowledgePage"')
     expect(operations).toContain('platformApi.accessBindingPage(bindingPage.value, bindingSize.value)')
     expect(operations).toContain(':page="bindingPage"')
@@ -140,7 +142,9 @@ describe('生产界面交互契约', () => {
     expect(policiesView).toContain('platformApi.reanalyzePolicyImpact(')
     expect(policiesView).toContain('platformApi.reviewPolicyImpact(')
     expect(policiesView).toContain('platformApi.policyImpactHistory(')
-    expect(policiesView).toContain("platformApi.members(\n      impactMemberQuery.value.trim(), 'ACTIVE'")
+    expect(policiesView).toMatch(
+      /platformApi\.members\(\s*impactMemberQuery\.value\.trim\(\),\s*'ACTIVE'/,
+    )
     expect(policiesView).toContain(':disabled="impactBusy || !impactEnterpriseId"')
     expect(policiesView).toContain('v-if="canReviewHere && impactSelected.status === \'PENDING_REVIEW\'"')
     expect(policiesView).toContain('<PaginationBar :page="impactPageIndex"')

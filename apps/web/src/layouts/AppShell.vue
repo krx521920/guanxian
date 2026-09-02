@@ -20,6 +20,8 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
 const mobileOpen = ref(false)
+const sidebarCollapsed = ref(false)
+const keyboardNavigation = ref(false)
 const profileOpen = ref(false)
 const settingsOpen = ref(false)
 const settingsPrimaryTheme = ref<PrimaryTheme>('teal')
@@ -299,17 +301,27 @@ function notificationTime(value: string): string {
 }
 
 function closeOverlays(event: PointerEvent) {
+  keyboardNavigation.value = false
   if (notificationOpen.value && !notificationWrap.value?.contains(event.target as Node)) {
     closeNotifications()
   }
 }
 
 function closeOnEscape(event: KeyboardEvent) {
+  if (event.key === 'Tab') keyboardNavigation.value = true
   if (event.key === 'Escape') {
     closeNotifications()
     profileOpen.value = false
     settingsOpen.value = false
   }
+}
+
+function toggleSidebar() {
+  if (window.matchMedia('(max-width: 780px)').matches) {
+    mobileOpen.value = !mobileOpen.value
+    return
+  }
+  sidebarCollapsed.value = !sidebarCollapsed.value
 }
 
 function openSettings() {
@@ -374,8 +386,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar" :class="{ open: mobileOpen }">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'keyboard-navigation': keyboardNavigation }">
+    <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
         <div><strong>管线智联</strong><small>管理协作平台</small></div>
@@ -413,7 +425,14 @@ onBeforeUnmount(() => {
 
     <main class="main-area">
       <header class="topbar">
-        <button class="icon-button menu-button" aria-label="打开导航" @click="mobileOpen = true">☰</button>
+        <button
+          class="icon-button menu-button"
+          type="button"
+          aria-controls="main-sidebar"
+          :aria-expanded="mobileOpen || !sidebarCollapsed"
+          :aria-label="mobileOpen ? '关闭导航' : sidebarCollapsed ? '展开导航' : '收起导航'"
+          @click="toggleSidebar"
+        >☰</button>
         <div class="crumb"><span>{{ crumbOrganization }}</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
         <div class="top-actions">
           <div ref="notificationWrap" class="notification-wrap">

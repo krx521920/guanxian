@@ -7,8 +7,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface PolicyStore {
-    List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, long offset, int limit);
-    long count(ActorScope actor, String query, boolean includeDeleted);
+    default List<PolicyView> list(
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+        return list(actor, query, null, includeDeleted, offset, limit);
+    }
+    List<PolicyView> list(
+            ActorScope actor, String query, String level,
+            boolean includeDeleted, long offset, int limit);
+    default long count(ActorScope actor, String query, boolean includeDeleted) {
+        return count(actor, query, null, includeDeleted);
+    }
+    long count(ActorScope actor, String query, String level, boolean includeDeleted);
+    List<String> levels(ActorScope actor);
     Optional<PolicyView> find(UUID id, ActorScope actor, boolean includeDeleted);
     PolicyView create(UUID associationId, PolicyUpsertRequest request, ActorScope actor);
     Optional<PolicyView> update(UUID id, long expectedVersion, PolicyUpsertRequest request, ActorScope actor);

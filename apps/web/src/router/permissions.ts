@@ -8,6 +8,7 @@ export const protectedRouteRoles: Record<string, readonly UserRole[]> = {
   '/members/edit': [...associationRoles, 'ENTERPRISE_ADMIN'],
   '/members/new': associationRoles,
   '/policies': allRoles,
+  '/ecosystem/overview': workspaceRoles,
   '/ecosystem': workspaceRoles,
   '/matching': workspaceRoles,
   '/collaborations': workspaceRoles,

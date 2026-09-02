@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus } from '@lucide/vue'
 import { computed, onMounted } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import MetricCard from '../components/MetricCard.vue'
@@ -10,6 +11,9 @@ import { useAuth } from '../services/auth'
 
 const auth = useAuth()
 const { data, loading, error, load } = useAsyncResource(platformApi.enterpriseDashboard)
+const profileRoute = computed(() => auth.user.value?.role === 'ENTERPRISE_ADMIN' && auth.user.value.enterpriseId
+  ? `/members/${auth.user.value.enterpriseId}/edit`
+  : '/members')
 const profileTitle = computed(() => {
   const completeness = data.value?.completeness ?? 0
   if (completeness >= 80) return '企业资料已达到较高完整度'
@@ -25,16 +29,16 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
-    <PageHeader eyebrow="ENTERPRISE WORKSPACE" title="企业工作台" :description="`${auth.user.value?.organization} · 管理能力资产，发现政策与合作机会`">
-      <RouterLink class="secondary-button" to="/members">查看企业资料</RouterLink><RouterLink v-if="auth.user.value?.role === 'ENTERPRISE_ADMIN'" class="primary-button" to="/ecosystem?create=demand">+ 发布需求</RouterLink><RouterLink v-else class="primary-button" to="/ecosystem">查看产品与需求</RouterLink>
+  <div class="enterprise-page">
+    <PageHeader title="企业工作台" :description="`${auth.user.value?.organization} · 管理能力资产，发现政策与合作机会`">
+      <RouterLink class="secondary-button" to="/members">查看企业资料</RouterLink><RouterLink class="primary-button icon-label-button" to="/matching"><Plus aria-hidden="true" /><span>进入供需匹配</span></RouterLink>
     </PageHeader>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="data">
       <section class="profile-completeness panel">
         <div class="completeness-ring" :style="{ '--progress': `${data.completeness * 3.6}deg` }"><div><strong>{{ data.completeness }}%</strong><span>资料完整度</span></div></div>
-        <div><span class="eyebrow">ENTERPRISE PROFILE</span><h2>{{ profileTitle }}</h2><p>完整度由服务端依据当前可见企业字段计算；产品、需求和附件可在对应页面持续维护。</p><RouterLink class="text-button" to="/members">{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '继续完善资料 →' : '查看企业资料 →' }}</RouterLink></div>
-        <div class="profile-checks"><RouterLink to="/members">企业基本信息</RouterLink><RouterLink to="/ecosystem">产品与需求</RouterLink><RouterLink to="/attachments">资质与案例</RouterLink><RouterLink to="/matching">生态匹配</RouterLink></div>
+        <div><h2>{{ profileTitle }}</h2><p>完整度由服务端依据当前可见企业字段计算；页面不会推断尚缺材料的具体数量。</p><RouterLink class="text-button" :to="profileRoute">{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '维护企业资料' : '查看企业资料' }} →</RouterLink></div>
+        <div class="profile-checks"><span :class="data.completeness >= 80 ? 'done' : 'todo'">{{ data.completeness >= 80 ? '✓' : '•' }} 当前完整度 {{ data.completeness }}%</span><span class="todo">• 以最新服务端数据为准</span></div>
       </section>
 
       <section class="metrics-grid enterprise-metrics"><MetricCard v-for="(metric, index) in data.metrics" :key="metric.label" :metric="metric" :icon="['品', '机', '协', '策'][index]" /></section>
@@ -46,12 +50,12 @@ onMounted(load)
             <div class="score-bubble"><strong>{{ item.score }}</strong><span>匹配度</span></div>
             <div class="compact-main"><div><span class="tag">{{ item.scene }}</span><StatusBadge :value="item.state" /></div><h3>{{ item.demandTitle }}</h3><p>{{ item.demandCompany }} · 推荐方案：{{ item.solution }}</p></div>
           </div>
-          <div v-if="!data.matches.length" class="empty-business-state"><b>暂无可见匹配</b><span>请先完善并开放合作需求，或前往匹配工作台查看当前权限范围。</span><RouterLink class="primary-button" to="/matching">进入匹配工作台</RouterLink></div>
+          <div v-if="data.matches.length === 0" class="resource-error"><h2>暂无可见匹配</h2><p>请先完善并开放合作需求，或前往匹配工作台查看当前权限范围。</p><RouterLink class="primary-button" to="/matching">进入匹配工作台</RouterLink></div>
         </article>
         <article class="panel">
           <div class="panel-header"><div><h2>政策影响提醒</h2><p>与企业业务相关的最新政策</p></div><RouterLink to="/policies" class="text-button">政策中心 →</RouterLink></div>
           <div class="policy-compact" v-for="policy in data.recommendedPolicies" :key="policy.id"><span class="date-block"><strong>{{ displayPolicyDate(policy.publishDate).month }}</strong><small>{{ displayPolicyDate(policy.publishDate).day }}</small></span><div><StatusBadge :value="policy.status" /><h3>{{ policy.title }}</h3><p>{{ policy.authority }}</p></div></div>
-          <div v-if="!data.recommendedPolicies.length" class="empty-business-state"><b>暂无政策提醒</b><span>当前账号的数据范围内没有可展示的政策记录。</span><RouterLink class="primary-button" to="/policies">查看政策中心</RouterLink></div>
+          <div v-if="data.recommendedPolicies.length === 0" class="resource-error"><h2>暂无政策提醒</h2><p>当前账号的数据范围内没有可展示的政策记录。</p><RouterLink class="primary-button" to="/policies">查看政策中心</RouterLink></div>
         </article>
       </section>
     </template>

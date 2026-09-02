@@ -43,25 +43,36 @@ class PostgresPolicyStore implements PolicyStore {
     }
 
     @Override
-    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
-        MapSqlParameterSource params = parameters(actor, query)
+    public List<PolicyView> list(
+            ActorScope actor, String query, String level,
+            boolean includeDeleted, long offset, int limit) {
+        MapSqlParameterSource params = parameters(actor, query, level)
                 .addValue("offset", offset).addValue("limit", limit);
-        return jdbc.query(SELECT + where(actor, query, includeDeleted)
+        return jdbc.query(SELECT + where(actor, query, level, includeDeleted)
                         + " ORDER BY p.updated_at DESC, p.id LIMIT :limit OFFSET :offset",
                 params, mapper);
     }
 
     @Override
-    public long count(ActorScope actor, String query, boolean includeDeleted) {
+    public long count(ActorScope actor, String query, String level, boolean includeDeleted) {
         Long total = jdbc.queryForObject("SELECT count(*) FROM policy_document p"
-                + where(actor, query, includeDeleted), parameters(actor, query), Long.class);
+                + where(actor, query, level, includeDeleted), parameters(actor, query, level), Long.class);
         return total == null ? 0 : total;
     }
 
     @Override
+    public List<String> levels(ActorScope actor) {
+        return jdbc.queryForList("SELECT DISTINCT p.policy_level FROM policy_document p"
+                        + where(actor, null, null, false)
+                        + " AND p.policy_level IS NOT NULL AND btrim(p.policy_level)<>''"
+                        + " ORDER BY p.policy_level",
+                parameters(actor, null, null), String.class);
+    }
+
+    @Override
     public Optional<PolicyView> find(UUID id, ActorScope actor, boolean includeDeleted) {
-        MapSqlParameterSource params = parameters(actor, null).addValue("id", id);
-        return jdbc.query(SELECT + where(actor, null, includeDeleted) + " AND p.id = :id", params, mapper)
+        MapSqlParameterSource params = parameters(actor, null, null).addValue("id", id);
+        return jdbc.query(SELECT + where(actor, null, null, includeDeleted) + " AND p.id = :id", params, mapper)
                 .stream().findFirst();
     }
 
@@ -211,16 +222,17 @@ class PostgresPolicyStore implements PolicyStore {
         }
     }
 
-    private MapSqlParameterSource parameters(ActorScope actor, String query) {
+    private MapSqlParameterSource parameters(ActorScope actor, String query, String level) {
         List<UUID> partners = actor.partnerAssociationIds().isEmpty()
                 ? List.of(new UUID(0, 0)) : List.copyOf(actor.partnerAssociationIds());
         return new MapSqlParameterSource().addValue("associationId", actor.associationId())
                 .addValue("associationStaff", actor.isAssociationStaff())
                 .addValue("partnerIds", partners)
-                .addValue("query", query == null ? null : "%" + query.trim() + "%");
+                .addValue("query", query == null ? null : "%" + query.trim() + "%")
+                .addValue("level", level);
     }
 
-    private String where(ActorScope actor, String query, boolean includeDeleted) {
+    private String where(ActorScope actor, String query, String level, boolean includeDeleted) {
         StringBuilder sql = new StringBuilder(" WHERE 1 = 1");
         if (!includeDeleted) {
             sql.append(" AND p.deleted_at IS NULL");
@@ -245,6 +257,9 @@ class PostgresPolicyStore implements PolicyStore {
                           OR p.category ILIKE :query OR p.summary ILIKE :query
                           OR p.tags::text ILIKE :query)
                     """);
+        }
+        if (level != null && !level.isBlank()) {
+            sql.append(" AND p.policy_level = :level");
         }
         return sql.toString();
     }

@@ -16,6 +16,7 @@ export const navigation: NavItem[] = [
   { label: '企业工作台', to: '/enterprise', icon: 'dashboard', roles: enterpriseRoles },
   { label: '会员企业', to: '/members', icon: 'enterprise', roles: allRoles },
   { label: '政策标准', to: '/policies', icon: 'policy', roles: allRoles },
+  { label: '生态全景', to: '/ecosystem/overview', icon: 'ecosystem', roles: workspaceRoles },
   { label: '产品与需求', to: '/ecosystem', icon: 'ecosystem', roles: workspaceRoles },
   { label: '生态匹配', to: '/matching', icon: 'match', roles: workspaceRoles },
   { label: '协作事项', to: '/collaborations', icon: 'task', roles: workspaceRoles },

@@ -9,6 +9,7 @@ describe('protected route permissions', () => {
       '/attachments',
       '/collaborations',
       '/ecosystem',
+      '/ecosystem/overview',
       '/enterprise',
       '/federation',
       '/matching',
@@ -36,6 +37,7 @@ describe('protected route permissions', () => {
     expect(protectedRouteRoles['/matching']).not.toContain('OBSERVER')
     expect(protectedRouteRoles['/collaborations']).not.toContain('OBSERVER')
     expect(protectedRouteRoles['/ecosystem']).not.toContain('OBSERVER')
+    expect(protectedRouteRoles['/ecosystem/overview']).not.toContain('OBSERVER')
     expect(protectedRouteRoles['/attachments']).not.toContain('OBSERVER')
     expect(protectedRouteRoles['/members']).toContain('OBSERVER')
     expect(protectedRouteRoles['/policies']).toContain('OBSERVER')

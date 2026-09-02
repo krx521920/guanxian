@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ROLES, type UserRole } from '../types/domain'
-import { roleDescriptions, roleLabels } from '../config/roles'
+import { roleLabels } from '../config/roles'
 import { useAuth } from '../services/auth'
 
 const route = useRoute()
@@ -40,9 +40,9 @@ async function login() {
       <div class="visual-copy">
         <span class="visual-kicker">北京地下管线协会</span>
         <h1>让行业资源<br />真正连接起来</h1>
-        <p>向上连接政策标准，横向协同友好协会，向下服务会员企业，以可信业务数据支持地下管线行业协作。</p>
+        <p>向上连接政策标准，横向协同兄弟协会，向下服务会员企业，以可信业务数据支持行业协作。</p>
         <div class="network-visual" aria-hidden="true">
-          <div class="network-core"><b>数据</b><span>生态中枢</span></div>
+          <div class="network-core"><b>协作</b><span>业务中枢</span></div>
           <div class="network-node node-a">政策</div>
           <div class="network-node node-b">协会</div>
           <div class="network-node node-c">企业</div>
@@ -56,7 +56,6 @@ async function login() {
     <section class="login-panel">
       <form class="login-card" @submit.prevent="login">
         <div class="mobile-brand"><div class="brand-mark"><span /><span /><span /></div><strong>管线智联</strong></div>
-        <span class="eyebrow">{{ auth.isDemoMode ? 'LOCAL DEMO' : 'SECURE ACCESS' }}</span>
         <h2>欢迎使用管理协作平台</h2>
         <p>{{ auth.isDemoMode ? '请选择本地测试身份' : '使用统一身份认证安全登录' }}</p>
 
@@ -64,7 +63,7 @@ async function login() {
           <label v-for="role in ROLES" :key="role" :class="{ selected: selectedRole === role }">
             <input v-model="selectedRole" type="radio" name="role" :value="role" />
             <span class="role-radio" />
-            <span><strong>{{ roleLabels[role] }}</strong><small>{{ roleDescriptions[role] }}</small></span>
+            <span><strong>{{ roleLabels[role] }}</strong><small>登录后按后台授权显示可用工作区</small></span>
           </label>
         </div>
         <div v-else class="secure-login-note">

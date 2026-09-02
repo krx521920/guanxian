@@ -222,7 +222,7 @@ describe('member ETag API contract', () => {
       { url: '/api/v1/members/page?q=&status=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80/commit', method: 'POST' },
-      { url: '/api/v1/policies/page?q=&page=0&size=20&includeDeleted=false', method: 'GET' },
+      { url: '/api/v1/policies/page?q=&level=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/matches?page=0&size=20', method: 'GET' },
       { url: '/api/v1/collaborations/page?query=&stage=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/notifications/messages?unreadOnly=false&page=2&size=15&status=ARCHIVED', method: 'GET' },
@@ -444,6 +444,25 @@ describe('member ETag API contract', () => {
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(new Headers(init.headers).has('If-Match')).toBe(false)
+  })
+
+  it('encodes policy level before pagination and loads visible level facets', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({
+        code: 'OK',
+        data: { items: [], total: 0, page: 2, size: 25 },
+      }))
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: ['国家级', '北京市/行业'] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.policies('安全 管理', 2, 25, true, '北京市/行业')
+    await expect(platformApi.policyLevels()).resolves.toEqual(['国家级', '北京市/行业'])
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/policies/page?q=%E5%AE%89%E5%85%A8%20%E7%AE%A1%E7%90%86&level=%E5%8C%97%E4%BA%AC%E5%B8%82%2F%E8%A1%8C%E4%B8%9A&page=2&size=25&includeDeleted=true',
+      '/api/v1/policies/levels',
+    ])
   })
 
   it.each(['7', '"07"', 'x"7"', '"7"x', '"-1"', ''])('rejects invalid strong ETag %j before sending a write', async (etag) => {

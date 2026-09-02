@@ -126,6 +126,17 @@ class PolicyServiceTest {
     }
 
     @Test
+    void levelFilterIsAppliedBeforePaginationAndListsOnlyVisibleFacets() {
+        ActorScope admin = associationAdmin(ASSOCIATION_A);
+
+        PolicyPage page = service.page(admin, "", "北京市", false, 0, 20);
+
+        assertThat(page.total()).isEqualTo(1);
+        assertThat(page.items()).extracting(PolicyView::level).containsOnly("北京市");
+        assertThat(service.levels(admin)).containsExactly("北京市", "国家");
+    }
+
+    @Test
     void systemAdministratorMustUseTheSelectedAssociationContext() {
         ActorScope globalAdministrator = systemAdmin(null);
         assertThatThrownBy(() -> service.create(request("无归属政策", "PRIVATE"), globalAdministrator))
