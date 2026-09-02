@@ -2,6 +2,37 @@ INSERT INTO association (id, name, status)
 VALUES ('00000000-0000-0000-0000-000000000106', '北京地下管线协会', 'ACTIVE')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, status = 'ACTIVE';
 
+INSERT INTO association (id, name, status)
+VALUES ('00000000-0000-0000-0000-000000000107', 'E2E友好管网协会', 'ACTIVE')
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, status = 'ACTIVE';
+
+INSERT INTO association_relationship (
+  source_association_id, target_association_id, status, allow_member_data,
+  expires_at, suspended_at, suspended_by_association_id, suspended_by_subject,
+  revoked_at, revoked_by_subject, revoke_reason, version)
+VALUES (
+  '00000000-0000-0000-0000-000000000106',
+  '00000000-0000-0000-0000-000000000107',
+  'ACTIVE', TRUE, now() + interval '30 days', NULL, NULL, NULL, NULL, NULL, NULL, 0)
+ON CONFLICT (source_association_id, target_association_id) DO UPDATE SET
+  status = 'ACTIVE', allow_member_data = TRUE, expires_at = now() + interval '30 days',
+  suspended_at = NULL, suspended_by_association_id = NULL, suspended_by_subject = NULL,
+  revoked_at = NULL, revoked_by_subject = NULL, revoke_reason = NULL;
+
+INSERT INTO association_share_policy (
+  id, source_association_id, target_association_id, resource_type, visible_fields,
+  status, valid_from, expires_at, created_by_subject, version)
+VALUES (
+  '40000000-0000-4000-8000-000000000001',
+  '00000000-0000-0000-0000-000000000106',
+  '00000000-0000-0000-0000-000000000107',
+  'PRODUCT', '["enterpriseName","name","description","scenarios","qualifications"]'::jsonb,
+  'ACTIVE', now() - interval '1 day', now() + interval '29 days',
+  '10000000-0000-4000-8000-000000000001', 0)
+ON CONFLICT (source_association_id, target_association_id, resource_type) DO UPDATE SET
+  visible_fields = EXCLUDED.visible_fields, status = 'ACTIVE',
+  valid_from = now() - interval '1 day', expires_at = now() + interval '29 days';
+
 INSERT INTO enterprise (
   id, association_id, unified_social_credit_code, name, short_name, description,
   enterprise_roles, service_scenarios, visibility, status, version, category,

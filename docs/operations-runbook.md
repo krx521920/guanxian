@@ -20,7 +20,7 @@
 
    ```bash
    python tools/deployment/validate_production_env.py --env-file .env
-   docker compose --env-file .env config --quiet
+   docker compose --env-file .env -f compose.production.yml --profile observability config --quiet
    ```
 
 4. 确认 HTTPS 证书、DNS、OIDC issuer/JWK、回调地址、PostgreSQL、MinIO 和 Redis 的连通性；按 `GUANXIAN_STORAGE_BUCKET` 预先创建私有 MinIO bucket，并只授予应用账号所需的对象读写/删除权限。生产 Profile 不会自动创建 bucket，bucket 缺失时后端应拒绝启动。
@@ -73,6 +73,10 @@ TLS 证书、私钥和所有 `*_FILE` 必须位于主机受控目录，权限只
 python tools/operations/render_alertmanager_config.py \
   --webhook-url-file "$ALERT_WEBHOOK_URL_FILE" \
   --output observability/runtime/alertmanager.yml
+
+python tools/operations/render_minio_prometheus_target.py \
+  --endpoint "$GUANXIAN_STORAGE_ENDPOINT" \
+  --output observability/runtime/minio-target.json
 ```
 
 然后预检并启动：
@@ -133,6 +137,7 @@ python tools/operations/postgres_restore_drill.py \
   --archive backups/postgres/guanxian-20260824T010203Z.dump \
   --target-database guanxian_restore_test_20260824 \
   --confirm-target guanxian_restore_test_20260824 \
+  --report test-results/restore-drill/postgres-20260824.json \
   --execute
 ```
 
@@ -144,13 +149,62 @@ python tools/operations/postgres_restore_drill.py `
   --archive backups/postgres/guanxian-20260824T010203Z.dump `
   --target-database guanxian_restore_test_20260824 `
   --confirm-target guanxian_restore_test_20260824 `
+  --report test-results/restore-drill/postgres-20260824.json `
   --execute
 Remove-Item Env:GUANXIAN_ALLOW_TEST_RESTORE
 ```
 
-工具会删除同名测试库、从 `template0` 新建、执行 `pg_restore --exit-on-error`，再验证 `flyway_schema_history`。恢复或验证失败时会尽力删除不完整的测试库。成功后测试库会保留供业务抽查；抽查完成后使用经过复核的精确库名删除，不得用通配符。
+工具会删除同名测试库、从 `template0` 新建、执行 `pg_restore --exit-on-error`，再验证 `flyway_schema_history` 和至少一张恢复的业务数据表。成功后生成含起止时间、耗时、归档 SHA-256、源/目标库和验证结果的 JSON 报告。恢复或验证失败时会尽力删除不完整的测试库。成功后测试库会保留供业务抽查；抽查完成后使用经过复核的精确库名删除，不得用通配符。
 
 每季度至少执行一次恢复演练，并验证：会员数量、审计记录、最近业务记录、附件元数据及其对应 MinIO 对象。记录实际恢复耗时和最近可恢复时间点。
+
+## 4.1 MinIO 备份和隔离恢复
+
+MinIO 备份使用官方 `mc` 客户端；应用访问密钥从只读文件读取，只进入子进程环境，不写入命令、清单或报告。先 dry-run，再执行镜像：
+
+```bash
+python tools/operations/minio_backup.py \
+  --endpoint "$GUANXIAN_STORAGE_ENDPOINT" \
+  --bucket "$GUANXIAN_STORAGE_BUCKET" \
+  --access-key-file "$STORAGE_ACCESS_KEY_FILE" \
+  --secret-key-file "$STORAGE_SECRET_KEY_FILE"
+
+python tools/operations/minio_backup.py \
+  --endpoint "$GUANXIAN_STORAGE_ENDPOINT" \
+  --bucket "$GUANXIAN_STORAGE_BUCKET" \
+  --access-key-file "$STORAGE_ACCESS_KEY_FILE" \
+  --secret-key-file "$STORAGE_SECRET_KEY_FILE" \
+  --execute
+```
+
+快照逐对象记录相对路径、字节数和 SHA-256。恢复只能写入 `guanxian-restore-test-` 前缀的隔离 bucket，同时要求目标二次确认和环境保护值；`mc diff` 无差异才算通过：
+
+```bash
+GUANXIAN_ALLOW_MINIO_TEST_RESTORE=I_UNDERSTAND_THIS_WRITES_TEST_OBJECTS \
+python tools/operations/minio_restore_drill.py \
+  --snapshot backups/minio/guanxian-private-20260902T010203Z \
+  --endpoint "$GUANXIAN_STORAGE_ENDPOINT" \
+  --target-bucket guanxian-restore-test-20260902 \
+  --confirm-target guanxian-restore-test-20260902 \
+  --access-key-file "$STORAGE_ACCESS_KEY_FILE" \
+  --secret-key-file "$STORAGE_SECRET_KEY_FILE" \
+  --report test-results/restore-drill/minio-20260902.json \
+  --execute
+```
+
+恢复 bucket 默认保留供抽样下载和哈希复核；删除必须走单独变更单并使用精确 bucket 名。对象版本、保留锁和生命周期规则要由 MinIO 管理策略独立备份，`mc mirror` 不能替代这些控制面配置。
+
+## 4.2 PostgreSQL PITR 方案
+
+生产 Compose 已启用 `wal_level=replica`、`archive_mode=on`，把完成的 WAL 写到独立 `postgres-wal-archive` 卷。下列命令会强制切换一个 WAL 并确认 `pg_stat_archiver` 成功计数增长，输出可追溯报告：
+
+```bash
+python tools/operations/postgres_pitr_readiness.py \
+  --report test-results/restore-drill/pitr-readiness.json \
+  --execute
+```
+
+这只证明 WAL 归档通道就绪，不等于完成 PITR。正式 PITR 还必须同时具备：定期 `pg_basebackup` 物理基线、连续异地 WAL 复制、基线与 WAL 的不可变清单、受控密钥和保留期。季度演练在隔离主机从最近物理基线启动新实例，设置 `restore_command` 和 `recovery_target_time`，创建 `recovery.signal`，禁止连接生产网络；实例达到目标时间并暂停后，核对会员、审计、附件元数据和目标时间前后哨兵记录，再提升为可读验证实例。报告记录目标时间、最后回放 WAL、实际 RPO/RTO、执行/复核人。缺少物理基线或异地 WAL 时，PITR 状态必须标记为“未具备”。
 
 ## 5. 部署步骤
 
@@ -175,6 +229,8 @@ Remove-Item Env:GUANXIAN_ALLOW_TEST_RESTORE
 
 特别说明：执行过 V13–V22 的数据库禁止直接启动 V12 或更早应用镜像，也禁止启动仍可能写入跨协会政策影响、非法匹配状态、未支持通知状态，或把 `REQUIRES_REUPLOAD` 附件当作可用内容的未验证镜像。旧应用还不了解 V21 的出处/知识生命周期和 V22 的评测闸门；直接回滚会产生写入失败、误用未校验附件、绕过知识审核或错误宣传能力。此时只允许切换到已经声明兼容 V13–V22 的镜像，或采用第 3 步的向前修复。
 
+发布记录必须包含：变更单号、Git 提交、全部镜像 digest、迁移前后 Flyway 版本、PostgreSQL/MinIO 备份清单、配置校验结果、浏览器 E2E 报告、观察窗口和回滚负责人。网关验收逐项确认 DNS 指向、证书 SAN 与域名一致、证书剩余有效期、80→443 的 308 跳转、TLS 1.2/1.3、HSTS，以及 `/actuator/` 不可经公网访问。应用回滚使用记录的上一审批 digest，不使用浮动标签；回滚后重新执行同一健康、OIDC 和核心业务冒烟清单。
+
 MinIO 对象与 PostgreSQL 附件元数据必须恢复到一致时间点。Redis 无需从备份恢复；清空后由应用重建，但要关注启动瞬间的缓存穿透和限流行为。
 
 ## 7. 灾难恢复顺序
@@ -196,8 +252,7 @@ MinIO 对象与 PostgreSQL 附件元数据必须恢复到一致时间点。Redis
 ### 已随代码交付的基础配置
 
 后端的 `/actuator/prometheus` 输出 Micrometer 指标，但它不是匿名接口：只有带
-`OBSERVABILITY_READ` 权限的 OIDC 服务账号（或系统管理员）才能读取；`/actuator/health`
-仍保持公开，供负载均衡器使用。生产日志采用 Spring Boot 的 Logstash JSON 控制台格式，
+`OBSERVABILITY_READ` 权限的 OIDC 服务账号（或系统管理员）才能读取。`/api/v1/health` 聚合 PostgreSQL、MinIO、Redis 和 OIDC/JWK 的真实探针，任一失败返回 503；私网还可读取 `readiness` 健康组。生产日志采用 Spring Boot 的 Logstash JSON 控制台格式，
 其中包含应用名和请求过滤器放入 MDC 的 `requestId`，可直接由集中日志代理采集。
 
 仓库提供固定版本的 Prometheus/Alertmanager 可选编排，默认 `compose.yaml` 不会启动它：
@@ -226,9 +281,21 @@ socket 即使只读也属于高权限接口，只允许在专用日志节点运�
 `ALERTMANAGER_CONFIG_FILE`。上线验收必须发送一条受控测试告警，证明值班 Webhook 收到
 firing 和 resolved 两条事件；未完成该演练不得宣称“真实告警已接入”。
 
-预置告警只引用后端已导出的 Micrometer 指标：不可抓取、5xx 比率、HTTP P95、JVM 堆、
-Hikari 连接池和节点磁盘空间。PostgreSQL、Redis、MinIO 还需要按实际部署接入各自的
-exporter；没有 exporter 时不得把“无数据”误解为“健康”。
+真实 Webhook 接收器应把原始事件写入受控 NDJSON 证据文件，然后执行（默认等待时间与生产告警分组间隔匹配）：
+
+```bash
+python tools/operations/alert_delivery_drill.py \
+  --alertmanager-url http://127.0.0.1:9093 \
+  --receiver-evidence /secure/alert-receiver/events.ndjson \
+  --report test-results/alert-delivery/report.json \
+  --execute
+```
+
+工具只有同时在真实接收器证据中找到同一 `drill_id` 的 `firing` 与 `resolved` 才输出 verified。只看到 Alertmanager 接受 API 请求不能算告警送达。
+
+生产 Compose 已接入 PostgreSQL exporter、Redis exporter 和 MinIO 原生受保护 exporter，并对三者配置不可抓取告警。PostgreSQL 密码、Redis 密码映射和 MinIO bearer token 均从只读 secret 文件加载；MinIO HTTPS 目标由渲染脚本生成 file_sd 文件。Prometheus Targets 页面必须三者均为 UP，且受控停止测试能触发对应告警后，才可把监控项标记为已验收。
+
+常用 Loki 查询：按请求号 `{service="server"} |= "<requestId>"`；仅错误 `{service="server"} | json | level="ERROR"`。发布窗口必须在 Grafana 时间选择器中设置精确 UTC 起止时间。查询结果需与 `audit_log.request_id` 交叉核对并导出到变更单，禁止只截一张没有时间范围和查询条件的图片。
 
 生产环境至少配置下列指标和告警：
 

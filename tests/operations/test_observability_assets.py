@@ -31,6 +31,9 @@ class ObservabilityAssetsTest(unittest.TestCase):
             "jvm_memory_used_bytes",
             "hikaricp_connections_active",
             "disk_free_bytes",
+            'up{job="postgres"}',
+            'up{job="redis"}',
+            'up{job="minio"}',
         ):
             self.assertIn(metric, alerts)
 
