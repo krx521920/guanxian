@@ -1,6 +1,9 @@
 package com.guanxian.platform.ecosystem;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -18,12 +21,24 @@ import java.util.concurrent.ConcurrentMap;
 class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     private final ConcurrentMap<UUID, StoredOffering> offerings = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, StoredDemand> demands = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> enterpriseAssociations = new ConcurrentHashMap<>();
+    private final EnterpriseLifecycle enterpriseLifecycle;
+
+    @Autowired
+    InMemoryEcosystemCatalogStore(EnterpriseLifecycle enterpriseLifecycle) {
+        this.enterpriseLifecycle = enterpriseLifecycle;
+    }
+
+    InMemoryEcosystemCatalogStore() {
+        this(enterpriseId -> true);
+    }
 
     @Override
     public List<OfferingView> listOfferings(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return offerings.values().stream()
-                .filter(item -> includeDeleted || !item.deleted())
+                .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
+                .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredOffering::value)
                 .filter(item -> canRead(actor, item.enterpriseId(), item.visibility(), item.status()))
                 .filter(item -> matches(query, item.name(), item.description(), item.enterpriseName()))
@@ -37,7 +52,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public long countOfferings(ActorScope actor, String query, boolean includeDeleted) {
         return offerings.values().stream()
-                .filter(item -> includeDeleted || !item.deleted())
+                .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
+                .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredOffering::value)
                 .filter(item -> canRead(actor, item.enterpriseId(), item.visibility(), item.status()))
                 .filter(item -> matches(query, item.name(), item.description(), item.enterpriseName()))
@@ -47,7 +63,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public Optional<OfferingView> findOffering(UUID id, ActorScope actor, boolean includeDeleted) {
         StoredOffering item = offerings.get(id);
-        if (item == null || (!includeDeleted && item.deleted())
+        if (item == null || !canReadEnterpriseHistory(actor, item.value().enterpriseId())
+                || !canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted)
                 || !canRead(actor, item.value().enterpriseId(), item.value().visibility(), item.value().status())) {
             return Optional.empty();
         }
@@ -57,12 +74,14 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public synchronized OfferingView createOffering(
             UUID enterpriseId, OfferingUpsertRequest request, ActorScope actor) {
+        requireCreateScope(enterpriseId, actor);
         UUID id = UUID.randomUUID();
         OfferingView value = new OfferingView(
                 id, enterpriseId, null, request.name().trim(), request.kind(),
                 clean(request.description()), list(request.scenarios()), list(request.qualifications()),
                 visibility(request.visibility(), "MEMBERS"), "DRAFT", 0, false, Instant.now());
         offerings.put(id, new StoredOffering(value, false));
+        bindEnterpriseAssociation(enterpriseId, actor);
         return value;
     }
 
@@ -70,7 +89,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<OfferingView> updateOffering(
             UUID id, long expectedVersion, OfferingUpsertRequest request, ActorScope actor) {
         StoredOffering stored = offerings.get(id);
-        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         OfferingView old = stored.value();
@@ -87,7 +107,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<OfferingView> transitionOffering(
             UUID id, long expectedVersion, String targetStatus, ActorScope actor) {
         StoredOffering stored = offerings.get(id);
-        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         OfferingView old = stored.value();
@@ -103,11 +124,16 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<OfferingView> softDeleteOffering(
             UUID id, long expectedVersion, ActorScope actor) {
         StoredOffering stored = offerings.get(id);
-        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         OfferingView old = stored.value();
-        OfferingView updated = copyOffering(old, old.status(), old.version() + 1, old.disabled());
+        Instant deletedAt = Instant.now();
+        OfferingView updated = new OfferingView(
+                old.id(), old.enterpriseId(), old.enterpriseName(), old.name(), old.kind(), old.description(),
+                old.scenarios(), old.qualifications(), old.visibility(), old.status(), old.version() + 1,
+                old.disabled(), true, deletedAt, deletedAt);
         offerings.put(id, new StoredOffering(updated, true));
         return Optional.of(updated);
     }
@@ -116,7 +142,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<OfferingView> restoreOffering(
             UUID id, long expectedVersion, ActorScope actor) {
         StoredOffering stored = offerings.get(id);
-        if (stored == null || !stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || !stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         OfferingView old = stored.value();
@@ -127,9 +154,10 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<DemandView> listDemands(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return demands.values().stream()
-                .filter(item -> includeDeleted || !item.deleted())
+                .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
+                .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredDemand::value)
                 .filter(item -> canRead(actor, item.enterpriseId(), item.visibility(), item.status()))
                 .filter(item -> matches(query, item.title(), item.description(), item.enterpriseName()))
@@ -143,7 +171,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public long countDemands(ActorScope actor, String query, boolean includeDeleted) {
         return demands.values().stream()
-                .filter(item -> includeDeleted || !item.deleted())
+                .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
+                .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredDemand::value)
                 .filter(item -> canRead(actor, item.enterpriseId(), item.visibility(), item.status()))
                 .filter(item -> matches(query, item.title(), item.description(), item.enterpriseName()))
@@ -153,7 +182,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public Optional<DemandView> findDemand(UUID id, ActorScope actor, boolean includeDeleted) {
         StoredDemand item = demands.get(id);
-        if (item == null || (!includeDeleted && item.deleted())
+        if (item == null || !canReadEnterpriseHistory(actor, item.value().enterpriseId())
+                || !canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted)
                 || !canRead(actor, item.value().enterpriseId(), item.value().visibility(), item.value().status())) {
             return Optional.empty();
         }
@@ -163,13 +193,15 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public synchronized DemandView createDemand(
             UUID enterpriseId, DemandUpsertRequest request, ActorScope actor) {
+        requireCreateScope(enterpriseId, actor);
         UUID id = UUID.randomUUID();
         DemandView value = new DemandView(
                 id, enterpriseId, null, request.title().trim(), request.description().trim(),
                 list(request.scenarios()), list(request.requiredCapabilities()),
-                visibility(request.visibility(), "DIRECTED"), request.budgetMin(), request.budgetMax(),
+                visibility(request.visibility(), "MEMBERS"), request.budgetMin(), request.budgetMax(),
                 request.responseDeadline(), "DRAFT", null, 0, false, Instant.now());
         demands.put(id, new StoredDemand(value, false));
+        bindEnterpriseAssociation(enterpriseId, actor);
         return value;
     }
 
@@ -177,7 +209,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<DemandView> updateDemand(
             UUID id, long expectedVersion, DemandUpsertRequest request, ActorScope actor) {
         StoredDemand stored = demands.get(id);
-        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         DemandView old = stored.value();
@@ -194,7 +227,8 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<DemandView> transitionDemand(
             UUID id, long expectedVersion, String targetStatus, String reason, ActorScope actor) {
         StoredDemand stored = demands.get(id);
-        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         DemandView old = stored.value();
@@ -211,11 +245,17 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<DemandView> softDeleteDemand(
             UUID id, long expectedVersion, ActorScope actor) {
         StoredDemand stored = demands.get(id);
-        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         DemandView old = stored.value();
-        DemandView updated = copyDemand(old, old.status(), old.closeReason(), old.version() + 1, old.disabled());
+        Instant deletedAt = Instant.now();
+        DemandView updated = new DemandView(
+                old.id(), old.enterpriseId(), old.enterpriseName(), old.title(), old.description(),
+                old.scenarios(), old.requiredCapabilities(), old.visibility(), old.budgetMin(), old.budgetMax(),
+                old.responseDeadline(), old.status(), old.closeReason(), old.version() + 1,
+                old.disabled(), true, deletedAt, deletedAt);
         demands.put(id, new StoredDemand(updated, true));
         return Optional.of(updated);
     }
@@ -224,13 +264,46 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     public synchronized Optional<DemandView> restoreDemand(
             UUID id, long expectedVersion, ActorScope actor) {
         StoredDemand stored = demands.get(id);
-        if (stored == null || !stored.deleted() || stored.value().version() != expectedVersion) {
+        if (stored == null || !stored.deleted() || stored.value().version() != expectedVersion
+                || !canWrite(actor, stored.value().enterpriseId())) {
             return Optional.empty();
         }
         DemandView old = stored.value();
         DemandView updated = copyDemand(old, "DRAFT", null, old.version() + 1, false);
         demands.put(id, new StoredDemand(updated, false));
         return Optional.of(updated);
+    }
+
+    @Override
+    public boolean isDemandDeleted(UUID demandId) {
+        StoredDemand stored = demands.get(demandId);
+        return stored == null || stored.deleted();
+    }
+
+    @Override
+    public boolean isDemandOpenForResponse(UUID demandId) {
+        StoredDemand stored = demands.get(demandId);
+        if (stored == null || stored.deleted()) {
+            return false;
+        }
+        DemandView demand = stored.value();
+        return "OPEN".equals(demand.status())
+                && !demand.disabled()
+                && !"DIRECTED".equals(demand.visibility())
+                && (demand.responseDeadline() == null
+                || demand.responseDeadline().isAfter(Instant.now()));
+    }
+
+    @Override
+    public boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return enterpriseLifecycle.isOperational(enterpriseId)
+                && associationId != null
+                && associationId.equals(enterpriseAssociations.get(enterpriseId));
+    }
+
+    @Override
+    public boolean enterpriseHistoricallyBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return associationId != null && associationId.equals(enterpriseAssociations.get(enterpriseId));
     }
 
     @Override
@@ -246,13 +319,77 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
         // In-memory mode is isolated for tests and demos. Durable history is provided by the PostgreSQL adapter.
     }
 
-    private static boolean canRead(
+    private boolean canRead(
             ActorScope actor, UUID enterpriseId, String visibility, String status) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff() || enterpriseId.equals(actor.enterpriseId())) {
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null) {
+                return actor.enterpriseId() == null;
+            }
+            UUID ownerAssociationId = enterpriseAssociations.get(enterpriseId);
+            return actor.associationId().equals(ownerAssociationId)
+                    && (actor.enterpriseId() == null || actor.enterpriseId().equals(enterpriseId));
+        }
+        if (enterpriseId.equals(actor.enterpriseId())) {
             return true;
         }
-        return "ACTIVE".equals(status) && ("PUBLIC".equals(visibility) || "MEMBERS".equals(visibility)
-                || "PARTNERS".equals(visibility));
+        UUID ownerAssociationId = enterpriseAssociations.get(enterpriseId);
+        boolean sameAssociation = ownerAssociationId != null && ownerAssociationId.equals(actor.associationId());
+        if (sameAssociation && actor.isAssociationStaff()) {
+            return true;
+        }
+        if (!"ACTIVE".equals(status) || ownerAssociationId == null) {
+            return false;
+        }
+        if (sameAssociation) {
+            return "MEMBERS".equals(visibility) || "PUBLIC".equals(visibility);
+        }
+        // The memory adapter has no durable share-policy or consent store. Fail closed
+        // instead of treating a partner relationship as blanket resource consent.
+        return false;
+    }
+
+    private static boolean canReadDeletion(
+            ActorScope actor, UUID enterpriseId, boolean deleted, boolean includeDeleted) {
+        if (!deleted) {
+            return true;
+        }
+        if (!includeDeleted) {
+            return false;
+        }
+        return actor.isSystemAdmin() || actor.isAssociationStaff()
+                || actor.isEnterpriseAdmin() && enterpriseId.equals(actor.enterpriseId());
+    }
+
+    private boolean canReadEnterpriseHistory(ActorScope actor, UUID enterpriseId) {
+        return actor.isSystemAdmin() || actor.isAssociationStaff()
+                || enterpriseLifecycle.isOperational(enterpriseId);
+    }
+
+    private void bindEnterpriseAssociation(UUID enterpriseId, ActorScope actor) {
+        if (actor.associationId() != null) {
+            enterpriseAssociations.putIfAbsent(enterpriseId, actor.associationId());
+        }
+    }
+
+    private void requireCreateScope(UUID enterpriseId, ActorScope actor) {
+        if (!actor.isSystemAdmin()) {
+            return;
+        }
+        EcosystemScopeGuard.requireWriteContext(actor);
+        if (actor.enterpriseId() == null || !actor.enterpriseId().equals(enterpriseId)) {
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "catalog records must be created for the selected enterprise");
+        }
+    }
+
+    private boolean canWrite(ActorScope actor, UUID enterpriseId) {
+        if (!actor.isSystemAdmin()) {
+            return true;
+        }
+        return actor.associationId() != null
+                && actor.associationId().equals(enterpriseAssociations.get(enterpriseId))
+                && (actor.enterpriseId() == null || actor.enterpriseId().equals(enterpriseId));
     }
 
     private static boolean matches(String query, String... values) {

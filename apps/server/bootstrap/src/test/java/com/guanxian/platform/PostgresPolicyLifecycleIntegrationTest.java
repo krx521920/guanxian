@@ -2,6 +2,7 @@ package com.guanxian.platform;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -58,6 +60,11 @@ class PostgresPolicyLifecycleIntegrationTest {
 
     @Test
     void persistsLifecycleOptimisticLockAuditHistoryAndRestore() throws Exception {
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO policy_document (title, status, visibility)
+                VALUES ('禁止写入的孤儿政策', 'DRAFT', 'PRIVATE')
+                """));
+
         String createBody = """
                 {
                   "title": "PostgreSQL政策纵切测试",

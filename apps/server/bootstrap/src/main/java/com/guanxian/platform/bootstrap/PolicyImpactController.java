@@ -165,6 +165,8 @@ public class PolicyImpactController {
         return switch (exception.reason()) {
             case NOT_FOUND -> new ApiException("RESOURCE_NOT_FOUND", exception.getMessage(), HttpStatus.NOT_FOUND);
             case FORBIDDEN -> new ApiException("POLICY_IMPACT_SCOPE_VIOLATION", exception.getMessage(), HttpStatus.FORBIDDEN);
+            case ASSOCIATION_CONTEXT_REQUIRED -> new ApiException(
+                    "ASSOCIATION_CONTEXT_REQUIRED", exception.getMessage(), HttpStatus.BAD_REQUEST);
             case CONFLICT -> new ApiException("POLICY_IMPACT_ALREADY_EXISTS", exception.getMessage(), HttpStatus.CONFLICT);
             case PRECONDITION_FAILED -> new ApiException(
                     "PRECONDITION_FAILED", exception.getMessage(), HttpStatus.PRECONDITION_FAILED);

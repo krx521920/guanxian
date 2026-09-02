@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -51,6 +52,28 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.data.username").value("association-admin"))
                 .andExpect(jsonPath("$.data.roles[0]").value("ASSOCIATION_ADMIN"))
                 .andExpect(jsonPath("$.data.permissions").isArray());
+    }
+
+    @Test
+    void auditPagingReturnsStableSnapshotAndRejectsUnboundedOffsets() throws Exception {
+        mockMvc.perform(get("/api/v1/audit-logs/page")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.total").isNumber())
+                .andExpect(jsonPath("$.data.snapshotId").isNumber());
+
+        mockMvc.perform(get("/api/v1/audit-logs/page")
+                        .param("page", "10001")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AUDIT_PAGE"));
+
+        mockMvc.perform(get("/api/v1/audit-logs/page")
+                        .param("size", "501")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AUDIT_PAGE_SIZE"));
     }
 
     @Test
@@ -120,7 +143,11 @@ class ApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/matches").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].score").isNumber());
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.total").value(0))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20));
 
         mockMvc.perform(get("/api/v1/collaborations").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())
@@ -129,7 +156,8 @@ class ApiIntegrationTest {
         mockMvc.perform(get("/api/v1/dashboards/association")
                         .with(httpBasic("association-admin", "admin123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.metrics").isArray());
+                .andExpect(jsonPath("$.data.metrics").isArray())
+                .andExpect(jsonPath("$.data.activities[*].type", hasItem("task")));
 
         mockMvc.perform(get("/api/v1/dashboards/enterprise")
                         .with(httpBasic("enterprise-admin", "enterprise123")))

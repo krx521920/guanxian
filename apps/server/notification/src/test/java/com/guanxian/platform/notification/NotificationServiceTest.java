@@ -40,7 +40,7 @@ class NotificationServiceTest {
         ActorScope userB = actor(USER_B, ASSOCIATION_A, "ENTERPRISE_MEMBER");
 
         SubscriptionView created = service.createSubscription(
-                new SubscriptionRequest("policy", Map.of("level", "市级"), null), userA);
+                new SubscriptionRequest("policy", Map.of(), null), userA);
         assertEquals(List.of("IN_APP"), created.channels());
         assertEquals(1, service.subscriptions(userA).size());
         assertTrue(service.subscriptions(userB).isEmpty());
@@ -56,6 +56,7 @@ class NotificationServiceTest {
         service.deleteSubscription(created.id(), 2, userA);
         assertTrue(service.subscriptions(userA).isEmpty());
         assertEquals(4, store.auditCount());
+        assertEquals(2L, store.latestAudit().get("resourceVersion"));
     }
 
     @Test
@@ -67,6 +68,7 @@ class NotificationServiceTest {
         service.createSubscription(new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), userB);
 
         UUID policyId = UUID.randomUUID();
+        store.registerPolicy(policyId, ASSOCIATION_A, "PUBLISHED", false, false);
         PolicyNotificationRequest request = new PolicyNotificationRequest(
                 ASSOCIATION_A, policyId, "新政策", "政策正文摘要", "policy-release-1");
         PolicyNotificationResult first = service.publishPolicy(request, adminA);
@@ -96,6 +98,15 @@ class NotificationServiceTest {
     }
 
     @Test
+    void maximumPageNumberDoesNotOverflowTheStoreOffset() {
+        NotificationMessagePage page = service.messages(
+                actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER"), false, Integer.MAX_VALUE, 100);
+
+        assertTrue(page.items().isEmpty());
+        assertEquals(Integer.MAX_VALUE, page.page());
+    }
+
+    @Test
     void unboundJwtIdentityCannotUsePersonalNotificationData() {
         ActorScope unbound = new ActorScope(null, "oidc-sub", "user", ASSOCIATION_A,
                 null, Set.of("ENTERPRISE_MEMBER"), Set.of());
@@ -105,8 +116,133 @@ class NotificationServiceTest {
                         "标题", "正文", "unbound"), unbound));
     }
 
+    @Test
+    void systemAdministratorReadsFollowSelectedAssociationAndWritesCannotEscapeIt() {
+        ActorScope global = systemActor(null);
+        ActorScope systemA = systemActor(ASSOCIATION_A);
+        ActorScope systemB = systemActor(ASSOCIATION_B);
+
+        SubscriptionView subscriptionA = service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), systemA);
+        SubscriptionView subscriptionB = service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), systemB);
+
+        assertEquals(2, service.subscriptions(global).size());
+        assertEquals(List.of(subscriptionA.id()),
+                service.subscriptions(systemA).stream().map(SubscriptionView::id).toList());
+        assertEquals(List.of(subscriptionB.id()),
+                service.subscriptions(systemB).stream().map(SubscriptionView::id).toList());
+        assertThrows(ForbiddenException.class, () -> service.createSubscription(
+                new SubscriptionRequest("STANDARD", Map.of(), List.of("IN_APP")), global));
+        assertThrows(NotFoundException.class, () -> service.updateSubscription(
+                subscriptionA.id(), subscriptionA.version(),
+                new SubscriptionRequest("STANDARD", Map.of(), List.of("IN_APP")), systemB));
+
+        UUID policyA = UUID.randomUUID();
+        UUID policyB = UUID.randomUUID();
+        store.registerPolicy(policyA, ASSOCIATION_A, "PUBLISHED", false, false);
+        store.registerPolicy(policyB, ASSOCIATION_B, "PUBLISHED", false, false);
+        service.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_A, policyA, "A 政策", "A 正文", "system-a"), systemA);
+        service.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_B, policyB, "B 政策", "B 正文", "system-b"), systemB);
+
+        assertEquals(2, service.messages(global, false, 0, 20).total());
+        assertEquals(1, service.messages(systemA, false, 0, 20).total());
+        NotificationMessageView messageB = service.messages(systemB, false, 0, 20).items().getFirst();
+        assertThrows(NotFoundException.class, () -> service.markRead(messageB.id(), systemA));
+        assertEquals("READ", service.markRead(messageB.id(), systemB).status());
+    }
+
+    @Test
+    void policyNotificationRequiresPublishedActivePolicyInTheSelectedAssociation() {
+        ActorScope adminA = actor(ADMIN, ASSOCIATION_A, "ASSOCIATION_ADMIN");
+        UUID foreign = UUID.randomUUID();
+        UUID draft = UUID.randomUUID();
+        UUID disabled = UUID.randomUUID();
+        UUID deleted = UUID.randomUUID();
+        store.registerPolicy(foreign, ASSOCIATION_B, "PUBLISHED", false, false);
+        store.registerPolicy(draft, ASSOCIATION_A, "DRAFT", false, false);
+        store.registerPolicy(disabled, ASSOCIATION_A, "PUBLISHED", true, false);
+        store.registerPolicy(deleted, ASSOCIATION_A, "PUBLISHED", false, true);
+
+        for (UUID policyId : List.of(foreign, draft, disabled, deleted, UUID.randomUUID())) {
+            assertThrows(NotFoundException.class, () -> service.publishPolicy(
+                    new PolicyNotificationRequest(
+                            ASSOCIATION_A, policyId, "不可发布", "无消息应生成", "invalid-" + policyId),
+                    adminA));
+        }
+        assertEquals(0, store.outboxCount());
+        assertEquals(0, store.auditCount());
+    }
+
+    @Test
+    void onlyUnfilteredInAppPolicySubscriptionsCanBeCreatedOrRestored() {
+        ActorScope user = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+
+        assertThrows(PreconditionFailedException.class, () -> service.createSubscription(
+                new SubscriptionRequest("STANDARD", Map.of(), List.of("IN_APP")), user));
+        assertThrows(PreconditionFailedException.class, () -> service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of("level", "市级"), List.of("IN_APP")), user));
+        assertThrows(PreconditionFailedException.class, () -> service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("EMAIL")), user));
+    }
+
+    @Test
+    void readArchiveAndRestoreAreIdempotentAndAuditOnlyFirstTransitions() {
+        ActorScope user = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+        ActorScope admin = actor(ADMIN, ASSOCIATION_A, "ASSOCIATION_ADMIN");
+        service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), user);
+        UUID policyId = UUID.randomUUID();
+        store.registerPolicy(policyId, ASSOCIATION_A, "PUBLISHED", false, false);
+        service.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_A, policyId, "政策", "正文", "lifecycle"), admin);
+        UUID messageId = service.messages(user, true, 0, 20).items().getFirst().id();
+        int baselineAudits = store.auditCount();
+
+        NotificationMessageView read = service.markRead(messageId, user);
+        assertEquals(read, service.markRead(messageId, user));
+        assertEquals(baselineAudits + 1, store.auditCount());
+
+        NotificationMessageView archived = service.archive(messageId, user);
+        assertEquals("ARCHIVED", archived.status());
+        assertEquals(archived, service.archive(messageId, user));
+        assertEquals(0, service.messages(user, false, 0, 20).total());
+        assertEquals(1, service.messages(user, false, "ARCHIVED", 0, 20).total());
+        assertEquals(baselineAudits + 2, store.auditCount());
+
+        NotificationMessageView restored = service.restore(messageId, user);
+        assertEquals("READ", restored.status());
+        assertEquals(restored, service.restore(messageId, user));
+        assertEquals(1, service.messages(user, false, 0, 20).total());
+        assertEquals(baselineAudits + 3, store.auditCount());
+    }
+
+    @Test
+    void globalSystemAdministratorCanPublishAndMaintainOwnMessagesByExplicitAssociation() {
+        ActorScope global = systemActor(null);
+        ActorScope selected = systemActor(ASSOCIATION_A);
+        service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), selected);
+        UUID policyId = UUID.randomUUID();
+        store.registerPolicy(policyId, ASSOCIATION_A, "PUBLISHED", false, false);
+
+        service.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_A, policyId, "A 政策", "正文", "global-publish"), global);
+        NotificationMessageView message = service.messages(global, true, 0, 20).items().getFirst();
+        assertEquals("READ", service.markRead(message.id(), global).status());
+        assertEquals("ARCHIVED", service.archive(message.id(), global).status());
+        assertEquals("READ", service.restore(message.id(), global).status());
+    }
+
     private static ActorScope actor(UUID userId, UUID associationId, String role) {
         return new ActorScope(userId, "subject-" + userId, "user-" + userId,
                 associationId, null, Set.of(role), Set.of());
+    }
+
+    private static ActorScope systemActor(UUID associationId) {
+        return new ActorScope(ADMIN, "system-subject", "system", associationId,
+                null, Set.of("SYSTEM_ADMIN"), Set.of());
     }
 }

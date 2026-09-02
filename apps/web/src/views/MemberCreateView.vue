@@ -13,8 +13,8 @@ const saving = ref(false)
 const message = ref<string | null>(null)
 const canSetActive = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'].includes(auth.user.value?.role || ''))
 const form = reactive({
-  name: '', unifiedSocialCreditCode: '', category: '', address: '', contactName: '', contactPhone: '',
-  introduction: '', capabilities: '', products: '', cooperationNeeds: '',
+  name: '', unifiedSocialCreditCode: '', category: '', address: '', contactName: '', contactPhone: '', contactEmail: '',
+  introduction: '', capabilities: '', products: '', services: '', applicationScenarios: '', cooperationNeeds: '',
   visibility: 'MEMBERS' as MemberVisibility,
   status: 'PENDING_REVIEW' as MemberStatus,
 })
@@ -27,10 +27,13 @@ function payload(): MemberUpsertPayload {
   return {
     name: form.name.trim(), unifiedSocialCreditCode: nullable(form.unifiedSocialCreditCode),
     category: form.category.trim(), address: nullable(form.address), contactName: nullable(form.contactName),
-    contactPhone: nullable(form.contactPhone), introduction: nullable(form.introduction),
+    contactPhone: nullable(form.contactPhone), contactEmail: nullable(form.contactEmail), introduction: nullable(form.introduction),
     capabilities: listValue(form.capabilities), products: listValue(form.products),
+    services: listValue(form.services), applicationScenarios: listValue(form.applicationScenarios),
     cooperationNeeds: listValue(form.cooperationNeeds), visibility: form.visibility,
     status: canSetActive.value ? form.status : 'PENDING_REVIEW',
+    associationId: auth.user.value?.role === 'SYSTEM_ADMIN'
+      ? auth.user.value.associationId || undefined : undefined,
   }
 }
 async function submit() {
@@ -65,6 +68,7 @@ async function submit() {
           <label class="form-span-2"><span>联系地址</span><input v-model="form.address" maxlength="300" /></label>
           <label><span>联系人</span><input v-model="form.contactName" maxlength="50" /></label>
           <label><span>联系电话</span><input v-model="form.contactPhone" maxlength="50" /></label>
+          <label><span>联系邮箱</span><input v-model="form.contactEmail" type="email" maxlength="200" /></label>
           <label class="form-span-2"><span>企业简介</span><textarea v-model="form.introduction" rows="5" maxlength="2000" /></label>
         </div>
       </section>
@@ -72,7 +76,9 @@ async function submit() {
         <h3>能力、产品与合作需求</h3><p>每行填写一项，也可以使用逗号或分号分隔。</p>
         <div class="form-grid">
           <label><span>核心能力</span><textarea v-model="form.capabilities" rows="6" /></label>
-          <label><span>产品与服务</span><textarea v-model="form.products" rows="6" /></label>
+          <label><span>产品</span><textarea v-model="form.products" rows="6" /></label>
+          <label><span>服务</span><textarea v-model="form.services" rows="6" /></label>
+          <label><span>应用场景</span><textarea v-model="form.applicationScenarios" rows="6" /></label>
           <label class="form-span-2"><span>合作需求</span><textarea v-model="form.cooperationNeeds" rows="5" /></label>
         </div>
       </section>

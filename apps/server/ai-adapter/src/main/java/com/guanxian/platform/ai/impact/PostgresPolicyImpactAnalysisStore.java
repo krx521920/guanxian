@@ -71,7 +71,8 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    AND policy.status = 'PUBLISHED'
                    AND policy.disabled_at IS NULL
                    AND policy.deleted_at IS NULL
-                   AND enterprise.status NOT IN ('DISABLED', 'DELETED')
+                   AND enterprise.status = 'ACTIVE'
+                   AND enterprise.deleted_at IS NULL
                 """, params, (rs, row) -> new AnalysisSourceHeader(
                 rs.getObject("policy_id", UUID.class), rs.getString("policy_title"), rs.getString("source_url"),
                 rs.getObject("enterprise_id", UUID.class), rs.getString("enterprise_name"),
@@ -97,7 +98,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    AND document_version.version = document.current_version
                    AND (
                        LOWER(BTRIM(document.title)) = LOWER(BTRIM(:policyTitle))
-                       OR (:sourceUrl IS NOT NULL AND document.source_url = :sourceUrl)
+                       OR (CAST(:sourceUrl AS TEXT) IS NOT NULL AND document.source_url = :sourceUrl)
                    )
                  ORDER BY document.updated_at DESC, chunk.chunk_index
                  LIMIT 200
@@ -124,7 +125,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
 
     @Override
     public List<PolicyImpactAnalysisView> list(
-            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, int offset, int limit) {
+            ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId, long offset, int limit) {
         MapSqlParameterSource params = filters(scope, status, policyDocumentId, enterpriseId)
                 .addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(SELECT + where(scope, status, policyDocumentId, enterpriseId)
@@ -144,6 +145,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
 
     @Override
     public PolicyImpactAnalysisView create(AnalysisDraft draft) {
+        requireOperational(draft.enterpriseId());
         try {
             return jdbc.query("""
                     INSERT INTO policy_impact_analysis (
@@ -175,6 +177,11 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                        reviewed_by_subject = NULL, reviewed_at = NULL,
                        version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :version
+                   AND EXISTS (
+                       SELECT 1 FROM enterprise write_enterprise
+                        WHERE write_enterprise.id=policy_impact_analysis.enterprise_id
+                          AND write_enterprise.status='ACTIVE'
+                          AND write_enterprise.deleted_at IS NULL)
                  RETURNING id
                 """, params, (rs, row) -> rs.getObject("id", UUID.class)).stream()
                 .findFirst().flatMap(this::find);
@@ -191,6 +198,11 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    SET status = :status, reviewed_by_subject = :reviewerSubject,
                        reviewed_at = now(), version = version + 1, updated_at = now()
                  WHERE id = :id AND version = :version
+                   AND EXISTS (
+                       SELECT 1 FROM enterprise write_enterprise
+                        WHERE write_enterprise.id=policy_impact_analysis.enterprise_id
+                          AND write_enterprise.status='ACTIVE'
+                          AND write_enterprise.deleted_at IS NULL)
                  RETURNING id
                 """, params, (rs, row) -> rs.getObject("id", UUID.class)).stream()
                 .findFirst().flatMap(this::find);
@@ -210,10 +222,11 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
             jdbc.update("""
                     INSERT INTO audit_log (
                         actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
-                        action, resource_type, resource_id, details, request_id)
-                    VALUES (:actorUserId, :actorSubject, :actorUsername, :associationId, :enterpriseId,
+                        action, resource_type, resource_id, resource_version, outcome, details, request_id)
+                    VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
+                            :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId, :enterpriseId,
                             :action, 'POLICY_IMPACT_ANALYSIS', CAST(:resourceId AS varchar),
-                            CAST(:snapshot AS jsonb), :requestId)
+                            :version, 'SUCCESS', CAST(:snapshot AS jsonb), COALESCE(:requestId, 'internal'))
                     """, params);
             jdbc.update("""
                     INSERT INTO business_entity_history (
@@ -275,7 +288,18 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
     private static String where(
             ReadScope scope, String status, UUID policyDocumentId, UUID enterpriseId) {
         List<String> clauses = new ArrayList<>();
-        if (!scope.systemAdmin()) {
+        if (!scope.systemAdmin() && !scope.associationStaff()) {
+            clauses.add("enterprise.status = 'ACTIVE'");
+            clauses.add("enterprise.deleted_at IS NULL");
+        }
+        if (scope.systemAdmin()) {
+            if (scope.enterpriseId() != null) {
+                clauses.add("analysis.enterprise_id = :scopeEnterpriseId");
+            }
+            if (scope.associationId() != null) {
+                clauses.add("enterprise.association_id = :associationId");
+            }
+        } else {
             if (scope.enterpriseId() != null) {
                 clauses.add("analysis.enterprise_id = :scopeEnterpriseId");
             } else if (scope.associationStaff() && scope.associationId() != null) {
@@ -304,6 +328,21 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
         if (value.reviewedBySubject() != null) snapshot.put("reviewedBySubject", value.reviewedBySubject());
         if (comment != null && !comment.isBlank()) snapshot.put("comment", comment.trim());
         return Map.copyOf(snapshot);
+    }
+
+    private void requireOperational(UUID enterpriseId) {
+        Boolean operational = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM enterprise
+                     WHERE id=:enterpriseId
+                       AND status='ACTIVE'
+                       AND deleted_at IS NULL)
+                """, new MapSqlParameterSource("enterpriseId", enterpriseId), Boolean.class);
+        if (!Boolean.TRUE.equals(operational)) {
+            throw new PolicyImpactException(
+                    PolicyImpactException.Reason.PRECONDITION_FAILED,
+                    "enterprise must be active before policy impact analysis");
+        }
     }
 
     private String writeJson(Object value) {

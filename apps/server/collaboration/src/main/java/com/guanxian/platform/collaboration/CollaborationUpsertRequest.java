@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public record CollaborationUpsertRequest(
         @NotBlank @Size(max = 200) String title,
@@ -15,5 +16,6 @@ public record CollaborationUpsertRequest(
         @Size(max = 16) String priority,
         @Size(max = 500) String nextAction,
         LocalDate dueDate,
-        @Min(0) @Max(100) Integer progress) {
+        @Min(0) @Max(100) Integer progress,
+        UUID matchId) {
 }

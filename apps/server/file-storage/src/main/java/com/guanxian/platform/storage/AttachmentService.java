@@ -7,6 +7,7 @@ import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 @Service
 public class AttachmentService {
+    static final String CONTENT_VALIDATED = "VALIDATED";
     private static final Map<String, Set<String>> MEDIA_EXTENSIONS = Map.of(
             "application/pdf", Set.of("pdf"),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Set.of("docx"),
@@ -37,16 +39,32 @@ public class AttachmentService {
     private final ObjectStorage objects;
     private final AttachmentRateLimiter rateLimiter;
     private final StorageProperties properties;
+    private final AttachmentEnterpriseScope enterpriseScope;
+    private final AttachmentContentScanner contentScanner;
 
     public AttachmentService(
             AttachmentMetadataStore metadata,
             ObjectStorage objects,
             AttachmentRateLimiter rateLimiter,
-            StorageProperties properties) {
+            StorageProperties properties,
+            AttachmentEnterpriseScope enterpriseScope) {
+        this(metadata, objects, rateLimiter, properties, enterpriseScope, new ContentValidationOnlyScanner());
+    }
+
+    @Autowired
+    public AttachmentService(
+            AttachmentMetadataStore metadata,
+            ObjectStorage objects,
+            AttachmentRateLimiter rateLimiter,
+            StorageProperties properties,
+            AttachmentEnterpriseScope enterpriseScope,
+            AttachmentContentScanner contentScanner) {
         this.metadata = metadata;
         this.objects = objects;
         this.rateLimiter = rateLimiter;
         this.properties = properties;
+        this.enterpriseScope = enterpriseScope;
+        this.contentScanner = contentScanner;
     }
 
     public AttachmentView upload(
@@ -58,6 +76,7 @@ public class AttachmentService {
         Scope target = writableScope(actor, requestedAssociationId, requestedEnterpriseId);
         rateLimiter.check(actor, "upload");
         ValidatedFile validated = validate(file);
+        contentScanner.assertClean(validated.content());
         String visibility = normalizeVisibility(requestedVisibility, target.enterpriseId());
         UUID id = UUID.randomUUID();
         LocalDate today = LocalDate.now();
@@ -70,7 +89,7 @@ public class AttachmentService {
         AttachmentDraft draft = new AttachmentDraft(
                 id, target.associationId(), target.enterpriseId(), properties.getBucket(), objectKey,
                 validated.filename(), validated.mediaType(), validated.content().length,
-                sha256(validated.content()), visibility, actor.subject());
+                sha256(validated.content()), CONTENT_VALIDATED, visibility, actor.subject());
         objects.put(objectKey, validated.mediaType(), validated.content());
         try {
             return metadata.create(draft, actor);
@@ -88,17 +107,18 @@ public class AttachmentService {
             ActorScope actor, UUID enterpriseId, boolean includeDeleted, int page, int size) {
         int boundedPage = Math.max(0, page);
         int boundedSize = Math.max(1, Math.min(size, 100));
-        if (enterpriseId != null && actor.isEnterpriseAdmin()
-                && !enterpriseId.equals(actor.enterpriseId())) {
+        UUID visibleEnterpriseId = visibleEnterpriseFilter(actor, enterpriseId);
+        if (visibleEnterpriseId != null && actor.isEnterpriseAdmin()
+                && !visibleEnterpriseId.equals(actor.enterpriseId())) {
             throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
                     "enterprise administrators may only list their own attachments");
         }
         return new AttachmentPage(
-                metadata.listVisible(actor, enterpriseId, includeDeleted,
+                metadata.listVisible(actor, visibleEnterpriseId, includeDeleted,
                         boundedPage * boundedSize, boundedSize),
                 boundedPage,
                 boundedSize,
-                metadata.countVisible(actor, enterpriseId, includeDeleted));
+                metadata.countVisible(actor, visibleEnterpriseId, includeDeleted));
     }
 
     public AttachmentView get(UUID id, ActorScope actor, boolean includeDeleted) {
@@ -108,6 +128,12 @@ public class AttachmentService {
 
     public AttachmentDownload download(UUID id, ActorScope actor) {
         AttachmentView view = get(id, actor, false);
+        if (!CONTENT_VALIDATED.equals(view.scanStatus())) {
+            throw new ApiException(
+                    "ATTACHMENT_CONTENT_UNAVAILABLE",
+                    "attachment content is unavailable until validation succeeds; legacy pending files must be uploaded again",
+                    HttpStatus.CONFLICT);
+        }
         byte[] content = objects.get(view.objectKey());
         if (content.length != view.sizeBytes() || content.length > properties.getMaxSizeBytes()) {
             throw new StorageUnavailableException("stored object failed size verification");
@@ -119,6 +145,7 @@ public class AttachmentService {
     }
 
     public AttachmentView delete(UUID id, long expectedVersion, ActorScope actor) {
+        requireSystemWriteContext(actor);
         rateLimiter.check(actor, "delete");
         AttachmentView current = get(id, actor, true);
         requireVersion(current, expectedVersion);
@@ -130,6 +157,7 @@ public class AttachmentService {
     }
 
     public AttachmentView restore(UUID id, long expectedVersion, ActorScope actor) {
+        requireSystemWriteContext(actor);
         rateLimiter.check(actor, "restore");
         AttachmentView current = get(id, actor, true);
         requireVersion(current, expectedVersion);
@@ -142,11 +170,16 @@ public class AttachmentService {
 
     private Scope writableScope(ActorScope actor, UUID associationId, UUID enterpriseId) {
         if (actor.isSystemAdmin()) {
-            if (associationId == null) {
-                throw new ApiException("ASSOCIATION_REQUIRED",
-                        "system administrators must select an association", HttpStatus.BAD_REQUEST);
+            requireSystemWriteContext(actor);
+            if (associationId != null && !associationId.equals(actor.associationId())) {
+                throw new ForbiddenException("ASSOCIATION_SCOPE_VIOLATION",
+                        "request association cannot override the selected system context");
             }
-            return new Scope(associationId, enterpriseId);
+            if (enterpriseId != null && !enterpriseId.equals(actor.enterpriseId())) {
+                throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
+                        "request enterprise cannot override the selected system context");
+            }
+            return checkedScope(actor, actor.associationId(), actor.enterpriseId());
         }
         if (actor.associationId() == null) {
             throw new ForbiddenException("ASSOCIATION_SCOPE_REQUIRED", "actor has no association scope");
@@ -156,17 +189,43 @@ public class AttachmentService {
                     "actor cannot upload into another association");
         }
         if (actor.isAssociationStaff()) {
-            return new Scope(actor.associationId(), enterpriseId);
+            return checkedScope(actor, actor.associationId(), enterpriseId);
         }
         if (actor.isEnterpriseAdmin() && actor.enterpriseId() != null) {
             if (enterpriseId != null && !actor.enterpriseId().equals(enterpriseId)) {
                 throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
                         "enterprise administrators may only upload for their own enterprise");
             }
-            return new Scope(actor.associationId(), actor.enterpriseId());
+            return checkedScope(actor, actor.associationId(), actor.enterpriseId());
         }
         throw new ForbiddenException("ATTACHMENT_WRITE_FORBIDDEN",
                 "actor is not allowed to manage attachments");
+    }
+
+    private Scope checkedScope(ActorScope actor, UUID associationId, UUID enterpriseId) {
+        if (enterpriseId != null && !enterpriseScope.contains(associationId, enterpriseId, actor)) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "target enterprise does not belong to the selected association");
+        }
+        return new Scope(associationId, enterpriseId);
+    }
+
+    private static UUID visibleEnterpriseFilter(ActorScope actor, UUID requestedEnterpriseId) {
+        if (actor.isSystemAdmin() && actor.enterpriseId() != null) {
+            if (requestedEnterpriseId != null && !actor.enterpriseId().equals(requestedEnterpriseId)) {
+                throw new ForbiddenException("ENTERPRISE_SCOPE_VIOLATION",
+                        "request enterprise cannot override the selected system context");
+            }
+            return actor.enterpriseId();
+        }
+        return requestedEnterpriseId;
+    }
+
+    private static void requireSystemWriteContext(ActorScope actor) {
+        if (actor.isSystemAdmin() && actor.associationId() == null) {
+            throw new ForbiddenException("ASSOCIATION_CONTEXT_REQUIRED",
+                    "system administrators must select an association before writing attachments");
+        }
     }
 
     private ValidatedFile validate(MultipartFile file) {

@@ -26,6 +26,10 @@ final class VersionEtags {
         }
     }
 
+    static Long optionalVersion(String ifMatch) {
+        return ifMatch == null || ifMatch.isBlank() ? null : requireVersion(ifMatch);
+    }
+
     static String format(long version) {
         return "\"" + version + "\"";
     }

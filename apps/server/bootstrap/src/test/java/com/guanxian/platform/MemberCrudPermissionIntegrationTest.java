@@ -74,7 +74,7 @@ class MemberCrudPermissionIntegrationTest {
                 .andExpect(jsonPath("$.data[0].products[0]").value("探测服务"))
                 .andExpect(jsonPath("$.data[0].city").value("北京市朝阳区"))
                 .andExpect(jsonPath("$.data[0].contact").value("测试联系人"))
-                .andExpect(jsonPath("$.data[0].completeness").value(89))
+                .andExpect(jsonPath("$.data[0].completeness").value(73))
                 .andExpect(jsonPath("$.data[0].status").value("待审核"))
                 .andExpect(jsonPath("$.data[0].updatedAt").exists());
 
@@ -106,6 +106,24 @@ class MemberCrudPermissionIntegrationTest {
                         .with(httpBasic("observer", "observer123")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mockMvc.perform(get("/api/v1/members/{id}", id)
+                        .queryParam("includeDeleted", "true")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, "\"2\""))
+                .andExpect(jsonPath("$.data.status").value("DELETED"))
+                .andExpect(jsonPath("$.data.deletedAt").isNotEmpty())
+                .andExpect(jsonPath("$.data.statusBeforeDelete").value("ACTIVE"));
+
+        mockMvc.perform(put("/api/v1/members/{id}/restore", id)
+                        .with(httpBasic("association-admin", "admin123"))
+                        .header(HttpHeaders.IF_MATCH, "\"2\""))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, "\"3\""))
+                .andExpect(jsonPath("$.data.name").value("更新后的企业-" + suffix))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.deletedAt").doesNotExist());
     }
 
     @Test

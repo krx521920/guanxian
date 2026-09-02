@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-guanxian}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${BIND_HOST:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${BIND_HOST:-0.0.0.0}:${REDIS_PORT:-6379}:6379"
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
@@ -39,8 +39,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${BIND_HOST:-0.0.0.0}:${MINIO_PORT:-9000}:9000"
+      - "${BIND_HOST:-0.0.0.0}:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio-data:/data
     healthcheck:
@@ -59,7 +59,17 @@ services:
       AI_PORT: 8001
       AI_MODEL_PROVIDER: disabled
     ports:
-      - "${AI_SERVICE_PORT:-8001}:8001"
+      - "${BIND_HOST:-0.0.0.0}:${AI_SERVICE_PORT:-8001}:8001"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2).read()"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     restart: unless-stopped
 
   server:
@@ -80,6 +90,7 @@ services:
       GUANXIAN_JWT_ISSUER_URI: ${GUANXIAN_JWT_ISSUER_URI:?GUANXIAN_JWT_ISSUER_URI is required}
       GUANXIAN_JWT_JWK_SET_URI: ${GUANXIAN_JWT_JWK_SET_URI:?GUANXIAN_JWT_JWK_SET_URI is required}
       GUANXIAN_JWT_PRINCIPAL_CLAIM: ${GUANXIAN_JWT_PRINCIPAL_CLAIM:-preferred_username}
+      GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS: ${GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS:-}
       GUANXIAN_STORAGE_BACKEND: minio
       GUANXIAN_STORAGE_BUCKET: ${GUANXIAN_STORAGE_BUCKET:-guanxian-private}
       GUANXIAN_STORAGE_ENDPOINT: ${GUANXIAN_STORAGE_ENDPOINT:?GUANXIAN_STORAGE_ENDPOINT is required and must be HTTPS}
@@ -87,6 +98,8 @@ services:
       GUANXIAN_STORAGE_SECRET_KEY: ${GUANXIAN_STORAGE_SECRET_KEY:?GUANXIAN_STORAGE_SECRET_KEY is required}
       GUANXIAN_STORAGE_REDIS_URL: ${GUANXIAN_STORAGE_REDIS_URL:?GUANXIAN_STORAGE_REDIS_URL is required and must use rediss}
       GUANXIAN_STORAGE_MAX_SIZE_BYTES: ${GUANXIAN_STORAGE_MAX_SIZE_BYTES:-20971520}
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:-20MB}
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:-21MB}
       GUANXIAN_STORAGE_RATE_LIMIT_ENABLED: "true"
       GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE: ${GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE:-30}
       SPRING_DATA_REDIS_HOST: redis
@@ -101,11 +114,26 @@ services:
       GUANXIAN_AI_OUTPUT_COST_PER_MILLION: ${GUANXIAN_AI_OUTPUT_COST_PER_MILLION:-0}
       GUANXIAN_RAG_MAX_ESTIMATED_COST: ${GUANXIAN_RAG_MAX_ESTIMATED_COST:-0.50}
       GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED: ${GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED:-false}
+      GUANXIAN_RAG_MAX_DOCUMENT_CHARS: ${GUANXIAN_RAG_MAX_DOCUMENT_CHARS:-2000000}
+      GUANXIAN_RAG_MAX_DOCUMENT_BYTES: ${GUANXIAN_RAG_MAX_DOCUMENT_BYTES:-20971520}
+      GUANXIAN_EMBEDDING_ENABLED: ${GUANXIAN_EMBEDDING_ENABLED:-false}
+      GUANXIAN_EMBEDDING_ENDPOINT: ${GUANXIAN_EMBEDDING_ENDPOINT:-}
+      GUANXIAN_EMBEDDING_API_KEY: ${GUANXIAN_EMBEDDING_API_KEY:-}
+      GUANXIAN_EMBEDDING_MODEL: ${GUANXIAN_EMBEDDING_MODEL:-}
+      GUANXIAN_EMBEDDING_DIMENSIONS: ${GUANXIAN_EMBEDDING_DIMENSIONS:-1536}
+      GUANXIAN_EMBEDDING_MAX_BATCH_SIZE: ${GUANXIAN_EMBEDDING_MAX_BATCH_SIZE:-32}
+      GUANXIAN_EMBEDDING_TIMEOUT: ${GUANXIAN_EMBEDDING_TIMEOUT:-30s}
     ports:
-      - "${SERVER_PORT:-8080}:8080"
+      - "${BIND_HOST:-0.0.0.0}:${SERVER_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/api/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 40s
     depends_on:
       ai:
-        condition: service_started
+        condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
@@ -126,17 +154,18 @@ services:
         VITE_OIDC_POST_LOGOUT_REDIRECT_URI: ${WEB_OIDC_POST_LOGOUT_REDIRECT_URI:?WEB_OIDC_POST_LOGOUT_REDIRECT_URI is required}
         VITE_OIDC_SCOPE: ${WEB_OIDC_SCOPE:-openid profile email}
     ports:
-      - "${WEB_HTTP_PORT:-8081}:8080"
+      - "${BIND_HOST:-0.0.0.0}:${WEB_HTTP_PORT:-8081}:8080"
     depends_on:
-      - server
+      server:
+        condition: service_healthy
     restart: unless-stopped
 
   toxiproxy:
     profiles: ["chaos"]
     image: ghcr.io/shopify/toxiproxy:2.12.0
     ports:
-      - "8474:8474"
-      - "18002:18002"
+      - "${BIND_HOST:-0.0.0.0}:8474:8474"
+      - "${BIND_HOST:-0.0.0.0}:18002:18002"
     restart: unless-stopped
 
 volumes:

@@ -1,8 +1,14 @@
-# 北京地下管线协会 AI 管理协作平台
+# 北京地下管线协会管理协作平台
+
+> 当前对外定位为“管理协作平台”。文档解析、可见范围检索、引用追踪和可选 Embedding
+> 已进入技术验证，但在真实模型供应商、协会语料评测、费用阈值和数据出境审批全部验收前，
+> 不对外宣称为“AI 平台”。
 
 本仓库用于实现平台第二版方案：**向上连接政策与标准，横向连接友好协会，向下服务会员企业，在平台内部形成可持续运营的产业生态。**
 
 当前已形成可运行的首期工程基线，模块边界、OIDC 数据域、会员审核审计和 Excel 调查采集闭环已经接通。企业调查表作为 106 家会员冷启动入口，经过逐行预检、协会审核后进入企业、产品、需求与场景库。
+
+当前代码已接通身份生命周期、系统管理员代管上下文和主要业务数据域。2026-09-02 已在本机 Docker 环境执行当前代码的全部 Testcontainers，并在隔离的 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境完成 8 条浏览器 E2E。该结果证明当前测试环境闭环，不替代正式 IdP、TLS/私网、备份恢复、集中日志与真实告警，以及真实模型和协会语料等生产上线闸门。
 
 ## 工程结构
 
@@ -11,10 +17,10 @@ apps/
   server/       Java 21 + Spring Boot 模块化单体业务后端
   web/          Vue 3 + TypeScript 协会/企业管理端
 services/
-  ai/           FastAPI 独立 AI 能力服务
+  ai/           FastAPI 规则兼容服务（政策问答入口已停用）
 infra/
   postgres/     PostgreSQL 初始化脚本
-tests/          正反向、模糊、压力、渗透与故障注入工具
+tests/          常规功能、权限、数据隔离、身份协议与运行时验收工具
 docs/
   architecture.md  软件架构与模块边界
 compose.yaml    本地 PostgreSQL、Redis、MinIO 编排
@@ -27,7 +33,9 @@ compose.yaml    本地 PostgreSQL、Redis、MinIO 编排
 - 政策与标准中心的列表和检索骨架
 - 生态供需匹配及可解释评分
 - 协作事项和运营工作台页面
-- 106 家会员 XLSX 模板下载、批量预检、合法行提交与待审核闭环
+- 106 家会员正式 XLSX 模板、来源指纹、批量预检、合法行提交与逐家审核闭环
+- 知识文档草稿、送审、发布、停用、归档、软删除、恢复、重解析与重新 Embedding
+- 严格按协会隔离的带出处检索、无证据拒答及真实语料评测发布闸门
 
 ## 核心基础约束
 
@@ -35,7 +43,7 @@ compose.yaml    本地 PostgreSQL、Redis、MinIO 编排
 - 生产默认使用 OIDC/JWT；仅显式本地/测试模式可启用 HTTP Basic 演示账号，生产 Profile 会拒绝 demo 模式。
 - ArchUnit 自动保护模块依赖方向，避免业务模块反向耦合启动层或内部实现。
 - Web、业务后端与 AI 服务统一使用安全的 `X-Request-Id`；成功与异常响应均可关联同一次请求，非法或可注入日志的值会被替换。
-- Flyway 对空库和既有非空 PostgreSQL 建立可追踪迁移；会员编辑页读取强 ETag，保存时携带 If-Match，陈旧写入返回 412。
+- Flyway 当前迁移链为 V1–V23，可追踪处理空库和既有非空 PostgreSQL；V16 固化政策影响分析的同协会约束，V17 固化跨协会授权、推荐和共享策略不变量，V18 固化“推荐—双方确认—邀请—洽谈—反馈—成果”闭环，V19/V20 收紧通知与附件状态，V21 冻结会员采集出处字段和知识生命周期，V22 持久化分协会 RAG 评测与发布闸门，V23 为跨协会申请及企业共享同意补齐版本列。会员、知识、跨协会申请、关系、字段策略、企业授权和推荐写入均使用强 ETag/If-Match，陈旧写入返回 412。
 - AI 输入具备字段、列表、数值和请求体资源上限；Unicode 统一规范化，校验错误不回显原始输入，评分分项与总分严格一致。
 - AI 请求体上限按 ASGI 数据块累计，无 `Content-Length` 或分块传输也不能绕过；Web 六个核心页面具有统一的安全失败态和重试机制。
 - Web 权限默认拒绝，生产构建禁用 mock 回退和演示身份切换；OIDC 登录采用 Authorization Code + PKCE，并回读后端验证身份。
@@ -59,10 +67,20 @@ docker compose --profile app up --build -d
 
 容器模式默认从 `http://localhost:8081` 访问。执行 `./scripts/verify.ps1` 可统一校验 Compose、Web、AI 服务和 Java 后端。
 
-## 测试与安全验证
+需要使用仓库内置的真实 PostgreSQL、MinIO、Redis 和 Keycloak/OIDC 数据执行浏览器 E2E 时，运行：
 
-仓库已配置单元/集成、反向与异常、变异、OpenAPI 模糊、k6 高压、OWASP ZAP 渗透基线、Trivy 供应链扫描和 Toxiproxy 故障注入。所有主动测试脚本默认只允许本机或 Compose 内部服务地址，避免误扫外部系统。
+```powershell
+./tools/testing/Start-E2eStack.ps1
+```
 
-快速入口和本轮实测结果见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，耗时和主动扫描任务按周或手动执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
+脚本强制使用独立项目名 `guanxian-platform-e2e`，并读取 `tests/e2e/compose.env` 中仅供本机测试的固定身份和端口；它会等待所有依赖健康且数据库种子导入成功后，才返回 Web 地址 `http://127.0.0.1:18082`。重复执行不会删除数据卷；结束环境可运行 `docker compose --project-name guanxian-platform-e2e --env-file tests/e2e/compose.env -f compose.yaml -f compose.e2e.yaml --profile app down`，除非明确需要重新初始化，禁止附加 `--volumes`。
 
-> 当前已接入生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计和 Excel 批量采集闭环；本地测试仍可显式使用演示身份与内存仓储。AI 服务目前仍为确定性规则实现，生产上线前还需配置真实 IdP、执行 V3 数据库迁移演练并完成实际会员数据验收。
+## 测试与质量验证
+
+仓库默认只执行单元测试、集成测试、权限与数据隔离回归、类型检查和构建。变异测试与隔离的 OIDC/PKCE 验收仅可手动触发；模糊请求、高压/负载、ZAP 主动扫描和网络故障注入已退出 CI，不得重新加入自动或手动工作流。
+
+快速入口和当前可复验基线见 [测试工具使用指南](docs/testing-guide.md)，脚本参数见 [tests/README.md](tests/README.md)。常规提交执行 `.github/workflows/ci.yml`，手动质量检查执行 `.github/workflows/advanced-testing.yml`，依赖与密钥扫描执行 `.github/workflows/security-scan.yml`。
+
+2026-09-02 当前变更的本地常规基线：Java 的 69 份 Surefire 报告共 349 项测试全部通过，失败 0、错误 0、跳过 0；其中原先因环境缺失而跳过的 62 项 Testcontainers 已连接真实 Docker 执行。Web 为 20 个 Vitest 文件、210 项全部通过，`vue-tsc -b` 与 Vite 生产构建通过；Playwright 4 个文件中的 8 条真实浏览器 E2E 全部通过。Flyway V1–V23、PostgreSQL、MinIO、Redis 和隔离 Keycloak/OIDC 已完成本轮复验；ClamAV、正式 IdP 与生产编排仍需在 CI 或预生产环境单独验收。
+
+> 当前代码提供了生产向 OIDC/JWT、PostgreSQL/Flyway、企业数据域、审计、正式 Excel 批量采集、附件知识治理、带出处检索和评测闸门；这不等于生产闭环已验收。本地测试仍可显式使用演示身份与内存仓储。Python 政策问答入口固定返回 503，Java 是唯一正式知识问答实现，且外部模型和 Embedding 默认关闭。生产上线前仍需取得 106 家真实回表并在预生产去重审核，配置正式 IdP、ClamAV 与合规模型密钥，完成生产编排、备份恢复演练和真实告警验收，并用协会真实语料跑过评测阈值；未通过前只能使用“管理协作平台”名称。

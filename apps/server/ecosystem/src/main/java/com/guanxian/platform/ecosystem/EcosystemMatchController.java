@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,8 +33,30 @@ public class EcosystemMatchController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('MATCH_REQUEST')")
-    ApiResponse<List<EcosystemMatch>> list() {
-        return ApiResponse.ok(matchService.demoMatches());
+    ApiResponse<EcosystemPage<PersistedMatchView>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String state,
+            Authentication authentication) {
+        return ApiResponse.ok(matchService.persisted(
+                actor(authentication), page, size, state));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('MATCH_REQUEST')")
+    ResponseEntity<ApiResponse<PersistedMatchView>> detail(
+            @PathVariable UUID id, Authentication authentication) {
+        return versioned(matchService.detail(id, actor(authentication)));
+    }
+
+    @GetMapping("/generation-demands")
+    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    ApiResponse<EcosystemPage<DemandView>> generationDemands(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(matchService.generationDemands(
+                actor(authentication), page, size));
     }
 
     @PostMapping
@@ -51,7 +74,7 @@ public class EcosystemMatchController {
     }
 
     @PostMapping("/demand/{demandId}/generate")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ApiResponse<List<PersistedMatchView>> generate(
             @PathVariable UUID demandId,
             @Valid @RequestBody(required = false) MatchGenerationRequest request,
@@ -81,7 +104,7 @@ public class EcosystemMatchController {
     }
 
     @PostMapping("/{id}/close")
-    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    @PreAuthorize("hasAnyAuthority('ENTERPRISE_WRITE', 'MEMBER_REVIEW')")
     ResponseEntity<ApiResponse<PersistedMatchView>> close(
             @PathVariable UUID id,
             @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,

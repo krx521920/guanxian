@@ -5,6 +5,8 @@ import com.guanxian.platform.shared.security.ActorScope;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.actuate.health.Health;
+import org.springframework.boot.actuate.health.HealthIndicator;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -22,7 +24,7 @@ import java.util.List;
 
 @Component
 @ConditionalOnProperty(name = "guanxian.storage.rate-limit.enabled", havingValue = "true")
-final class RedisAttachmentRateLimiter implements AttachmentRateLimiter {
+final class RedisAttachmentRateLimiter implements AttachmentRateLimiter, HealthIndicator {
     private static final String FIXED_WINDOW = """
             local current = redis.call('INCR', KEYS[1])
             if current == 1 then
@@ -80,6 +82,17 @@ final class RedisAttachmentRateLimiter implements AttachmentRateLimiter {
     @PreDestroy
     void close() {
         redis.close();
+    }
+
+    @Override
+    public Health health() {
+        try {
+            return "PONG".equalsIgnoreCase(redis.ping())
+                    ? Health.up().build()
+                    : Health.down().build();
+        } catch (RuntimeException exception) {
+            return Health.down(exception).build();
+        }
     }
 
     private void audit(String subjectHash, String route, String decision) {

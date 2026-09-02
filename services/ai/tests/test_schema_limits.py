@@ -75,7 +75,7 @@ def test_matching_deduplicates_labels_and_rejects_resource_abuse(client):
     assert huge_metrics.status_code == 422
 
 
-def test_policy_rejects_duplicate_ids_as_a_business_conflict(client):
+def test_disabled_policy_qa_does_not_run_document_business_logic(client):
     response = client.post(
         "/api/v1/qa/policy",
         json={
@@ -87,8 +87,8 @@ def test_policy_rejects_duplicate_ids_as_a_business_conflict(client):
         },
     )
 
-    assert response.status_code == 409
-    assert response.json()["error"]["code"] == "DUPLICATE_DOCUMENT_ID"
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "POLICY_QA_NOT_ENABLED"
 
 
 def test_policy_rejects_blank_content_and_unsafe_urls(client):
@@ -126,7 +126,7 @@ def test_policy_rejects_blank_content_and_unsafe_urls(client):
         assert response.status_code == 422
 
 
-def test_policy_accepts_safe_https_source_and_trims_identifiers(client):
+def test_policy_accepts_safe_https_source_but_capability_remains_disabled(client):
     response = client.post(
         "/api/v1/qa/policy",
         json={
@@ -142,11 +142,8 @@ def test_policy_accepts_safe_https_source_and_trims_identifiers(client):
         },
     )
 
-    assert response.status_code == 200
-    citation = response.json()["citations"][0]
-    assert citation["document_id"] == "P-1"
-    assert citation["title"] == "安全规定"
-    assert citation["source_url"] == "https://example.com/policy?id=1"
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "POLICY_QA_NOT_ENABLED"
 
 
 def test_trimmed_common_strings_still_enforce_wire_length_limits(client):

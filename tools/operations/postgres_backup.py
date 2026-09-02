@@ -143,8 +143,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--compose-file",
         type=Path,
-        default=repository_root() / "compose.yaml",
-        help="Docker Compose file containing the fixed 'postgres' service",
+        default=repository_root() / "compose.production.yml",
+        help="production Docker Compose file containing the fixed 'postgres' service",
     )
     parser.add_argument(
         "--output-dir",

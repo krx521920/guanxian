@@ -26,8 +26,10 @@ class PostgresMemberRepository implements MemberRepository {
     };
     private static final String SELECT_FIELDS = """
             SELECT id, association_id, name, unified_social_credit_code, category, address,
-                   contact_name, contact_phone, description, capabilities, products,
-                   cooperation_needs, visibility, status, version, created_at, updated_at
+                   contact_name, contact_phone, contact_email, description, capabilities, products,
+                   services, application_scenarios, cooperation_needs,
+                   visibility, status, version, created_at, updated_at,
+                   deleted_at, deleted_by_subject, status_before_delete
             FROM enterprise
             """;
 
@@ -73,11 +75,13 @@ class PostgresMemberRepository implements MemberRepository {
                     id, association_id, unified_social_credit_code, name, short_name,
                     description, enterprise_roles, service_scenarios, visibility, status,
                     version, created_at, updated_at, category, address, contact_name,
-                    contact_phone, capabilities, products, cooperation_needs)
+                    contact_phone, contact_email, capabilities, products, services,
+                    application_scenarios, cooperation_needs)
                 VALUES (:id, :associationId, :creditCode, :name, NULL,
                     :introduction, '[]'::jsonb, '[]'::jsonb, :visibility, :status,
                     :version, :createdAt, :updatedAt, :category, :address, :contactName,
-                    :contactPhone, CAST(:capabilities AS jsonb), CAST(:products AS jsonb),
+                    :contactPhone, :contactEmail, CAST(:capabilities AS jsonb), CAST(:products AS jsonb),
+                    CAST(:services AS jsonb), CAST(:applicationScenarios AS jsonb),
                     CAST(:cooperationNeeds AS jsonb))
                 """;
         try {
@@ -102,9 +106,15 @@ class PostgresMemberRepository implements MemberRepository {
                     address = :address,
                     contact_name = :contactName,
                     contact_phone = :contactPhone,
+                    contact_email = :contactEmail,
                     capabilities = CAST(:capabilities AS jsonb),
                     products = CAST(:products AS jsonb),
-                    cooperation_needs = CAST(:cooperationNeeds AS jsonb)
+                    services = CAST(:services AS jsonb),
+                    application_scenarios = CAST(:applicationScenarios AS jsonb),
+                    cooperation_needs = CAST(:cooperationNeeds AS jsonb),
+                    deleted_at = :deletedAt,
+                    deleted_by_subject = :deletedBySubject,
+                    status_before_delete = :statusBeforeDelete
                 WHERE id = :id AND association_id = :associationId AND version = :expectedVersion
                 """;
         try {
@@ -112,13 +122,6 @@ class PostgresMemberRepository implements MemberRepository {
         } catch (DataIntegrityViolationException exception) {
             throw translateIntegrityViolation(exception);
         }
-    }
-
-    @Override
-    public boolean deleteById(UUID id, long expectedVersion) {
-        return jdbc.update(
-                "DELETE FROM enterprise WHERE id = :id AND version = :expectedVersion",
-                new MapSqlParameterSource().addValue("id", id).addValue("expectedVersion", expectedVersion)) == 1;
     }
 
     private MapSqlParameterSource parameters(MemberProfile member) {
@@ -137,9 +140,15 @@ class PostgresMemberRepository implements MemberRepository {
                 .addValue("address", member.address())
                 .addValue("contactName", member.contactName())
                 .addValue("contactPhone", member.contactPhone())
+                .addValue("contactEmail", member.contactEmail())
                 .addValue("capabilities", writeList(member.capabilities()))
                 .addValue("products", writeList(member.products()))
-                .addValue("cooperationNeeds", writeList(member.cooperationNeeds()));
+                .addValue("services", writeList(member.services()))
+                .addValue("applicationScenarios", writeList(member.applicationScenarios()))
+                .addValue("cooperationNeeds", writeList(member.cooperationNeeds()))
+                .addValue("deletedAt", member.deletedAt() == null ? null : Timestamp.from(member.deletedAt()))
+                .addValue("deletedBySubject", member.deletedBySubject())
+                .addValue("statusBeforeDelete", member.statusBeforeDelete());
     }
 
     private MemberProfile mapMember(ResultSet resultSet, int rowNumber) throws SQLException {
@@ -152,15 +161,21 @@ class PostgresMemberRepository implements MemberRepository {
                 resultSet.getString("address"),
                 resultSet.getString("contact_name"),
                 resultSet.getString("contact_phone"),
+                resultSet.getString("contact_email"),
                 resultSet.getString("description"),
                 readList(resultSet.getString("capabilities")),
                 readList(resultSet.getString("products")),
+                readList(resultSet.getString("services")),
+                readList(resultSet.getString("application_scenarios")),
                 readList(resultSet.getString("cooperation_needs")),
                 resultSet.getString("visibility"),
                 resultSet.getString("status"),
                 resultSet.getLong("version"),
                 resultSet.getTimestamp("created_at").toInstant(),
-                resultSet.getTimestamp("updated_at").toInstant());
+                resultSet.getTimestamp("updated_at").toInstant(),
+                resultSet.getTimestamp("deleted_at") == null ? null : resultSet.getTimestamp("deleted_at").toInstant(),
+                resultSet.getString("deleted_by_subject"),
+                resultSet.getString("status_before_delete"));
     }
 
     private String writeList(List<String> values) {

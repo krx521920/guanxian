@@ -9,7 +9,10 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -135,7 +138,9 @@ def build_restore_plan(
                 "--tuples-only",
                 "--no-align",
                 "--command",
-                "SELECT CASE WHEN to_regclass('public.flyway_schema_history') IS NULL THEN 0 ELSE 1 END",
+                "SELECT CASE WHEN to_regclass('public.flyway_schema_history') IS NOT NULL "
+                "AND (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE n.nspname = 'public' AND c.relkind = 'r') > 1 THEN 1 ELSE 0 END",
             ),
         ),
     )
@@ -186,7 +191,9 @@ def _run(command: tuple[str, ...], *, stdin=None, capture_stdout: bool = False) 
 
 def execute_restore(
     plan: RestorePlan, *, confirm_target: str | None, environment: Mapping[str, str]
-) -> None:
+) -> dict[str, object]:
+    started_at = datetime.now(timezone.utc)
+    started_monotonic = time.monotonic()
     validate_restore_target(plan.target_database, plan.source_database)
     validate_execution_guards(plan, confirm_target=confirm_target, environment=environment)
     _run(plan.drop_command)
@@ -196,12 +203,51 @@ def execute_restore(
             _run(plan.restore_command, stdin=archive)
         verification = _run(plan.verify_command, capture_stdout=True)
         if verification.stdout.decode("utf-8", errors="replace").strip() != "1":
-            raise RuntimeError("restore verification failed: Flyway schema history table was not found")
+            raise RuntimeError(
+                "restore verification failed: required Flyway history or restored business table was not found"
+            )
     except Exception:
         try:
             _run(plan.drop_command)
         except RuntimeError:
             pass
+        raise
+    completed_at = datetime.now(timezone.utc)
+    return {
+        "schemaVersion": 1,
+        "operation": "postgres-restore-drill",
+        "status": "verified",
+        "startedAt": started_at.isoformat(),
+        "completedAt": completed_at.isoformat(),
+        "durationSeconds": round(time.monotonic() - started_monotonic, 3),
+        "archive": str(plan.archive),
+        "archiveSha256": sha256_file(plan.archive),
+        "manifest": str(plan.manifest),
+        "sourceDatabase": plan.source_database,
+        "targetDatabase": plan.target_database,
+        "verification": {
+            "flywaySchemaHistoryPresent": True,
+            "restoredUserTablePresent": True,
+            "targetIsIsolated": True,
+        },
+    }
+
+
+def write_report_atomic(report_path: Path, report: Mapping[str, object]) -> Path:
+    target = report_path.expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", dir=target.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as destination:
+            json.dump(report, destination, ensure_ascii=False, indent=2, sort_keys=True)
+            destination.write("\n")
+            destination.flush()
+            os.fsync(destination.fileno())
+        temporary.replace(target)
+        return target
+    except Exception:
+        temporary.unlink(missing_ok=True)
         raise
 
 
@@ -213,14 +259,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--compose-file",
         type=Path,
-        default=repository_root() / "compose.yaml",
-        help="Docker Compose file containing the fixed 'postgres' service",
+        default=repository_root() / "compose.production.yml",
+        help="production Docker Compose file containing the fixed 'postgres' service",
     )
     parser.add_argument("--production-database", default=os.getenv("POSTGRES_DB", "guanxian"))
     parser.add_argument("--user", default=os.getenv("POSTGRES_USER", "guanxian"))
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", action="store_true", help="validate and print the plan; this is the default")
     mode.add_argument("--execute", action="store_true", help="run the guarded restore drill")
+    parser.add_argument(
+        "--report",
+        type=Path,
+        help="write a traceable JSON report after a successful executed drill",
+    )
     return parser.parse_args(argv)
 
 
@@ -237,18 +288,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.execute:
             print(json.dumps(describe_plan(plan), ensure_ascii=False, indent=2))
             return 0
-        execute_restore(plan, confirm_target=args.confirm_target, environment=os.environ)
-        print(
-            json.dumps(
-                {
-                    "status": "verified",
-                    "archive": str(plan.archive),
-                    "targetDatabase": plan.target_database,
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-        )
+        report = execute_restore(plan, confirm_target=args.confirm_target, environment=os.environ)
+        if args.report:
+            report["report"] = str(write_report_atomic(args.report, report))
+        print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
     except (OperationSafetyError, OSError, RuntimeError) as error:
         print(f"ERROR: {error}", file=sys.stderr)

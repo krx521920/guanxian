@@ -8,12 +8,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.nio.charset.StandardCharsets;
 import java.util.stream.Stream;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -158,6 +160,29 @@ class ApiSecurityIntegrationTest {
         mockMvc.perform(get("/api/v1/collaborations").with(httpBasic("observer", "observer123")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void associationReviewerPermissionCanGenerateAndCloseScopedMatches() throws Exception {
+        var reviewer = jwt().authorities(
+                new SimpleGrantedAuthority("ROLE_ASSOCIATION_ADMIN"),
+                new SimpleGrantedAuthority("MEMBER_REVIEW"));
+        String unknown = "00000000-0000-0000-0000-00000000d099";
+
+        mockMvc.perform(post("/api/v1/matches/demand/{id}/generate", unknown)
+                        .with(reviewer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        mockMvc.perform(post("/api/v1/matches/{id}/close", unknown)
+                        .with(reviewer)
+                        .header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"审核关闭\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
     }
 
     private static Stream<Arguments> validAccounts() {

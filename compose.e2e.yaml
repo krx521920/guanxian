@@ -1,0 +1,71 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ci-admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ci-only-keycloak-password
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "${BIND_HOST:-127.0.0.1}:${KEYCLOAK_PORT:-18081}:8080"
+    volumes:
+      - ./tests/identity/keycloak-ci-realm.json:/opt/keycloak/data/import/guanxian-ci-realm.json:ro
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000;
+          printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3;
+          grep -q ' 200 ' <&3
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 30s
+    restart: unless-stopped
+
+  server:
+    environment:
+      SPRING_PROFILES_ACTIVE: e2e
+      GUANXIAN_JWT_ISSUER_URI: http://127.0.0.1:18081/realms/guanxian-ci
+      GUANXIAN_JWT_JWK_SET_URI: http://keycloak:8080/realms/guanxian-ci/protocol/openid-connect/certs
+      GUANXIAN_STORAGE_ENDPOINT: http://minio:9000
+      GUANXIAN_STORAGE_REDIS_URL: redis://redis:6379
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  e2e-seed:
+    profiles: ["app"]
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-guanxian}
+      POSTGRES_USER: ${POSTGRES_USER:-guanxian}
+    volumes:
+      - ./tests/e2e/postgres-seed.sql:/seed/postgres-seed.sql:ro
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        attempt=0
+        until psql -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -Atc "select 1 from pg_constraint where conname='notification_message_status_ck'" | grep -q 1; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 60 ]; then
+            echo 'Timed out waiting for the V19 database schema.' >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        psql --single-transaction -v ON_ERROR_STOP=1 -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -f /seed/postgres-seed.sql
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    depends_on:
+      e2e-seed:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy

@@ -7,6 +7,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface EcosystemWorkflowStore {
+    default void registerMatchContext(PersistedMatchView match, UUID associationId) {
+    }
+
     MatchInvitationView createInvitation(
             UUID matchId, UUID associationId, UUID senderEnterpriseId,
             MatchInvitationRequest request, ActorScope actor);
@@ -14,6 +17,13 @@ interface EcosystemWorkflowStore {
     List<MatchInvitationView> invitations(UUID matchId, ActorScope actor);
 
     Optional<MatchInvitationView> findInvitation(UUID invitationId, ActorScope actor);
+
+    List<MatchInvitationView> expirePendingInvitations(UUID matchId, ActorScope actor);
+
+    List<MatchInvitationView> cancelPendingInvitations(
+            UUID matchId, String reason, ActorScope actor);
+
+    boolean hasPendingInvitation(UUID matchId, ActorScope actor);
 
     Optional<MatchInvitationView> respondInvitation(
             UUID invitationId, long expectedVersion, boolean accepted, String comment, ActorScope actor);
@@ -24,11 +34,21 @@ interface EcosystemWorkflowStore {
 
     List<NegotiationView> negotiations(UUID matchId, ActorScope actor);
 
-    MatchFeedbackView upsertFeedback(
-            UUID matchId, UUID enterpriseId, MatchFeedbackRequest request, ActorScope actor);
+    Optional<NegotiationView> latestNegotiation(UUID matchId, ActorScope actor);
+
+    Optional<MatchFeedbackView> feedbackByEnterprise(
+            UUID matchId, UUID enterpriseId, ActorScope actor);
+
+    Optional<MatchFeedbackView> upsertFeedback(
+            UUID matchId, UUID enterpriseId, Long expectedVersion,
+            MatchFeedbackRequest request, ActorScope actor);
+
+    List<MatchFeedbackView> feedback(UUID matchId, ActorScope actor);
 
     OutcomeArchiveView archive(
             UUID matchId, UUID associationId, OutcomeArchiveRequest request, ActorScope actor);
+
+    boolean hasActiveOutcome(UUID matchId, ActorScope actor);
 
     List<OutcomeArchiveView> outcomes(UUID matchId, ActorScope actor);
 }

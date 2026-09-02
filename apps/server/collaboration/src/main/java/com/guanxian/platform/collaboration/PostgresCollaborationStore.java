@@ -26,7 +26,7 @@ class PostgresCollaborationStore implements CollaborationStore {
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() { };
     private static final TypeReference<Map<String, Object>> MAP = new TypeReference<>() { };
     private static final String SELECT = """
-            SELECT c.id, c.association_id, c.enterprise_id, c.title,
+            SELECT c.id, c.association_id, c.enterprise_id, c.match_id, c.title,
                    c.participants::text AS participants,
                    coalesce(c.owner_subject, u.display_name) AS owner,
                    c.status, c.priority, c.next_action, c.due_at, c.progress,
@@ -46,25 +46,96 @@ class PostgresCollaborationStore implements CollaborationStore {
 
     @Override
     public List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
-        MapSqlParameterSource values = params(actor, query).addValue("offset", offset).addValue("limit", limit);
-        return jdbc.query(SELECT + where(actor, query, includeDeleted)
+            ActorScope actor, String query, String stage,
+            boolean includeDeleted, long offset, int limit) {
+        MapSqlParameterSource values = params(actor, query, stage)
+                .addValue("offset", offset).addValue("limit", limit);
+        return jdbc.query(SELECT + where(actor, query, stage, includeDeleted)
                 + " ORDER BY c.updated_at DESC, c.id LIMIT :limit OFFSET :offset", values, mapper);
     }
 
     @Override
-    public long count(ActorScope actor, String query, boolean includeDeleted) {
+    public long count(ActorScope actor, String query, String stage, boolean includeDeleted) {
         Long count = jdbc.queryForObject("SELECT count(*) FROM collaboration_task c"
-                + where(actor, query, includeDeleted), params(actor, query), Long.class);
+                + where(actor, query, stage, includeDeleted), params(actor, query, stage), Long.class);
         return count == null ? 0 : count;
     }
 
     @Override
     public Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted) {
         List<CollaborationView> values = jdbc.query(
-                SELECT + where(actor, null, includeDeleted) + " AND c.id=:id",
-                params(actor, null).addValue("id", id), mapper);
+                SELECT + where(actor, null, null, includeDeleted) + " AND c.id=:id",
+                params(actor, null, null).addValue("id", id), mapper);
         return values.stream().findFirst();
+    }
+
+    @Override
+    public boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
+        return matchScopeExists(matchId, associationId, enterpriseId, true);
+    }
+
+    @Override
+    public boolean canAccessLinkedMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
+        return matchScopeExists(matchId, associationId, enterpriseId, false);
+    }
+
+    @Override
+    public boolean linkedMatchParticipantsOperational(UUID matchId) {
+        if (matchId == null) {
+            return true;
+        }
+        Boolean operational = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                      JOIN enterprise de ON de.id=d.enterprise_id
+                      JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                     WHERE m.id=:matchId
+                       AND d.enterprise_id<>m.candidate_enterprise_id
+                       AND de.status='ACTIVE' AND de.deleted_at IS NULL
+                       AND ce.status='ACTIVE' AND ce.deleted_at IS NULL
+                )
+                """, new MapSqlParameterSource("matchId", matchId), Boolean.class);
+        return Boolean.TRUE.equals(operational);
+    }
+
+    private boolean matchScopeExists(
+            UUID matchId, UUID associationId, UUID enterpriseId, boolean requireLinkableState) {
+        if (matchId == null) {
+            return true;
+        }
+        String lifecycleScope = requireLinkableState ? """
+                       AND m.deleted_at IS NULL
+                       AND d.deleted_at IS NULL
+                       AND m.disabled_at IS NULL
+                       AND m.state IN ('CONFIRMED','INVITED','NEGOTIATING','OUTCOME_PENDING')
+                       AND m.demand_confirmed_at IS NOT NULL
+                       AND m.candidate_confirmed_at IS NOT NULL
+                       AND de.status='ACTIVE' AND de.deleted_at IS NULL
+                       AND ce.status='ACTIVE' AND ce.deleted_at IS NULL
+                """ : "";
+        Boolean allowed = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM ecosystem_match m
+                      JOIN cooperation_demand d ON d.id=m.demand_id
+                      JOIN enterprise de ON de.id=d.enterprise_id
+                      JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                     WHERE m.id=:matchId
+                       AND ((de.association_id=:associationId
+                              AND (CAST(:enterpriseId AS UUID) IS NULL
+                                   OR d.enterprise_id=:enterpriseId))
+                            OR (ce.association_id=:associationId
+                              AND (CAST(:enterpriseId AS UUID) IS NULL
+                                   OR m.candidate_enterprise_id=:enterpriseId)))
+                """ + lifecycleScope + """
+                )
+                """, new MapSqlParameterSource()
+                .addValue("matchId", matchId)
+                .addValue("associationId", associationId)
+                .addValue("enterpriseId", enterpriseId), Boolean.class);
+        return Boolean.TRUE.equals(allowed);
     }
 
     @Override
@@ -75,10 +146,10 @@ class PostgresCollaborationStore implements CollaborationStore {
                 .addValue("id", id).addValue("associationId", associationId).addValue("enterpriseId", enterpriseId);
         jdbc.update("""
                 INSERT INTO collaboration_task (
-                    id, association_id, enterprise_id, owner_subject, title,
+                    id, association_id, enterprise_id, match_id, owner_subject, title,
                     participants, priority, next_action, progress, status, due_at)
                 VALUES (
-                    :id, :associationId, :enterpriseId, :owner, :title,
+                    :id, :associationId, :enterpriseId, :matchId, :owner, :title,
                     CAST(:participants AS jsonb), :priority, :nextAction, :progress, 'DRAFT', :dueAt)
                 """, values);
         return find(id, actor, false).orElseThrow();
@@ -90,6 +161,7 @@ class PostgresCollaborationStore implements CollaborationStore {
         int updated = jdbc.update("""
                 UPDATE collaboration_task
                    SET title=:title, participants=CAST(:participants AS jsonb), owner_subject=:owner,
+                       match_id=:matchId,
                        priority=:priority, next_action=:nextAction, due_at=:dueAt, progress=:progress,
                        version=version+1, updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NULL
@@ -105,7 +177,10 @@ class PostgresCollaborationStore implements CollaborationStore {
                    SET status=:stage,
                        disabled_at=CASE WHEN :disabled THEN now() ELSE NULL END,
                        completed_at=CASE WHEN :stage='COMPLETED' THEN now() ELSE NULL END,
-                       progress=CASE WHEN :stage='COMPLETED' THEN 100 ELSE progress END,
+                       progress=CASE
+                           WHEN :stage='COMPLETED' THEN 100
+                           WHEN status='COMPLETED' AND :stage='OPEN' THEN LEAST(progress, 99)
+                           ELSE progress END,
                        version=version+1, updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NULL
                 """, new MapSqlParameterSource().addValue("id", id).addValue("expectedVersion", expectedVersion)
@@ -128,7 +203,8 @@ class PostgresCollaborationStore implements CollaborationStore {
         int updated = jdbc.update("""
                 UPDATE collaboration_task
                    SET deleted_at=NULL, disabled_at=NULL, completed_at=NULL,
-                       status='DRAFT', version=version+1, updated_at=now()
+                       status='DRAFT', progress=LEAST(progress, 99),
+                       version=version+1, updated_at=now()
                  WHERE id=:id AND version=:expectedVersion AND deleted_at IS NOT NULL
                 """, new MapSqlParameterSource().addValue("id", id).addValue("expectedVersion", expectedVersion));
         return updated == 0 ? Optional.empty() : find(id, actor, false);
@@ -217,41 +293,95 @@ class PostgresCollaborationStore implements CollaborationStore {
         jdbc.update("""
                 INSERT INTO audit_log (
                     actor_user_id, actor_subject, actor_username, association_id,
-                    enterprise_id, action, resource_type, resource_id, details, request_id)
+                    enterprise_id, action, resource_type, resource_id, resource_version,
+                    outcome, details, request_id)
                 VALUES (
-                    :actorUserId, :subject, :actorUsername, :associationId,
+                    (SELECT id FROM user_account WHERE id = :actorUserId),
+                    :subject, COALESCE(:actorUsername, :subject), :associationId,
                     :enterpriseId, :action, 'COLLABORATION_TASK',
-                    CAST(:collaborationId AS varchar), CAST(:snapshot AS jsonb), :requestId)
+                    CAST(:collaborationId AS varchar), :version, 'SUCCESS',
+                    CAST(:snapshot AS jsonb), COALESCE(:requestId, 'internal'))
                 """, values);
     }
 
-    private String where(ActorScope actor, String query, boolean includeDeleted) {
+    private String where(
+            ActorScope actor, String query, String stage, boolean includeDeleted) {
         StringBuilder sql = new StringBuilder(" WHERE ");
         if (actor.isSystemAdmin()) {
-            sql.append("TRUE");
+            if (actor.associationId() == null) {
+                sql.append("TRUE");
+            } else {
+                sql.append("((c.match_id IS NULL AND c.association_id=:associationId");
+                if (actor.enterpriseId() != null) sql.append(" AND c.enterprise_id=:enterpriseId");
+                sql.append(") OR (c.match_id IS NOT NULL AND ")
+                        .append(linkedMatchScope(actor.enterpriseId() != null)).append("))");
+            }
         } else if (actor.isAssociationStaff()) {
-            sql.append("c.association_id=:associationId");
+            sql.append("((c.match_id IS NULL AND c.association_id=:associationId)")
+                    .append(" OR (c.match_id IS NOT NULL AND ")
+                    .append(linkedMatchScope(false)).append("))");
         } else if (actor.associationId() != null) {
-            sql.append("c.association_id=:associationId")
-                    .append(" AND (c.enterprise_id IS NULL OR c.enterprise_id=:enterpriseId)");
+            sql.append("((c.match_id IS NULL AND c.association_id=:associationId")
+                    .append(" AND (c.enterprise_id=:enterpriseId OR c.enterprise_id IS NULL))")
+                    .append(" OR (c.match_id IS NOT NULL AND ")
+                    .append(linkedMatchScope(true)).append("))");
         } else {
             sql.append("FALSE");
         }
         if (!includeDeleted) {
             sql.append(" AND c.deleted_at IS NULL");
         }
+        if (!actor.isSystemAdmin() && !actor.isAssociationStaff()) {
+            sql.append(" AND EXISTS (")
+                    .append("SELECT 1 FROM enterprise actor_enterprise ")
+                    .append("WHERE actor_enterprise.id=:enterpriseId ")
+                    .append("AND actor_enterprise.status='ACTIVE' ")
+                    .append("AND actor_enterprise.deleted_at IS NULL)");
+        }
         if (query != null && !query.isBlank()) {
             sql.append(" AND (lower(c.title) LIKE :query")
                     .append(" OR lower(coalesce(c.owner_subject,'')) LIKE :query")
                     .append(" OR lower(c.participants::text) LIKE :query)");
         }
+        if (stage != null && !stage.isBlank()) {
+            if ("ACTIVE".equals(stage)) {
+                sql.append(" AND c.status NOT IN ('COMPLETED', 'DISABLED')");
+            } else {
+                sql.append(" AND c.status=:stage");
+            }
+        }
         return sql.toString();
     }
 
-    private MapSqlParameterSource params(ActorScope actor, String query) {
+    private static String linkedMatchScope(boolean enterpriseScoped) {
+        String participantScope = enterpriseScoped
+                ? "((scope_demand.enterprise_id=:enterpriseId "
+                    + "AND scope_demand_enterprise.association_id=:associationId) "
+                    + "OR (scope_match.candidate_enterprise_id=:enterpriseId "
+                    + "AND scope_candidate_enterprise.association_id=:associationId))"
+                : "(scope_demand_enterprise.association_id=:associationId "
+                    + "OR scope_candidate_enterprise.association_id=:associationId)";
+        return "EXISTS (SELECT 1 FROM ecosystem_match scope_match "
+                + "JOIN cooperation_demand scope_demand ON scope_demand.id=scope_match.demand_id "
+                + "JOIN enterprise scope_demand_enterprise "
+                + "ON scope_demand_enterprise.id=scope_demand.enterprise_id "
+                + "JOIN enterprise scope_candidate_enterprise "
+                + "ON scope_candidate_enterprise.id=scope_match.candidate_enterprise_id "
+                + "WHERE scope_match.id=c.match_id AND " + participantScope
+                + (enterpriseScoped
+                    ? " AND scope_demand_enterprise.status='ACTIVE' "
+                      + "AND scope_demand_enterprise.deleted_at IS NULL "
+                      + "AND scope_candidate_enterprise.status='ACTIVE' "
+                      + "AND scope_candidate_enterprise.deleted_at IS NULL"
+                    : "")
+                + ")";
+    }
+
+    private MapSqlParameterSource params(ActorScope actor, String query, String stage) {
         return new MapSqlParameterSource().addValue("associationId", actor.associationId())
                 .addValue("enterpriseId", actor.enterpriseId())
-                .addValue("query", query == null ? null : "%" + query.trim().toLowerCase() + "%");
+                .addValue("query", query == null ? null : "%" + query.trim().toLowerCase() + "%")
+                .addValue("stage", stage);
     }
 
     private MapSqlParameterSource valueParams(CollaborationUpsertRequest request, ActorScope actor) {
@@ -259,6 +389,7 @@ class PostgresCollaborationStore implements CollaborationStore {
                 .addValue("participants", json(cleanList(request.participants())))
                 .addValue("owner", owner(request.owner(), actor)).addValue("priority", priority(request.priority()))
                 .addValue("nextAction", clean(request.nextAction()))
+                .addValue("matchId", request.matchId())
                 .addValue("dueAt", request.dueDate() == null ? null
                         : Timestamp.from(request.dueDate().atStartOfDay(ZoneOffset.UTC).toInstant()))
                 .addValue("progress", request.progress() == null ? 0 : request.progress());
@@ -268,7 +399,8 @@ class PostgresCollaborationStore implements CollaborationStore {
         Timestamp dueAt = rs.getTimestamp("due_at");
         return new CollaborationView(
                 rs.getObject("id", UUID.class), rs.getObject("association_id", UUID.class),
-                rs.getObject("enterprise_id", UUID.class), rs.getString("title"),
+                rs.getObject("enterprise_id", UUID.class), rs.getObject("match_id", UUID.class),
+                rs.getString("title"),
                 readList(rs.getString("participants")), rs.getString("owner"), rs.getString("status"),
                 rs.getString("priority"), rs.getString("next_action"),
                 dueAt == null ? null : dueAt.toInstant().atZone(ZoneOffset.UTC).toLocalDate(),

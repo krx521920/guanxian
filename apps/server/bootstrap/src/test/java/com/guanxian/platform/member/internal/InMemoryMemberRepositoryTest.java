@@ -11,12 +11,11 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InMemoryMemberRepositoryTest {
     @Test
-    void storesReplacesAndDeletesMemberSnapshotsById() {
+    void storesAndReplacesMemberSnapshotsById() {
         var repository = new InMemoryMemberRepository();
         UUID id = UUID.randomUUID();
         MemberProfile first = member(id, "初始企业", 0);
@@ -30,9 +29,6 @@ class InMemoryMemberRepositoryTest {
         assertEquals(updated, repository.findById(id).orElseThrow());
         assertEquals(1, repository.findAll().size());
 
-        assertTrue(repository.deleteById(id, 1));
-        assertTrue(repository.findById(id).isEmpty());
-        assertFalse(repository.deleteById(id, 1));
     }
 
     @Test
@@ -73,6 +69,6 @@ class InMemoryMemberRepositoryTest {
         return new MemberProfile(
                 id, UUID.fromString("00000000-0000-0000-0000-000000000100"),
                 name, "91110000TEST000001", "测试单位", null, null, null, null,
-                List.of(), List.of(), List.of(), "MEMBERS", "ACTIVE", version, now, now);
+                List.of(), List.of(), List.of(), "MEMBERS", "ACTIVE", version, now, now, null, null, null);
     }
 }

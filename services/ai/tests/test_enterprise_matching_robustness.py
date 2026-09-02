@@ -1,3 +1,4 @@
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -203,6 +204,7 @@ def test_missing_required_qualification_always_makes_candidate_ineligible(client
     assert "缺少要求资质：安全生产许可证" in match["missing_conditions"]
 
 
+@pytest.mark.fuzz
 @given(
     title=SHORT_TEXT,
     scenario=SHORT_TEXT,

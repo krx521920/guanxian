@@ -1,6 +1,6 @@
 # 管线智联后端
 
-北京地下管线协会 AI 管理协作平台的 Java 21 / Spring Boot 3 模块化单体后端。会员档案默认持久化到 PostgreSQL，数据库结构由 Flyway 管理；生产认证默认使用 OIDC/JWT。
+北京地下管线协会管理协作平台的 Java 21 / Spring Boot 3 模块化单体后端。会员档案默认持久化到 PostgreSQL，数据库结构由 Flyway 管理；生产认证默认使用 OIDC/JWT。
 
 ## 模块划分
 
@@ -10,10 +10,10 @@
 | `shared-kernel` | 统一响应、业务异常、参数校验错误结构、请求追踪过滤器 |
 | `iam` | OIDC/JWT 资源服务器、账号绑定、协会/企业数据域、RBAC 与安全错误响应 |
 | `member` | 会员档案、Excel 采集、审核、审计、可见范围及生态查询接口 |
-| `policy` | 政策标准列表与检索 |
-| `ecosystem` | 生态匹配列表、匹配请求、可解释规则评分 |
-| `collaboration` | 协作事项列表，后续承接受理、跟进、反馈闭环 |
-| `ai-adapter` | AI 能力端口与本地规则实现，后续可替换为独立 Python AI 服务 |
+| `policy` | 政策标准持久化、审核发布、协会数据域、影响分析入口与订阅关联 |
+| `ecosystem` | 产品/服务与需求目录、持久化匹配、双方确认、邀请、洽谈、反馈和成果归档 |
+| `collaboration` | 协作事项受理、指派、状态流转、关闭、恢复、历史与审计 |
+| `ai-adapter` | 文档解析、分段、Embedding 适配、引用检索、模型供应商门禁与降级 |
 
 依赖方向保持为 `bootstrap -> 业务模块 -> shared-kernel`；`ecosystem` 只通过 `member.api.MemberDirectory` 读取企业资料，通过 `AiTextService` 使用 AI 能力，避免直接访问其他模块的内部存储。
 
@@ -27,22 +27,27 @@ mvn clean verify
 mvn -pl bootstrap -am spring-boot:run
 ```
 
-应用启动时由 Flyway 按顺序执行 V1–V3：基础结构、会员档案扩展、OIDC 数据域/审计/批量导入。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移；迁移使用幂等 DDL，并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+应用启动时由 Flyway 按顺序执行 V1–V23，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除、知识向量持久化、身份生命周期约束、政策协会归属约束及分协会通知订阅唯一键。V16–V20 固化政策影响、跨协会协作、匹配闭环、通知和附件状态不变量；V21 增加会员正式模板版本、来源文件 SHA-256、提交单位及企业、产品/服务/场景字段，并为知识文档增加审核、软删除、生命周期版本与历史；V22 持久化分协会 RAG 评测；V23 为接入申请和企业共享同意补齐 ETag 版本。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移并保留已有企业记录。后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+
+V16–V18 会在 DDL 生效前检查历史数据。除 V16/V17 的协会与跨协会授权约束外，V18 会拒绝同企业供需、绕过推荐或双方确认的父状态、错绑参与方/协会、状态与应答字段矛盾或提前携带应答文本的邀请、普通洽谈跳级或终态后追加、非参与企业反馈、成功反馈携带关闭原因、失败反馈缺少原因、单方成功即归档及非法结果类型/可见范围；接受邀请后首条 `TERMINATED` 是允许的明确终止路径。邀请请求字段和终态、匹配推荐/确认事实、成果归档主体/时间均不可通过增加版本号改写；拒绝、取消或终止原因必须与父匹配关闭原因一致。`MATCH` 跨协会字段白名单在 V18 中仅新增 `outcomes`，其他未声明字段继续拒绝。歧义数据会以可操作的 `DETAIL`/`HINT` 失败并整体回滚；不得用 `flyway repair`、修改迁移历史或无审核批量更新来绕过。V17 不会在迁移时静默改写单个已过期但仍标记 `ACTIVE` 的旧授权；V18 也不会替存量匹配伪造推荐、确认、邀请或成果事实。能从旧字段唯一确定的反馈 `updated_at` 仅取原 `submitted_at`，其余业务事实必须由负责人核验后修正。
 
 生产默认 `GUANXIAN_SECURITY_MODE=jwt`。必须配置：
 
 - `GUANXIAN_JWT_ISSUER_URI`：令牌 `iss` 的精确值。
 - `GUANXIAN_JWT_JWK_SET_URI`：身份提供方公开密钥地址。
 - `GUANXIAN_JWT_PRINCIPAL_CLAIM`：默认 `preferred_username`。
+- `GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS`：可选、逗号分隔的精确 IdP `sub` 白名单；默认空并拒绝所有未绑定系统管理员，仅用于首次建号。
 - JWT 的 `roles`、`realm_access.roles` 或 `permissions` 声明；后端只接受平台白名单角色和权限。
 
-开发或自动化测试必须显式设置 `GUANXIAN_SECURITY_MODE=demo` 和 `GUANXIAN_MEMBER_REPOSITORY=memory`。演示模式在 `prod` / `production` Profile 下会拒绝启动；默认配置和 Compose 均使用 PostgreSQL + JWT。
+纯单元测试可显式使用 `GUANXIAN_SECURITY_MODE=demo` 和 `GUANXIAN_MEMBER_REPOSITORY=memory`；PostgreSQL 集成测试使用 demo 身份配合真实 PostgreSQL Testcontainers。演示模式在 `prod` / `production` Profile 下会拒绝启动；默认配置和 Compose 均使用 PostgreSQL + JWT。
 
 默认监听 `http://localhost:8080`，公开健康检查：
 
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
+
+该接口聚合 PostgreSQL、MinIO、Redis 和 OIDC/JWK 依赖状态：全部可用时返回 200；任一必需依赖不可用时返回 503 与稳定错误码 `DEPENDENCY_UNAVAILABLE`，不向未认证调用方泄露内部异常、地址或凭据。
 
 ## 首批接口
 
@@ -57,8 +62,20 @@ curl http://localhost:8080/api/v1/health
 | GET | `/api/v1/members/import-template` | `MEMBER_IMPORT` |
 | POST | `/api/v1/members/imports/preview` | `MEMBER_IMPORT`，XLSX 预检 |
 | GET/POST | `/api/v1/members/imports/{batchId}` / `.../commit` | 查看预检 / 提交合法行 |
+| GET | `/api/v1/members/{id}/provenance` | 数据域内查看来源文件、提交单位、时间、行号及审核信息 |
+| GET | `/api/v1/knowledge/documents` | 当前协会上下文内分页查看知识文档，可选择包含软删除记录 |
+| POST | `/api/v1/knowledge/documents/{id}/submit` / `.../review` | 知识送审/审核，必须携带 `If-Match` |
+| POST/DELETE | `/api/v1/knowledge/documents/{id}/disable` / `.../archive` / `.../restore` / 文档本身 | 停用、归档、恢复和软删除，必须携带 `If-Match` |
+| POST | `/api/v1/knowledge/documents/{id}/reparse` / `.../reembed` | 重新解析来源附件/重新生成 Embedding，必须携带 `If-Match` |
+| GET/POST | `/api/v1/knowledge/readiness` / `/api/v1/knowledge/evaluations` | 查看对外名称闸门 / 用真实协会资料执行评测 |
 | GET | `/api/v1/audit-logs` | `AUDIT_READ`，按协会数据域过滤 |
-| GET/POST | `/api/v1/access-bindings` | JWT 模式系统管理员绑定 OIDC 身份 |
+| GET/POST | `/api/v1/access-bindings` | JWT 模式系统管理员查询/绑定 OIDC 身份；修改既有账号必须携带 `If-Match` |
+| GET | `/api/v1/access-bindings/page` | 系统管理员按当前协会/企业上下文分页查看账号绑定 |
+| PUT | `/api/v1/access-bindings/{id}/disable` / `.../restore` | 显式停用/恢复账号绑定，必须携带 `If-Match` |
+| DELETE | `/api/v1/access-bindings/{id}` | 解绑 OIDC `sub` 并冻结账号，必须携带 `If-Match` |
+| GET | `/api/v1/cross-associations/{resource}/page` | 接入申请、关系、字段策略、企业同意和推荐台账分页查询 |
+| PUT | `/api/v1/cross-associations/access-requests/{id}/review` / `.../cancel` | 必须携带 `If-Match`；成功返回新 ETag |
+| DELETE | `/api/v1/cross-associations/consents/{id}` | 企业撤销逐资源授权，必须携带 `If-Match` |
 | 同上 | `/api/v1/enterprises/**` | 企业 CRUD 兼容别名 |
 | GET | `/api/v1/policies` | `POLICY_READ` |
 | GET/POST | `/api/v1/matches` | `MATCH_REQUEST` |
@@ -95,7 +112,7 @@ curl -u enterprise-admin:enterprise123 \
 
 生产 Profile 会将控制台日志输出为 Logstash JSON，每行带应用名和 MDC 中的 `requestId`；请由部署环境的日志代理转送到集中日志系统。Micrometer Prometheus 指标已启用 HTTP 请求直方图，`/actuator/prometheus` 必须使用拥有 `OBSERVABILITY_READ` 的短期 OIDC 服务令牌读取，不能把它暴露给公网或匿名抓取器。
 
-会员企业状态只接受 `ACTIVE`、`PENDING_REVIEW`、`INCOMPLETE`、`DISABLED`（忽略大小写及首尾空白）。协会管理员或系统管理员手工新增时空值按 `ACTIVE` 处理；协会运营人员新增、企业自助修改和 Excel 导入统一进入 `PENDING_REVIEW`，由协会管理员审核。统一社会信用代码入库前会去除首尾空白并转为大写，唯一性判断使用规范化后的值。
+会员企业状态只接受 `ACTIVE`、`PENDING_REVIEW`、`INCOMPLETE`、`DISABLED`（忽略大小写及首尾空白）。协会管理员或已选定协会上下文的系统管理员手工新增时空值按 `ACTIVE` 处理；请求体中的归属不能覆盖系统管理员当前上下文。协会运营人员新增、企业自助修改和 Excel 导入统一进入 `PENDING_REVIEW`，由协会管理员审核。统一社会信用代码入库前会去除首尾空白并转为大写，唯一性判断使用规范化后的值。
 
 会员应用服务通过模块内部 `MemberRepository` 端口访问数据。默认 `PostgresMemberRepository` 使用 JDBC 映射 JSONB 列，并由数据库唯一索引和版本条件语句保证跨实例一致性；`InMemoryMemberRepository` 只在测试配置中创建。
 
@@ -104,13 +121,27 @@ curl -u enterprise-admin:enterprise123 \
 `capabilities`、`products` 和 `cooperationNeeds` 每个列表最多 50 项，元素仍执行各自长度限制，避免单个企业档案形成无界集合。
 ### 身份绑定、数据范围与审计
 
-JWT 模式以令牌 `sub` 精确绑定 `user_account.external_subject`。协会身份必须绑定 `association_id`，企业身份还必须绑定 `enterprise_id`；缺失时分别返回 `IDENTITY_NOT_BOUND` 或 `IDENTITY_SCOPE_INCOMPLETE`。系统管理员保留不绑定企业的引导身份，用于首次建立账号绑定；该身份应只由受控的 IdP 管理员角色签发。
+JWT 模式以令牌 `sub` 精确绑定 `user_account.external_subject`。账号必须处于 `ACTIVE`，所属协会也必须处于 `ACTIVE`；企业账号在企业为 `DISABLED`、`DELETED` 或已有删除时间时立即失去数据范围。`DRAFT`、`INCOMPLETE`、`PENDING_REVIEW` 企业仍可登录补充并提交资料。协会身份必须绑定 `association_id`，企业身份还必须绑定 `enterprise_id`；缺失时分别返回 `IDENTITY_NOT_BOUND` 或 `IDENTITY_SCOPE_INCOMPLETE`，组织被冻结时返回 `IDENTITY_SCOPE_INACTIVE`。系统管理员也必须绑定一个 `ACTIVE` 账号；唯一例外是 `GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS` 中精确列出的未绑定 `sub`，用于首次建立账号绑定。空配置或非名单主体一律返回 `IDENTITY_NOT_BOUND`，已停用或已撤销主体即使仍在白名单也不能进入。
+
+账号状态与企业状态相互独立：恢复企业不会自动恢复曾被人工停用的账号。账号停用、恢复和解绑均使用强 ETag 乐观锁并写入审计；解绑会清除 `external_subject` 并将账号置为 `INACTIVE`，因此旧令牌中的 `sub` 无法继续解析。重新绑定一个已停用/已解绑账号不会隐式激活，必须由系统管理员再次显式恢复。
+
+系统管理员通过 `X-Guanxian-Association-Id` 和可选的 `X-Guanxian-Enterprise-Id` 进入代管上下文。未选择协会时只允许全平台读取，所有业务写入均拒绝；选择协会后读写范围收窄到该协会；继续选择企业后，企业级资源与匹配参与数据进一步收窄到该企业。路径、查询参数和请求体中的协会或企业标识只能与请求头上下文一致，不能临时扩权。
 
 企业管理员只能修改其绑定企业；协会工作人员只能操作本协会数据，且只有协会管理员可以审核或删除。可见范围为 `PRIVATE`、`ASSOCIATION`、`PARTNERS`、`MEMBERS`、`PUBLIC`：友好协会访问由 `association_relationship` 的启用关系控制。创建、修改、审核、删除、导入预检/提交和账号绑定均写审计日志，并携带操作主体、协会、企业和 `X-Request-Id`。
 
 ### 106 家会员资料采集
 
-调查模板为 XLSX，单文件最大 5 MiB、最多 500 条有效数据行，拒绝公式单元格和被修改的表头。上传先生成持久化预检批次，逐行返回校验与重复错误；提交只导入标记为 `VALID` 的行，所有新企业进入待审核。批次提交使用事务和行锁/CAS 防止重复提交，导入后仍需协会管理员审核，不会自动认证。
+正式调查模板版本冻结为 `GX-MEMBER-SURVEY-2026-01`。工作簿将提交单位、模板版本、企业简介、产品、服务、合作需求、应用场景和联系人信息分列；单文件最大 5 MiB、最多 500 条有效数据行，拒绝公式单元格、版本不匹配和被修改的表头。上传先生成持久化预检批次，逐行返回格式错误、文件内重复信用代码和库内重复冲突；提交只导入标记为 `VALID` 的行，所有新企业进入待审核。
+
+批次保存原始文件名、SHA-256、模板版本、提交单位、提交企业、提交主体和时间；成功行保留工作表行号，可由企业档案的 provenance 接口追溯。批次提交使用事务和行锁/CAS 防止重复提交。生产操作顺序必须是“企业回表 → 预生产预检/去重 → 协会逐家审核 → 正式库”，导入不会自动认证，也不能绕过协会审核。
+
+### 知识治理与 RAG 发布闸门
+
+知识文档只允许在已选定协会上下文中管理和检索。新建文档固定为 `DRAFT`，经 `PENDING_REVIEW` 审核通过后才成为 `PUBLISHED` 并进入检索；支持停用、归档、软删除、恢复、从已校验附件重新解析及重新生成 Embedding。生命周期操作使用强 ETag，历史动作写入 `knowledge_document_history`。系统管理员的特权访问也不会跨越所选协会。
+
+附件只有完成内容验证且生产 ClamAV 扫描成功后才能进入知识库；`PENDING`、`REQUIRES_REUPLOAD` 或扫描失败内容一律失败关闭。模型密钥通过生产编排的只读 secret/configtree 文件注入，不写入环境样例或镜像。外部 Embedding 与生成模型共用数据出境开关、单次费用阈值和 `model_execution` 执行审计。
+
+每个协会必须用已审核发布的真实资料建立评测集，至少 10 例且同时包含有证据题和拒答题。当前发布阈值为证据召回率不低于 0.85、引用精确率不低于 0.95、拒答正确率不低于 0.95；最新一次评测未达标或尚无评测时，readiness 只允许 `ASSOCIATION_COLLABORATION_PLATFORM`。Python `/api/v1/qa/policy` 固定返回 503，不参与降级答复；Java `ai-adapter` 是唯一正式 RAG 实现。
 
 ## 自动化测试与变异测试
 
@@ -141,7 +172,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-当前基线（2026-08-21）：常规 `verify` 发现 84 项测试，83 项通过，1 项 PostgreSQL/Testcontainers 迁移测试因本机 Docker 不可用而明确跳过；其余失败和错误均为 0。完整 PIT 对 576 个变异体进行验证，杀死 379 个、存活 108 个、无覆盖 89 个，变异得分 65.80%，已覆盖代码的测试强度为 77.82%。权限策略的存活变异已清零；剩余低分主要集中在本机未执行的 PostgreSQL 适配器、XLSX 防御分支及部分基础展示代码。CI 必须提供 Docker 并把迁移测试作为门禁，PIT 报告以本次 `bootstrap/target/pit-reports/` 产物为准。
+2026-09-02 当前变更的普通全量回归生成 69 份 Surefire 报告，共 349 项测试全部通过，失败 0、错误 0、跳过 0；其中 62 项 Testcontainers 已连接真实 Docker 执行。前端 210 项单测、类型检查和构建通过，Playwright 的 8 条真实业务 E2E 也已在 PostgreSQL、MinIO、Redis、隔离 Keycloak/OIDC 联合环境全部通过。Flyway V1–V23 已完成本轮复验；正式 IdP、ClamAV、生产编排与网络、备份恢复、真实告警和真实语料评测完成前，仍不得声明生产闭环或对外使用“AI 平台”名称。
 
 ## Docker
 
@@ -151,10 +182,10 @@ docker build -t guanxian-server:dev .
 docker run --rm -p 8080:8080 guanxian-server:dev
 ```
 
-## 下一阶段
+## 后续生产上线闸门
 
-1. 将系统管理员的账号绑定接口接入管理页面，并补充绑定停用、离职回收与双人复核。
-2. 在实际 PostgreSQL/Docker 环境执行 V3 迁移演练、备份恢复和批量导入容量测试。
-3. 为会员资料增加附件对象存储、病毒扫描、数据质量评分和导入批次撤销策略。
-4. 将 `ai-adapter` 的规则实现替换为 AI 服务 HTTP 客户端，加入超时、重试、熔断与人工确认。
-5. 将协作事项升级为需求受理、推荐确认、沟通跟进、结果反馈的状态机。
+1. 将系统管理员账号绑定、停用、恢复、解绑和代管上下文接入管理页面，并落实高权限操作双人复核。
+2. 使用正式 IdP（不是隔离 Keycloak）完成生产域浏览器 OIDC/PKCE 登录与各身份权限验收，关闭全部演示身份。
+3. 在生产数据隔离副本完成 V12→V23 升级、V16–V23 存量数据处置、备份恢复和回滚兼容演练。
+4. 在预生产接通真实 PostgreSQL、MinIO、Redis、OIDC 与私网 ClamAV，完成当前版本浏览器 E2E；继续完善数据质量治理和导入批次撤销策略。
+5. 收齐并逐家审核 106 家正式调查表，配置合规的真实模型与 Embedding 供应商，使用协会真实语料完成召回、引用、拒答、费用和数据出境验收；通过前继续使用“管理协作平台”名称。

@@ -5,6 +5,7 @@ import com.guanxian.platform.shared.security.ActorScope;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 interface CrossAssociationStore {
@@ -16,7 +17,10 @@ interface CrossAssociationStore {
             UUID applicantAssociationId, UUID targetAssociationId, String reason, ActorScope actor, Instant now);
 
     CrossAssociationDtos.AccessRequestView reviewAccessRequest(
-            UUID id, String status, String comment, ActorScope actor, Instant now);
+            UUID id, long expectedVersion, String status, String comment, ActorScope actor, Instant now);
+
+    CrossAssociationDtos.AccessRequestView cancelAccessRequest(
+            UUID id, long expectedVersion, String reason, ActorScope actor, Instant now);
 
     List<CrossAssociationDtos.RelationshipView> relationships();
 
@@ -48,7 +52,16 @@ interface CrossAssociationStore {
     CrossAssociationDtos.ConsentView insertConsent(
             UUID enterpriseId, CrossAssociationDtos.ConsentCreate request, ActorScope actor, Instant now);
 
-    CrossAssociationDtos.ConsentView revokeConsent(UUID id, ActorScope actor, Instant now);
+    CrossAssociationDtos.ConsentView revokeConsent(UUID id, long expectedVersion, ActorScope actor, Instant now);
+
+    List<CrossAssociationDtos.ConsentView> materializeExpiredConsents(
+            UUID enterpriseId, UUID targetAssociationId, String resourceType, UUID resourceId, Instant now);
+
+    List<CrossAssociationDtos.ConsentView> revokeActiveConsentsBetweenAssociations(
+            UUID sourceAssociationId, UUID targetAssociationId, Instant now);
+
+    Optional<Set<String>> authorizedFields(
+            UUID targetAssociationId, UUID enterpriseId, String resourceType, UUID resourceId, Instant now);
 
     List<CrossAssociationDtos.RecommendationView> recommendations();
 
@@ -71,7 +84,12 @@ interface CrossAssociationStore {
     Optional<MatchOwnership> matchOwnership(UUID matchId);
 
     void audit(ActorScope actor, UUID associationId, UUID enterpriseId,
-               String action, String resourceType, Object resourceId, Object details);
+               String action, String resourceType, Object resourceId, Long resourceVersion, Object details);
+
+    default void audit(ActorScope actor, UUID associationId, UUID enterpriseId,
+                       String action, String resourceType, Object resourceId, Object details) {
+        audit(actor, associationId, enterpriseId, action, resourceType, resourceId, null, details);
+    }
 
     record DemandOwnership(UUID demandId, UUID enterpriseId, UUID associationId) {
     }

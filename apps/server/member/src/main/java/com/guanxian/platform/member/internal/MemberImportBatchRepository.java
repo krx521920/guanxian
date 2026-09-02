@@ -1,5 +1,7 @@
 package com.guanxian.platform.member.internal;
 
+import com.guanxian.platform.member.web.MemberDataProvenanceView;
+
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,4 +14,6 @@ interface MemberImportBatchRepository {
     Optional<MemberImportBatch> findByIdForCommit(UUID id);
 
     boolean markCommitted(UUID id, Map<Integer, UUID> importedRows);
+
+    Optional<MemberDataProvenanceView> findProvenance(UUID enterpriseId);
 }

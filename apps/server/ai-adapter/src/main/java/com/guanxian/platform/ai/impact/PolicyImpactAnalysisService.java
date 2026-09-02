@@ -3,6 +3,8 @@ package com.guanxian.platform.ai.impact;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.AnalysisDraft;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.AnalysisSource;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.ImpactActor;
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,19 +19,31 @@ public class PolicyImpactAnalysisService {
 
     private final PolicyImpactAnalysisStore store;
     private final DeterministicPolicyImpactAnalyzer analyzer;
+    private final EnterpriseLifecycle enterpriseLifecycle;
 
+    @Autowired
     public PolicyImpactAnalysisService(
             PolicyImpactAnalysisStore store,
-            DeterministicPolicyImpactAnalyzer analyzer) {
+            DeterministicPolicyImpactAnalyzer analyzer,
+            EnterpriseLifecycle enterpriseLifecycle) {
         this.store = store;
         this.analyzer = analyzer;
+        this.enterpriseLifecycle = enterpriseLifecycle;
+    }
+
+    PolicyImpactAnalysisService(
+            PolicyImpactAnalysisStore store,
+            DeterministicPolicyImpactAnalyzer analyzer) {
+        this(store, analyzer, enterpriseId -> true);
     }
 
     @Transactional
     public PolicyImpactAnalysisView create(UUID policyDocumentId, UUID enterpriseId, ImpactActor actor) {
-        requireReviewerIdentity(actor);
+        requireWriteContext(actor);
+        requireOperational(enterpriseId);
         AnalysisSource source = source(policyDocumentId, enterpriseId);
-        requireReviewerFor(actor, source.associationId());
+        requireReviewerFor(actor, source.associationId(), source.enterpriseId());
+        requireEvidence(source);
         if (store.findByPair(policyDocumentId, enterpriseId).isPresent()) {
             throw conflict("policy impact analysis already exists for this enterprise");
         }
@@ -40,10 +54,14 @@ public class PolicyImpactAnalysisService {
 
     @Transactional
     public PolicyImpactAnalysisView reanalyze(UUID id, long expectedVersion, ImpactActor actor) {
+        requireWriteContext(actor);
         PolicyImpactAnalysisView current = raw(id);
-        requireReviewerFor(actor, current.associationId());
+        requireOperational(current.enterpriseId());
+        requireReviewerFor(actor, current.associationId(), current.enterpriseId());
         requireVersion(current.version(), expectedVersion);
-        AnalysisDraft draft = analyzer.analyze(source(current.policyDocumentId(), current.enterpriseId()));
+        AnalysisSource source = source(current.policyDocumentId(), current.enterpriseId());
+        requireEvidence(source);
+        AnalysisDraft draft = analyzer.analyze(source);
         PolicyImpactAnalysisView updated = store.reanalyze(id, expectedVersion, draft)
                 .orElseThrow(PolicyImpactAnalysisService::stale);
         store.recordChange(actor, "REANALYZE", updated, null);
@@ -53,8 +71,10 @@ public class PolicyImpactAnalysisService {
     @Transactional
     public PolicyImpactAnalysisView review(
             UUID id, long expectedVersion, boolean approved, String comment, ImpactActor actor) {
+        requireWriteContext(actor);
         PolicyImpactAnalysisView current = raw(id);
-        requireReviewerFor(actor, current.associationId());
+        requireOperational(current.enterpriseId());
+        requireReviewerFor(actor, current.associationId(), current.enterpriseId());
         if (!"PENDING_REVIEW".equals(current.status())) {
             throw precondition("only a pending policy impact analysis can be reviewed");
         }
@@ -69,7 +89,9 @@ public class PolicyImpactAnalysisService {
     @Transactional(readOnly = true)
     public PolicyImpactAnalysisView get(UUID id, ImpactActor actor) {
         PolicyImpactAnalysisView value = raw(id);
-        if (!canRead(actor, value)) {
+        boolean historicalAdministrator = actor.systemAdmin() || actor.associationStaff();
+        if (!canRead(actor, value)
+                || !historicalAdministrator && !enterpriseLifecycle.isOperational(value.enterpriseId())) {
             throw notFound(id);
         }
         return value;
@@ -86,10 +108,11 @@ public class PolicyImpactAnalysisService {
         String status = normalizeStatus(requestedStatus);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         UUID enterpriseId = visibleEnterpriseFilter(actor, requestedEnterpriseId);
         var scope = actor.readScope();
         return new PolicyImpactPage(
-                store.list(scope, status, policyDocumentId, enterpriseId, safePage * safeSize, safeSize),
+                store.list(scope, status, policyDocumentId, enterpriseId, offset, safeSize),
                 store.count(scope, status, policyDocumentId, enterpriseId),
                 safePage,
                 safeSize);
@@ -102,20 +125,30 @@ public class PolicyImpactAnalysisService {
     }
 
     private AnalysisSource source(UUID policyDocumentId, UUID enterpriseId) {
-        AnalysisSource source = store.loadSource(policyDocumentId, enterpriseId)
+        return store.loadSource(policyDocumentId, enterpriseId)
                 .orElseThrow(() -> new PolicyImpactException(
                         PolicyImpactException.Reason.NOT_FOUND,
                         "published policy and enterprise were not found in the same association"));
+    }
+
+    private static void requireEvidence(AnalysisSource source) {
         if (source.chunks().isEmpty()) {
             throw new PolicyImpactException(
                     PolicyImpactException.Reason.EVIDENCE_REQUIRED,
                     "no published knowledge chunks are linked to this policy");
         }
-        return source;
     }
 
     private PolicyImpactAnalysisView raw(UUID id) {
         return store.find(id).orElseThrow(() -> notFound(id));
+    }
+
+    private void requireOperational(UUID enterpriseId) {
+        if (!enterpriseLifecycle.isOperational(enterpriseId)) {
+            throw new PolicyImpactException(
+                    PolicyImpactException.Reason.PRECONDITION_FAILED,
+                    "enterprise must be active before policy impact analysis");
+        }
     }
 
     private static void requireReviewerIdentity(ImpactActor actor) {
@@ -124,8 +157,21 @@ public class PolicyImpactAnalysisService {
         }
     }
 
-    private static void requireReviewerFor(ImpactActor actor, UUID associationId) {
-        if (actor.systemAdmin()) return;
+    private static void requireWriteContext(ImpactActor actor) {
+        requireReviewerIdentity(actor);
+        if (actor.systemAdmin() && actor.associationId() == null) {
+            throw associationContextRequired();
+        }
+    }
+
+    private static void requireReviewerFor(ImpactActor actor, UUID associationId, UUID enterpriseId) {
+        if (actor.systemAdmin()) {
+            if (!actor.associationId().equals(associationId)
+                    || actor.enterpriseId() != null && !actor.enterpriseId().equals(enterpriseId)) {
+                throw forbidden("system administrators can write only inside the selected system context");
+            }
+            return;
+        }
         if (!actor.associationReviewer() || actor.associationId() == null
                 || !actor.associationId().equals(associationId)) {
             throw forbidden("association administrators can analyze only their own enterprises");
@@ -133,7 +179,12 @@ public class PolicyImpactAnalysisService {
     }
 
     private static boolean canRead(ImpactActor actor, PolicyImpactAnalysisView value) {
-        if (actor.systemAdmin()) return true;
+        if (actor.systemAdmin()) {
+            if (actor.enterpriseId() != null && !actor.enterpriseId().equals(value.enterpriseId())) {
+                return false;
+            }
+            return actor.associationId() == null || actor.associationId().equals(value.associationId());
+        }
         if (actor.enterpriseId() != null) return actor.enterpriseId().equals(value.enterpriseId());
         return actor.associationStaff() && actor.associationId() != null
                 && actor.associationId().equals(value.associationId());
@@ -167,6 +218,12 @@ public class PolicyImpactAnalysisService {
 
     private static PolicyImpactException forbidden(String message) {
         return new PolicyImpactException(PolicyImpactException.Reason.FORBIDDEN, message);
+    }
+
+    private static PolicyImpactException associationContextRequired() {
+        return new PolicyImpactException(
+                PolicyImpactException.Reason.ASSOCIATION_CONTEXT_REQUIRED,
+                "system administrators must select an association context");
     }
 
     private static PolicyImpactException conflict(String message) {

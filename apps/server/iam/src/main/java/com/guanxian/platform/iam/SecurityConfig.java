@@ -197,7 +197,7 @@ public class SecurityConfig {
         }
     }
 
-    private static URI validatedEndpoint(String label, String value, String[] activeProfiles) {
+    static URI validatedEndpoint(String label, String value, String[] activeProfiles) {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException("JWT " + label + " URI must be configured");
         }

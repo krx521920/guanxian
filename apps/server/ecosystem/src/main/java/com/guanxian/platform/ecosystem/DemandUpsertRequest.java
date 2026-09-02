@@ -14,7 +14,7 @@ public record DemandUpsertRequest(
         @NotBlank @Size(max = 5000) String description,
         @Size(max = 30) List<@NotBlank @Size(max = 100) String> scenarios,
         @Size(max = 30) List<@NotBlank @Size(max = 200) String> requiredCapabilities,
-        @Pattern(regexp = "PRIVATE|MEMBERS|PARTNERS|PUBLIC|DIRECTED") String visibility,
+        @Pattern(regexp = "PRIVATE|MEMBERS|PARTNERS|PUBLIC") String visibility,
         @DecimalMin("0.00") BigDecimal budgetMin,
         @DecimalMin("0.00") BigDecimal budgetMax,
         Instant responseDeadline) {

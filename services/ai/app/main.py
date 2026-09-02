@@ -22,8 +22,8 @@ def create_app() -> FastAPI:
         version=settings.version,
         debug=settings.debug,
         description=(
-            "企业资料结构化、供需匹配与政策问答服务。"
-            "当前版本全部使用确定性规则，尚未接入外部大模型。"
+            "企业资料结构化与供需匹配规则服务。"
+            "政策问答未在本服务启用，生产知识库主链路位于 Java ai-adapter。"
         ),
         lifespan=lifespan,
     )

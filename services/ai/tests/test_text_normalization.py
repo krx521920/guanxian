@@ -1,5 +1,6 @@
 import unicodedata
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -12,6 +13,7 @@ def test_normalize_handles_full_width_case_spacing_and_invisible_controls():
     assert keyword_similarity("ＧＩＳ 管线", "gis管线") == 1
 
 
+@pytest.mark.fuzz
 @given(value=st.text(max_size=500))
 def test_normalize_is_idempotent_and_never_contains_control_characters(value):
     normalized = normalize(value)

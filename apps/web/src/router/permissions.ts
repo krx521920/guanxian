@@ -1,4 +1,4 @@
-import { allRoles, associationRoles, enterpriseRoles } from '../config/roles'
+import { allRoles, associationRoles, enterpriseRoles, workspaceRoles } from '../config/roles'
 import type { UserRole } from '../types/domain'
 
 export const protectedRouteRoles: Record<string, readonly UserRole[]> = {
@@ -8,6 +8,10 @@ export const protectedRouteRoles: Record<string, readonly UserRole[]> = {
   '/members/edit': [...associationRoles, 'ENTERPRISE_ADMIN'],
   '/members/new': associationRoles,
   '/policies': allRoles,
-  '/matching': allRoles,
-  '/collaborations': allRoles,
+  '/ecosystem': workspaceRoles,
+  '/matching': workspaceRoles,
+  '/collaborations': workspaceRoles,
+  '/attachments': workspaceRoles,
+  '/federation': associationRoles,
+  '/operations': ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'],
 }

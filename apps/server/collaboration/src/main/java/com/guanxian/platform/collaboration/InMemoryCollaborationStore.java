@@ -1,6 +1,10 @@
 package com.guanxian.platform.collaboration;
 
+import com.guanxian.platform.member.api.EnterpriseLifecycle;
+
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -12,7 +16,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -23,14 +29,30 @@ import java.util.concurrent.atomic.AtomicLong;
 class InMemoryCollaborationStore implements CollaborationStore {
     private static final UUID DEMO_ASSOCIATION =
             UUID.fromString("00000000-0000-0000-0000-000000000106");
+    private static final Set<String> LINKABLE_MATCH_STATES = Set.of(
+            "CONFIRMED", "INVITED", "NEGOTIATING", "OUTCOME_PENDING");
 
     private final ConcurrentMap<UUID, CollaborationView> items = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, MatchScope> matchScopes = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, List<CollaborationActivityView>> activities = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, List<CollaborationHistoryView>> histories = new ConcurrentHashMap<>();
     private final AtomicLong activitySequence = new AtomicLong();
     private final AtomicLong historySequence = new AtomicLong();
+    private final EnterpriseLifecycle enterpriseLifecycle;
 
     InMemoryCollaborationStore() {
+        this(false, enterpriseId -> true);
+    }
+
+    @Autowired
+    InMemoryCollaborationStore(
+            @Value("${guanxian.business.seed-demo-data:${guanxian.member.seed-demo-data:false}}")
+            boolean seedDemoData,
+            EnterpriseLifecycle enterpriseLifecycle) {
+        this.enterpriseLifecycle = enterpriseLifecycle;
+        if (!seedDemoData) {
+            return;
+        }
         seed("00000000-0000-0000-0000-00000000c001", "高压燃气管道零泄漏阀门联合评估",
                 List.of("北京市政建设集团", "北方阀门制造有限公司"), "徐明",
                 "IN_PROGRESS", "HIGH", "确认试验场地与技术参数", LocalDate.of(2026, 8, 18), 62);
@@ -47,11 +69,14 @@ class InMemoryCollaborationStore implements CollaborationStore {
 
     @Override
     public List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+            ActorScope actor, String query, String stage,
+            boolean includeDeleted, long offset, int limit) {
         return items.values().stream()
+                .filter(item -> canReadEnterpriseHistory(actor, item))
                 .filter(item -> includeDeleted || !item.deleted())
                 .filter(item -> canRead(actor, item))
                 .filter(item -> matches(query, item))
+                .filter(item -> matchesStage(stage, item))
                 .sorted(Comparator.comparing(CollaborationView::updatedAt).reversed()
                         .thenComparing(CollaborationView::id))
                 .skip(offset)
@@ -60,21 +85,60 @@ class InMemoryCollaborationStore implements CollaborationStore {
     }
 
     @Override
-    public long count(ActorScope actor, String query, boolean includeDeleted) {
+    public long count(ActorScope actor, String query, String stage, boolean includeDeleted) {
         return items.values().stream()
+                .filter(item -> canReadEnterpriseHistory(actor, item))
                 .filter(item -> includeDeleted || !item.deleted())
                 .filter(item -> canRead(actor, item))
                 .filter(item -> matches(query, item))
+                .filter(item -> matchesStage(stage, item))
                 .count();
     }
 
     @Override
     public Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted) {
         CollaborationView item = items.get(id);
-        if (item == null || (!includeDeleted && item.deleted()) || !canRead(actor, item)) {
+        if (item == null || !canReadEnterpriseHistory(actor, item)
+                || (!includeDeleted && item.deleted()) || !canRead(actor, item)) {
             return Optional.empty();
         }
         return Optional.of(item);
+    }
+
+    @Override
+    public boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
+        if (matchId == null) {
+            return true;
+        }
+        MatchScope scope = matchScopes.get(matchId);
+        if (scope == null || !LINKABLE_MATCH_STATES.contains(scope.state())
+                || scope.matchDeleted() || scope.demandDeleted()
+                || !enterpriseLifecycle.isOperational(scope.demandEnterpriseId())
+                || !enterpriseLifecycle.isOperational(scope.candidateEnterpriseId())) {
+            return false;
+        }
+        return scope.includes(associationId, enterpriseId);
+    }
+
+    @Override
+    public boolean canAccessLinkedMatch(UUID matchId, UUID associationId, UUID enterpriseId) {
+        if (matchId == null) {
+            return true;
+        }
+        MatchScope scope = matchScopes.get(matchId);
+        return scope != null && scope.includes(associationId, enterpriseId);
+    }
+
+    @Override
+    public boolean linkedMatchParticipantsOperational(UUID matchId) {
+        if (matchId == null) {
+            return true;
+        }
+        MatchScope scope = matchScopes.get(matchId);
+        return scope != null
+                && !scope.demandEnterpriseId().equals(scope.candidateEnterpriseId())
+                && enterpriseLifecycle.isOperational(scope.demandEnterpriseId())
+                && enterpriseLifecycle.isOperational(scope.candidateEnterpriseId());
     }
 
     @Override
@@ -85,7 +149,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             ActorScope actor) {
         Instant now = Instant.now();
         CollaborationView value = new CollaborationView(
-                UUID.randomUUID(), associationId, enterpriseId, request.title().trim(),
+                UUID.randomUUID(), associationId, enterpriseId, request.matchId(), request.title().trim(),
                 cleanList(request.participants()), owner(request.owner(), actor), "DRAFT",
                 priority(request.priority()), clean(request.nextAction()), request.dueDate(),
                 progress(request.progress()), 0, false, false, now);
@@ -104,7 +168,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             return Optional.empty();
         }
         CollaborationView updated = new CollaborationView(
-                current.id(), current.associationId(), current.enterpriseId(), request.title().trim(),
+                current.id(), current.associationId(), current.enterpriseId(), request.matchId(), request.title().trim(),
                 cleanList(request.participants()), owner(request.owner(), actor), current.stage(),
                 priority(request.priority()), clean(request.nextAction()), request.dueDate(),
                 progress(request.progress()), current.version() + 1, current.disabled(), false, Instant.now());
@@ -123,7 +187,11 @@ class InMemoryCollaborationStore implements CollaborationStore {
         if (current == null || current.deleted() || current.version() != expectedVersion) {
             return Optional.empty();
         }
-        int progress = "COMPLETED".equals(stage) ? 100 : current.progress();
+        int progress = "COMPLETED".equals(stage)
+                ? 100
+                : "COMPLETED".equals(current.stage()) && "OPEN".equals(stage)
+                ? Math.min(current.progress(), 99)
+                : current.progress();
         CollaborationView updated = copy(
                 current, stage, current.version() + 1, disabled, false, progress);
         items.put(id, updated);
@@ -151,7 +219,8 @@ class InMemoryCollaborationStore implements CollaborationStore {
             return Optional.empty();
         }
         CollaborationView updated = copy(
-                current, "DRAFT", current.version() + 1, false, false, current.progress());
+                current, "DRAFT", current.version() + 1, false, false,
+                Math.min(current.progress(), 99));
         items.put(id, updated);
         return Optional.of(updated);
     }
@@ -212,6 +281,65 @@ class InMemoryCollaborationStore implements CollaborationStore {
         }
     }
 
+    InMemoryCollaborationStore(boolean seedDemoData) {
+        this(seedDemoData, enterpriseId -> true);
+    }
+
+    void registerMatchScope(
+            UUID matchId,
+            UUID associationId,
+            UUID demandEnterpriseId,
+            UUID candidateEnterpriseId) {
+        registerMatchScope(
+                matchId, associationId, associationId,
+                demandEnterpriseId, candidateEnterpriseId, "CONFIRMED");
+    }
+
+    void registerMatchScope(
+            UUID matchId,
+            UUID demandAssociationId,
+            UUID candidateAssociationId,
+            UUID demandEnterpriseId,
+            UUID candidateEnterpriseId,
+            String state) {
+        matchScopes.put(
+                Objects.requireNonNull(matchId, "matchId"),
+                new MatchScope(
+                        Objects.requireNonNull(demandAssociationId, "demandAssociationId"),
+                        Objects.requireNonNull(candidateAssociationId, "candidateAssociationId"),
+                        Objects.requireNonNull(demandEnterpriseId, "demandEnterpriseId"),
+                        Objects.requireNonNull(candidateEnterpriseId, "candidateEnterpriseId"),
+                        Objects.requireNonNull(state, "state"), false, false));
+    }
+
+    void setMatchState(UUID matchId, String state) {
+        matchScopes.computeIfPresent(
+                Objects.requireNonNull(matchId, "matchId"),
+                (ignored, scope) -> new MatchScope(
+                        scope.demandAssociationId(), scope.candidateAssociationId(),
+                        scope.demandEnterpriseId(), scope.candidateEnterpriseId(),
+                        Objects.requireNonNull(state, "state"),
+                        scope.matchDeleted(), scope.demandDeleted()));
+    }
+
+    void softDeleteMatch(UUID matchId) {
+        matchScopes.computeIfPresent(
+                Objects.requireNonNull(matchId, "matchId"),
+                (ignored, scope) -> new MatchScope(
+                        scope.demandAssociationId(), scope.candidateAssociationId(),
+                        scope.demandEnterpriseId(), scope.candidateEnterpriseId(),
+                        scope.state(), true, scope.demandDeleted()));
+    }
+
+    void softDeleteDemand(UUID matchId) {
+        matchScopes.computeIfPresent(
+                Objects.requireNonNull(matchId, "matchId"),
+                (ignored, scope) -> new MatchScope(
+                        scope.demandAssociationId(), scope.candidateAssociationId(),
+                        scope.demandEnterpriseId(), scope.candidateEnterpriseId(),
+                        scope.state(), scope.matchDeleted(), true));
+    }
+
     private void seed(
             String id,
             String title,
@@ -223,14 +351,27 @@ class InMemoryCollaborationStore implements CollaborationStore {
             LocalDate dueDate,
             int progress) {
         CollaborationView item = new CollaborationView(
-                UUID.fromString(id), DEMO_ASSOCIATION, null, title, participants, owner, stage,
+                UUID.fromString(id), DEMO_ASSOCIATION, null, null, title, participants, owner, stage,
                 priority, nextAction, dueDate, progress, 0, false, false, Instant.now());
         items.put(item.id(), item);
     }
 
-    private static boolean canRead(ActorScope actor, CollaborationView value) {
+    private boolean canRead(ActorScope actor, CollaborationView value) {
+        if (value.matchId() != null) {
+            if (actor.isSystemAdmin() && actor.associationId() == null) {
+                return true;
+            }
+            UUID enterpriseId = actor.isAssociationStaff() ? null : actor.enterpriseId();
+            return actor.associationId() != null
+                    && canAccessLinkedMatch(value.matchId(), actor.associationId(), enterpriseId);
+        }
         if (actor.isSystemAdmin()) {
-            return true;
+            if (actor.associationId() != null
+                    && !actor.associationId().equals(value.associationId())) {
+                return false;
+            }
+            return actor.enterpriseId() == null
+                    || actor.enterpriseId().equals(value.enterpriseId());
         }
         if (actor.associationId() == null || !actor.associationId().equals(value.associationId())) {
             return false;
@@ -238,7 +379,21 @@ class InMemoryCollaborationStore implements CollaborationStore {
         if (actor.isAssociationStaff()) {
             return true;
         }
-        return value.enterpriseId() == null || value.enterpriseId().equals(actor.enterpriseId());
+        if (value.enterpriseId() != null) {
+            return value.enterpriseId().equals(actor.enterpriseId());
+        }
+        return true;
+    }
+
+    private boolean canReadEnterpriseHistory(ActorScope actor, CollaborationView value) {
+        if (actor.isSystemAdmin() || actor.isAssociationStaff()) {
+            return true;
+        }
+        if (actor.enterpriseId() != null) {
+            return enterpriseLifecycle.isOperational(actor.enterpriseId());
+        }
+        return value.enterpriseId() == null
+                || enterpriseLifecycle.isOperational(value.enterpriseId());
     }
 
     private static boolean matches(String query, CollaborationView value) {
@@ -252,6 +407,15 @@ class InMemoryCollaborationStore implements CollaborationStore {
                 .anyMatch(item -> item.toLowerCase(Locale.ROOT).contains(needle));
     }
 
+    private static boolean matchesStage(String stage, CollaborationView value) {
+        if (stage == null || stage.isBlank()) {
+            return true;
+        }
+        return "ACTIVE".equals(stage)
+                ? !Set.of("COMPLETED", "DISABLED").contains(value.stage())
+                : stage.equals(value.stage());
+    }
+
     private static CollaborationView copy(
             CollaborationView old,
             String stage,
@@ -260,7 +424,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
             boolean deleted,
             int progress) {
         return new CollaborationView(
-                old.id(), old.associationId(), old.enterpriseId(), old.title(), old.participants(),
+                old.id(), old.associationId(), old.enterpriseId(), old.matchId(), old.title(), old.participants(),
                 old.owner(), stage, old.priority(), old.nextAction(), old.dueDate(), progress,
                 version, disabled, deleted, Instant.now());
     }
@@ -269,6 +433,7 @@ class InMemoryCollaborationStore implements CollaborationStore {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", value.id().toString());
         result.put("title", value.title());
+        result.put("matchId", value.matchId() == null ? "" : value.matchId().toString());
         result.put("participants", value.participants());
         result.put("owner", value.owner() == null ? "" : value.owner());
         result.put("stage", value.stage());
@@ -307,5 +472,28 @@ class InMemoryCollaborationStore implements CollaborationStore {
 
     private static String clean(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private record MatchScope(
+            UUID demandAssociationId,
+            UUID candidateAssociationId,
+            UUID demandEnterpriseId,
+            UUID candidateEnterpriseId,
+            String state,
+            boolean matchDeleted,
+            boolean demandDeleted) {
+        private boolean includes(UUID associationId, UUID enterpriseId) {
+            if (associationId == null) {
+                return false;
+            }
+            if (enterpriseId == null) {
+                return associationId.equals(demandAssociationId)
+                        || associationId.equals(candidateAssociationId);
+            }
+            return associationId.equals(demandAssociationId)
+                    && enterpriseId.equals(demandEnterpriseId)
+                    || associationId.equals(candidateAssociationId)
+                    && enterpriseId.equals(candidateEnterpriseId);
+        }
     }
 }

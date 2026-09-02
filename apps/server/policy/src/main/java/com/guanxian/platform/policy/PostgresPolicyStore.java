@@ -43,7 +43,7 @@ class PostgresPolicyStore implements PolicyStore {
     }
 
     @Override
-    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         MapSqlParameterSource params = parameters(actor, query)
                 .addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(SELECT + where(actor, query, includeDeleted)
@@ -164,10 +164,12 @@ class PostgresPolicyStore implements PolicyStore {
                     .addValue("requestId", MDC.get("requestId"));
             jdbc.update("""
                     INSERT INTO audit_log (
-                        actor_user_id, actor_subject, actor_username, association_id, action,
-                        resource_type, resource_id, details, request_id)
-                    VALUES (:actorUserId, :actorSubject, :actorUsername, :associationId, :action,
-                            'POLICY_DOCUMENT', :resourceId, CAST(:snapshot AS jsonb), :requestId)
+                        actor_user_id, actor_subject, actor_username, association_id, enterprise_id, action,
+                        resource_type, resource_id, resource_version, outcome, details, request_id)
+                    VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
+                            :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId,
+                            NULL, :action, 'POLICY_DOCUMENT', :resourceId, :version, 'SUCCESS',
+                            CAST(:snapshot AS jsonb), COALESCE(:requestId, 'internal'))
                     """, params);
             jdbc.update("""
                     INSERT INTO business_entity_history (
@@ -223,11 +225,14 @@ class PostgresPolicyStore implements PolicyStore {
         if (!includeDeleted) {
             sql.append(" AND p.deleted_at IS NULL");
         }
-        if (!actor.isSystemAdmin()) {
+        if (actor.isSystemAdmin() && actor.associationId() != null) {
+            sql.append(" AND p.association_id = :associationId");
+        } else if (!actor.isSystemAdmin()) {
             sql.append("""
                      AND (
                        (p.association_id = :associationId AND (:associationStaff OR
-                          (p.status = 'PUBLISHED' AND p.disabled_at IS NULL)))
+                          (p.status = 'PUBLISHED' AND p.disabled_at IS NULL
+                           AND p.visibility <> 'PRIVATE')))
                        OR (p.status = 'PUBLISHED' AND p.disabled_at IS NULL AND p.visibility = 'PUBLIC')
                        OR (p.status = 'PUBLISHED' AND p.disabled_at IS NULL
                            AND p.visibility = 'PARTNERS' AND p.association_id IN (:partnerIds))

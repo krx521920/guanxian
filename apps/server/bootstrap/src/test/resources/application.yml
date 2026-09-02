@@ -12,5 +12,7 @@ guanxian:
   member:
     repository: memory
     seed-demo-data: true
+  notification:
+    repository: memory
   security:
     mode: demo

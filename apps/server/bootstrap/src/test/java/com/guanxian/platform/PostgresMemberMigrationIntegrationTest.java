@@ -19,6 +19,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -35,6 +36,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class PostgresMemberMigrationIntegrationTest {
     private static final String LEGACY_MEMBER_ID = "20000000-0000-0000-0000-000000000001";
+    private static final String OTHER_ASSOCIATION_ID = "72000000-0000-0000-0000-000000000001";
+    private static final String OTHER_ENTERPRISE_ID = "72000000-0000-0000-0000-000000000002";
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -48,6 +51,8 @@ class PostgresMemberMigrationIntegrationTest {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("guanxian.security.demo.association-id",
+                () -> "10000000-0000-0000-0000-000000000001");
     }
 
     @Autowired
@@ -63,11 +68,27 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(10, migrationCount);
+        org.junit.jupiter.api.Assertions.assertEquals(24, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals("member_import_batch", jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.member_import_batch')::text", String.class));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'user_account' AND column_name = 'external_subject'", Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'user_account' AND column_name = 'version'
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conname = 'user_account_version_ck'
+                  AND conrelid = 'user_account'::regclass
+                """, Integer.class));
+        org.junit.jupiter.api.Assertions.assertEquals("revoked_identity_subject", jdbcTemplate.queryForObject(
+                "SELECT to_regclass('public.revoked_identity_subject')::text", String.class));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pg_constraint
+                WHERE conname = 'policy_document_association_required_ck'
+                  AND conrelid = 'policy_document'::regclass
+                """, Integer.class));
         org.junit.jupiter.api.Assertions.assertEquals("business_entity_history", jdbcTemplate.queryForObject(
                 "SELECT to_regclass('public.business_entity_history')::text", String.class));
         org.junit.jupiter.api.Assertions.assertEquals("knowledge_chunk", jdbcTemplate.queryForObject(
@@ -101,7 +122,9 @@ class PostgresMemberMigrationIntegrationTest {
                 """, Integer.class));
         org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM pg_indexes
-                WHERE schemaname = 'public' AND indexname = 'notification_subscription_user_type_uq'
+                WHERE schemaname = 'public'
+                  AND indexname = 'notification_subscription_user_association_type_uq'
+                  AND indexdef LIKE '%(user_id, association_id, subscription_type)%'
                 """, Integer.class));
 
         mockMvc.perform(get("/api/v1/members/{id}", LEGACY_MEMBER_ID)
@@ -138,8 +161,9 @@ class PostgresMemberMigrationIntegrationTest {
                         .header(HttpHeaders.IF_MATCH, "\"0\""))
                 .andExpect(status().isOk());
 
-        org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM enterprise WHERE id = ?::uuid", Integer.class, id));
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM enterprise WHERE id = ?::uuid AND status = 'DELETED' AND deleted_at IS NOT NULL",
+                Integer.class, id));
         org.junit.jupiter.api.Assertions.assertEquals(2, jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM audit_log
                 WHERE enterprise_id = ?::uuid AND action IN ('MEMBER_CREATE', 'MEMBER_DELETE')
@@ -155,5 +179,75 @@ class PostgresMemberMigrationIntegrationTest {
                   AND constraint_info.constraint_type = 'FOREIGN KEY'
                   AND column_info.column_name IN ('association_id', 'enterprise_id')
                 """, Integer.class));
+
+        mockMvc.perform(put("/api/v1/members/{id}/restore", id)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"1\""))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, "\"2\""))
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.data.deletedAt").doesNotExist());
+
+        org.junit.jupiter.api.Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM enterprise WHERE id = ?::uuid AND deleted_at IS NULL",
+                Integer.class, id));
+    }
+
+    @Test
+    void selectedSystemAssociationCannotReadOrMutateAnotherAssociationsMembers() throws Exception {
+        jdbcTemplate.update("""
+                INSERT INTO association (id, name, status)
+                VALUES (?::uuid, '会员系统上下文隔离协会', 'ACTIVE')
+                """, OTHER_ASSOCIATION_ID);
+        jdbcTemplate.update("""
+                INSERT INTO enterprise (id, association_id, name, category, status, version)
+                VALUES (?::uuid, ?::uuid, '会员系统上下文隔离企业', '测试单位', 'ACTIVE', 0)
+                """, OTHER_ENTERPRISE_ID, OTHER_ASSOCIATION_ID);
+
+        mockMvc.perform(get("/api/v1/members/{id}", OTHER_ENTERPRISE_ID)
+                        .with(httpBasic("system-admin", "system123")))
+                .andExpect(status().isNotFound());
+        String page = mockMvc.perform(get("/api/v1/members/page")
+                        .with(httpBasic("system-admin", "system123")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        for (com.fasterxml.jackson.databind.JsonNode item : objectMapper.readTree(page).path("data").path("items")) {
+            org.junit.jupiter.api.Assertions.assertNotEquals(OTHER_ENTERPRISE_ID, item.path("id").asText());
+        }
+        mockMvc.perform(post("/api/v1/members")
+                        .with(httpBasic("system-admin", "system123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name":"跨协会新建企业",
+                                  "unifiedSocialCreditCode":"SYSTEMCROSS001",
+                                  "category":"测试单位",
+                                  "associationId":"%s"
+                                }
+                                """.formatted(OTHER_ASSOCIATION_ID)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("DATA_SCOPE_DENIED"));
+        mockMvc.perform(put("/api/v1/members/{id}", OTHER_ENTERPRISE_ID)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"跨协会修改企业","category":"测试单位","status":"ACTIVE"}
+                                """))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/members/{id}/review", OTHER_ENTERPRISE_ID)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"ACTIVE\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(delete("/api/v1/members/{id}", OTHER_ENTERPRISE_ID)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(put("/api/v1/members/{id}/restore", OTHER_ENTERPRISE_ID)
+                        .with(httpBasic("system-admin", "system123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isForbidden());
     }
 }

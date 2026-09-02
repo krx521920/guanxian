@@ -1,4 +1,4 @@
-def test_policy_qa_returns_retrieved_citation_and_warning(client):
+def test_policy_qa_is_explicitly_unavailable(client):
     response = client.post(
         "/api/v1/qa/policy",
         json={
@@ -13,20 +13,21 @@ def test_policy_qa_returns_retrieved_citation_and_warning(client):
         },
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 503
     body = response.json()
-    assert body["model_connected"] is False
-    assert body["processing_mode"] == "placeholder_retrieval"
-    assert "未连接大语言模型" in body["warning"]
-    assert body["citations"][0]["document_id"] == "P-001"
+    assert body == {
+        "error": {
+            "code": "POLICY_QA_NOT_ENABLED",
+            "message": "Python 服务未启用政策问答，请使用 Java ai-adapter 的知识库问答接口",
+        }
+    }
 
 
-def test_policy_qa_without_documents_is_explicit(client):
+def test_policy_qa_without_documents_is_still_unavailable(client):
     response = client.post(
         "/api/v1/qa/policy",
         json={"question": "最新政策是什么？"},
     )
 
-    assert response.status_code == 200
-    assert response.json()["citations"] == []
-    assert "没有检索到" in response.json()["answer"]
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "POLICY_QA_NOT_ENABLED"

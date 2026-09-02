@@ -11,6 +11,6 @@ public record OutcomeArchiveRequest(
         @NotBlank @Size(max = 300) String title,
         @NotBlank @Size(max = 5000) String summary,
         @DecimalMin("0.00") BigDecimal contractAmount,
-        @NotBlank @Size(max = 32) String resultType,
+        @NotBlank @Pattern(regexp = "COOPERATION|CONTRACT|PILOT|TECHNICAL_RESULT") String resultType,
         @Pattern(regexp = "PRIVATE|ENTERPRISES|ASSOCIATION|PARTNERS|PUBLIC") String visibility) {
 }

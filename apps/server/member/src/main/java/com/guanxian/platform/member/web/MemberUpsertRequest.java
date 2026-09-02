@@ -14,9 +14,15 @@ public record MemberUpsertRequest(
         @Size(max = 300) String address,
         @Size(max = 50) String contactName,
         @Size(max = 50) String contactPhone,
+        @Size(max = 254) @Pattern(
+                regexp = "(?i)^\\s*([a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+)?\\s*$",
+                message = "must be a valid email address")
+        String contactEmail,
         @Size(max = 2000) String introduction,
         @Size(max = 50) List<@Size(max = 100) String> capabilities,
         @Size(max = 50) List<@Size(max = 100) String> products,
+        @Size(max = 50) List<@Size(max = 100) String> services,
+        @Size(max = 50) List<@Size(max = 100) String> applicationScenarios,
         @Size(max = 50) List<@Size(max = 200) String> cooperationNeeds,
         @Size(max = 30)
         @Pattern(
@@ -29,6 +35,24 @@ public record MemberUpsertRequest(
                 message = "must be ACTIVE, PENDING_REVIEW, INCOMPLETE or DISABLED")
         String status,
         UUID associationId) {
+
+    public MemberUpsertRequest(
+            String name,
+            String unifiedSocialCreditCode,
+            String category,
+            String address,
+            String contactName,
+            String contactPhone,
+            String introduction,
+            List<String> capabilities,
+            List<String> products,
+            List<String> cooperationNeeds,
+            String visibility,
+            String status,
+            UUID associationId) {
+        this(name, unifiedSocialCreditCode, category, address, contactName, contactPhone, null, introduction,
+                capabilities, products, List.of(), List.of(), cooperationNeeds, visibility, status, associationId);
+    }
 
     public MemberUpsertRequest(
             String name,

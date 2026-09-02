@@ -15,6 +15,7 @@ public final class PolicyImpactException extends RuntimeException {
     public enum Reason {
         NOT_FOUND,
         FORBIDDEN,
+        ASSOCIATION_CONTEXT_REQUIRED,
         CONFLICT,
         PRECONDITION_FAILED,
         EVIDENCE_REQUIRED

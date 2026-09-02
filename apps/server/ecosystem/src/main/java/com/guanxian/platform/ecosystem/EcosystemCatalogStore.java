@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface EcosystemCatalogStore {
-    List<OfferingView> listOfferings(ActorScope actor, String query, boolean includeDeleted, int offset, int limit);
+    List<OfferingView> listOfferings(ActorScope actor, String query, boolean includeDeleted, long offset, int limit);
 
     long countOfferings(ActorScope actor, String query, boolean includeDeleted);
 
@@ -25,7 +25,7 @@ interface EcosystemCatalogStore {
 
     Optional<OfferingView> restoreOffering(UUID id, long expectedVersion, ActorScope actor);
 
-    List<DemandView> listDemands(ActorScope actor, String query, boolean includeDeleted, int offset, int limit);
+    List<DemandView> listDemands(ActorScope actor, String query, boolean includeDeleted, long offset, int limit);
 
     long countDemands(ActorScope actor, String query, boolean includeDeleted);
 
@@ -42,6 +42,18 @@ interface EcosystemCatalogStore {
     Optional<DemandView> softDeleteDemand(UUID id, long expectedVersion, ActorScope actor);
 
     Optional<DemandView> restoreDemand(UUID id, long expectedVersion, ActorScope actor);
+
+    boolean isDemandDeleted(UUID demandId);
+
+    default boolean isDemandOpenForResponse(UUID demandId) {
+        return !isDemandDeleted(demandId);
+    }
+
+    boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId);
+
+    default boolean enterpriseHistoricallyBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return enterpriseBelongsToAssociation(enterpriseId, associationId);
+    }
 
     void recordChange(
             ActorScope actor,

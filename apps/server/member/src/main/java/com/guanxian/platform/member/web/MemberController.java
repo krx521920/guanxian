@@ -46,16 +46,46 @@ public class MemberController {
     @GetMapping
     @PreAuthorize("hasAuthority('MEMBER_READ')")
     ApiResponse<List<MemberListItem>> list(
-            @RequestParam(required = false) String q, Authentication authentication) {
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            Authentication authentication) {
         ActorScope actor = actorScopeResolver.resolve(authentication);
-        return ApiResponse.ok(memberService.findAll(q, actor).stream()
+        return ApiResponse.ok(memberService.findAll(q, null, includeDeleted, actor).stream()
                 .map(member -> MemberListItem.from(member, actor, memberService)).toList());
+    }
+
+    @GetMapping("/page")
+    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    ApiResponse<MemberPage> page(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Authentication authentication) {
+        ActorScope actor = actorScopeResolver.resolve(authentication);
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(100, Math.max(1, size));
+        List<com.guanxian.platform.member.api.MemberProfile> visible = memberService.findAll(q, status, includeDeleted, actor);
+        long offset = (long) safePage * safeSize;
+        List<com.guanxian.platform.member.api.MemberProfile> pageMembers = offset >= visible.size()
+                ? List.of()
+                : visible.subList(
+                        Math.toIntExact(offset),
+                        Math.toIntExact(Math.min((long) visible.size(), offset + safeSize)));
+        List<MemberListItem> items = pageMembers.stream()
+                .map(member -> MemberListItem.from(member, actor, memberService)).toList();
+        return ApiResponse.ok(new MemberPage(items, visible.size(), safePage, safeSize));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('MEMBER_READ')")
-    ResponseEntity<ApiResponse<MemberProfile>> get(@PathVariable UUID id, Authentication authentication) {
-        return response(HttpStatus.OK, memberService.get(id, actorScopeResolver.resolve(authentication)));
+    ResponseEntity<ApiResponse<MemberProfile>> get(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "false") boolean includeDeleted,
+            Authentication authentication) {
+        return response(HttpStatus.OK, memberService.get(
+                id, actorScopeResolver.resolve(authentication), includeDeleted));
     }
 
     @PostMapping
@@ -89,13 +119,26 @@ public class MemberController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN')")
-    ApiResponse<Map<String, Object>> delete(
+    ResponseEntity<ApiResponse<Map<String, Object>>> delete(
             @PathVariable UUID id,
             @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
             Authentication authentication) {
         MemberProfile deleted = memberService.delete(
                 id, requiredVersion(ifMatch), actorScopeResolver.resolve(authentication));
-        return ApiResponse.ok(Map.of("deleted", true, "id", deleted.id()));
+        return ResponseEntity.ok()
+                .eTag('"' + Long.toString(deleted.version()) + '"')
+                .body(ApiResponse.ok(Map.of(
+                        "deleted", true, "id", deleted.id(), "version", deleted.version())));
+    }
+
+    @PutMapping("/{id}/restore")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN', 'ASSOCIATION_ADMIN')")
+    ResponseEntity<ApiResponse<MemberProfile>> restore(
+            @PathVariable UUID id,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) List<String> ifMatch,
+            Authentication authentication) {
+        return response(HttpStatus.OK, memberService.restore(
+                id, requiredVersion(ifMatch), actorScopeResolver.resolve(authentication)));
     }
 
     static ResponseEntity<ApiResponse<MemberProfile>> response(HttpStatus status, MemberProfile member) {

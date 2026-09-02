@@ -17,5 +17,4 @@ interface MemberRepository {
 
     boolean update(MemberProfile member, long expectedVersion);
 
-    boolean deleteById(UUID id, long expectedVersion);
 }

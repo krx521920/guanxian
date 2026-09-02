@@ -2,6 +2,7 @@ package com.guanxian.platform.storage;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,15 +30,21 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final AttachmentEnterpriseScope enterpriseScope;
 
-    PostgresAttachmentMetadataStore(NamedParameterJdbcTemplate jdbc, ObjectMapper objectMapper) {
+    PostgresAttachmentMetadataStore(
+            NamedParameterJdbcTemplate jdbc,
+            ObjectMapper objectMapper,
+            AttachmentEnterpriseScope enterpriseScope) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.enterpriseScope = enterpriseScope;
     }
 
     @Override
     @Transactional
     public AttachmentView create(AttachmentDraft draft, ActorScope actor) {
+        requireCreateScope(draft, actor);
         jdbc.update("""
                 INSERT INTO object_file (
                     id, association_id, enterprise_id, bucket_name, object_key, original_filename,
@@ -45,7 +52,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                     version, uploaded_by_subject, uploaded_at, updated_at)
                 VALUES (
                     :id, :associationId, :enterpriseId, :bucketName, :objectKey, :originalFilename,
-                    :mediaType, :sizeBytes, :sha256, 'PENDING', :visibility, 'ACTIVE',
+                    :mediaType, :sizeBytes, :sha256, :scanStatus, :visibility, 'ACTIVE',
                     0, :uploadedBy, now(), now())
                 """, draftParameters(draft));
         AttachmentView created = findById(draft.id()).orElseThrow();
@@ -135,7 +142,12 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private String readScope(ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return "";
+            if (actor.associationId() == null) {
+                return "";
+            }
+            return actor.enterpriseId() == null
+                    ? " AND association_id = :actorAssociationId"
+                    : " AND association_id = :actorAssociationId AND enterprise_id = :actorEnterpriseId";
         }
         if (actor.isAssociationStaff()) {
             return " AND association_id = :actorAssociationId";
@@ -143,13 +155,18 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
         return """
                  AND association_id = :actorAssociationId
                  AND (visibility = 'ASSOCIATION'
-                      OR (:actorEnterpriseId IS NOT NULL AND enterprise_id = :actorEnterpriseId))
+                      OR (CAST(:actorEnterpriseId AS UUID) IS NOT NULL AND enterprise_id = :actorEnterpriseId))
                 """;
     }
 
     private String manageScope(ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return "";
+            if (actor.associationId() == null) {
+                return " AND FALSE";
+            }
+            return actor.enterpriseId() == null
+                    ? " AND association_id = :actorAssociationId"
+                    : " AND association_id = :actorAssociationId AND enterprise_id = :actorEnterpriseId";
         }
         if (actor.isAssociationStaff()) {
             return " AND association_id = :actorAssociationId";
@@ -166,6 +183,33 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                 .addValue("actorEnterpriseId", actor.enterpriseId());
     }
 
+    private void requireCreateScope(AttachmentDraft draft, ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null || !actor.associationId().equals(draft.associationId())
+                    || !java.util.Objects.equals(actor.enterpriseId(), draft.enterpriseId())) {
+                throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                        "attachment target is outside the selected system context");
+            }
+            requireEnterpriseAssociation(draft, actor);
+            return;
+        }
+        if (actor.associationId() == null || !actor.associationId().equals(draft.associationId())
+                || actor.isEnterpriseAdmin() && (actor.enterpriseId() == null
+                || !actor.enterpriseId().equals(draft.enterpriseId()))) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "attachment target is outside the actor scope");
+        }
+        requireEnterpriseAssociation(draft, actor);
+    }
+
+    private void requireEnterpriseAssociation(AttachmentDraft draft, ActorScope actor) {
+        if (draft.enterpriseId() != null && !enterpriseScope.contains(
+                draft.associationId(), draft.enterpriseId(), actor)) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "target enterprise does not belong to the attachment association");
+        }
+    }
+
     private MapSqlParameterSource draftParameters(AttachmentDraft draft) {
         return new MapSqlParameterSource()
                 .addValue("id", draft.id())
@@ -177,6 +221,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                 .addValue("mediaType", draft.mediaType())
                 .addValue("sizeBytes", draft.sizeBytes())
                 .addValue("sha256", draft.sha256())
+                .addValue("scanStatus", draft.scanStatus())
                 .addValue("visibility", draft.visibility())
                 .addValue("uploadedBy", draft.uploadedBySubject());
     }
@@ -218,14 +263,17 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                     "mediaType", value.mediaType(),
                     "sizeBytes", value.sizeBytes(),
                     "version", value.version(),
+                    "validationStatus", value.scanStatus(),
                     "status", value.status()));
             jdbc.update("""
                     INSERT INTO audit_log (
                         actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
-                        action, resource_type, resource_id, details, request_id)
+                        action, resource_type, resource_id, resource_version, outcome, details, request_id)
                     VALUES (
-                        :actorUserId, :actorSubject, :actorUsername, :associationId, :enterpriseId,
-                        :action, 'OBJECT_FILE', :resourceId, CAST(:details AS jsonb), :requestId)
+                        (SELECT id FROM user_account WHERE id = :actorUserId),
+                        :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId, :enterpriseId,
+                        :action, 'OBJECT_FILE', :resourceId, :resourceVersion, 'SUCCESS',
+                        CAST(:details AS jsonb), COALESCE(:requestId, 'internal'))
                     """, new MapSqlParameterSource()
                     .addValue("actorUserId", actor.userId())
                     .addValue("actorSubject", actor.subject())
@@ -234,6 +282,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                     .addValue("enterpriseId", value.enterpriseId())
                     .addValue("action", action)
                     .addValue("resourceId", value.id().toString())
+                    .addValue("resourceVersion", value.version())
                     .addValue("details", details)
                     .addValue("requestId", MDC.get("requestId")));
         } catch (JsonProcessingException exception) {

@@ -2,6 +2,7 @@ package com.guanxian.platform.ecosystem;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public record PersistedMatchView(
@@ -14,13 +15,18 @@ public record PersistedMatchView(
         String scene,
         String supplierCompany,
         String solution,
-        int score,
+        Integer score,
         List<String> reasons,
         String state,
+        Instant recommendedAt,
+        Instant demandConfirmedAt,
+        Instant candidateConfirmedAt,
         String closedReason,
         long version,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Set<String> allowedActions) {
     public PersistedMatchView {
         reasons = reasons == null ? List.of() : List.copyOf(reasons);
+        allowedActions = allowedActions == null ? Set.of() : Set.copyOf(allowedActions);
     }
 }

@@ -69,3 +69,32 @@ groups:
         annotations:
           summary: "管线平台应用节点可用磁盘空间低于 15%"
           runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+  - name: guanxian-dependencies
+    rules:
+      - alert: GuanxianPostgresExporterDown
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL 指标不可抓取"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianRedisExporterDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis 指标不可抓取"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"
+
+      - alert: GuanxianMinioExporterDown
+        expr: up{job="minio"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MinIO 指标不可抓取"
+          runbook_url: "docs/operations-runbook.md#8-监控与告警最低集"

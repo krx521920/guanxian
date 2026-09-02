@@ -1,12 +1,15 @@
 package com.guanxian.platform.policy;
 
+import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -44,8 +47,9 @@ public class PolicyService {
     public PolicyPage page(ActorScope actor, String query, boolean includeDeleted, int page, int size) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && (actor.isSystemAdmin() || actor.isAssociationStaff());
-        return new PolicyPage(store.list(actor, query, allowedDeleted, safePage * safeSize, safeSize),
+        return new PolicyPage(store.list(actor, query, allowedDeleted, offset, safeSize),
                 store.count(actor, query, allowedDeleted), safePage, safeSize);
     }
 
@@ -119,11 +123,16 @@ public class PolicyService {
     public PolicyView restore(UUID id, long expectedVersion, ActorScope actor) {
         PolicyView current = get(id, actor, true);
         requireReviewer(actor, current.associationId());
-        if (!current.deleted()) {
-            throw new PreconditionFailedException("policy is not deleted");
-        }
         requireVersion(current.version(), expectedVersion);
-        PolicyView restored = store.restore(id, expectedVersion, actor).orElseThrow(PolicyService::stale);
+        PolicyView restored;
+        if (current.deleted()) {
+            restored = store.restore(id, expectedVersion, actor).orElseThrow(PolicyService::stale);
+        } else if ("DISABLED".equals(current.status()) || current.disabled()) {
+            restored = store.transition(id, expectedVersion, "DRAFT", actor)
+                    .orElseThrow(PolicyService::stale);
+        } else {
+            throw new PreconditionFailedException("policy is neither deleted nor disabled");
+        }
         store.recordChange(actor, "RESTORE", restored, null);
         return restored;
     }
@@ -154,13 +163,45 @@ public class PolicyService {
         if (!VISIBILITIES.contains(visibility)) {
             throw new PreconditionFailedException("visibility must be PRIVATE, MEMBERS, PARTNERS or PUBLIC");
         }
+        validateSourceUrl(request.sourceUrl());
+    }
+
+    private static void validateSourceUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        try {
+            URI uri = URI.create(value.trim());
+            if (!("http".equalsIgnoreCase(uri.getScheme())
+                    || "https".equalsIgnoreCase(uri.getScheme()))
+                    || uri.getHost() == null
+                    || uri.getUserInfo() != null) {
+                throw invalidSourceUrl();
+            }
+        } catch (IllegalArgumentException exception) {
+            throw invalidSourceUrl();
+        }
+    }
+
+    private static ApiException invalidSourceUrl() {
+        return new ApiException(
+                "INVALID_POLICY_SOURCE_URL",
+                "sourceUrl must be an HTTP or HTTPS URL without embedded credentials",
+                HttpStatus.BAD_REQUEST);
     }
 
     private static UUID writableAssociation(UUID requested, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return requested;
+            UUID selected = requireAssociationContext(actor);
+            if (requested != null && !requested.equals(selected)) {
+                throw scopeViolation();
+            }
+            return selected;
         }
         if (actor.isAssociationStaff() && actor.associationId() != null) {
+            if (requested != null && !requested.equals(actor.associationId())) {
+                throw scopeViolation();
+            }
             return actor.associationId();
         }
         throw new ForbiddenException("POLICY_WRITE_SCOPE_REQUIRED",
@@ -169,17 +210,18 @@ public class PolicyService {
 
     private static void requireWriter(ActorScope actor, UUID associationId) {
         if (actor.isSystemAdmin()) {
+            requireSelectedAssociation(actor, associationId);
             return;
         }
         if (!actor.isAssociationStaff() || actor.associationId() == null
                 || !actor.associationId().equals(associationId)) {
-            throw new ForbiddenException("POLICY_SCOPE_VIOLATION",
-                    "association staff can only maintain their own policies");
+            throw scopeViolation();
         }
     }
 
     private static void requireReviewer(ActorScope actor, UUID associationId) {
         if (actor.isSystemAdmin()) {
+            requireSelectedAssociation(actor, associationId);
             return;
         }
         if (!actor.isAssociationReviewer() || actor.associationId() == null
@@ -203,5 +245,27 @@ public class PolicyService {
 
     private static PreconditionFailedException stale() {
         return new PreconditionFailedException("resource version is stale; reload and retry with the latest ETag");
+    }
+
+    private static void requireSelectedAssociation(ActorScope actor, UUID associationId) {
+        UUID selected = requireAssociationContext(actor);
+        if (!selected.equals(associationId)) {
+            throw scopeViolation();
+        }
+    }
+
+    private static UUID requireAssociationContext(ActorScope actor) {
+        if (actor.associationId() == null) {
+            throw new ApiException(
+                    "ASSOCIATION_CONTEXT_REQUIRED",
+                    "system administrators must select an association context",
+                    HttpStatus.BAD_REQUEST);
+        }
+        return actor.associationId();
+    }
+
+    private static ForbiddenException scopeViolation() {
+        return new ForbiddenException("POLICY_SCOPE_VIOLATION",
+                "policies can only be maintained in the selected association context");
     }
 }

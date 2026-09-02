@@ -11,3 +11,12 @@ logging:
   structured:
     format:
       console: logstash
+
+management:
+  endpoint:
+    health:
+      # The public /api/v1/health endpoint aggregates all registered indicators.
+      # This named group also gives private operators a stable dependency contract.
+      group:
+        readiness:
+          include: db,minioObjectStorage,redisAttachmentRateLimiter,oidcJwkSet

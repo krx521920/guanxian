@@ -12,6 +12,8 @@ public class RagProperties {
     private int maxQuestionChars = 2000;
     private int maxInputTokens = 6000;
     private int maxOutputTokens = 800;
+    private int maxDocumentChars = 2_000_000;
+    private long maxDocumentBytes = 20L * 1024 * 1024;
     private BigDecimal maxEstimatedCost = new BigDecimal("0.50");
     private boolean externalModelDataEgressEnabled = false;
 
@@ -27,6 +29,10 @@ public class RagProperties {
     public void setMaxInputTokens(int value) { maxInputTokens = value; }
     public int getMaxOutputTokens() { return maxOutputTokens; }
     public void setMaxOutputTokens(int value) { maxOutputTokens = value; }
+    public int getMaxDocumentChars() { return maxDocumentChars; }
+    public void setMaxDocumentChars(int value) { maxDocumentChars = value; }
+    public long getMaxDocumentBytes() { return maxDocumentBytes; }
+    public void setMaxDocumentBytes(long value) { maxDocumentBytes = value; }
     public BigDecimal getMaxEstimatedCost() { return maxEstimatedCost; }
     public void setMaxEstimatedCost(BigDecimal value) { maxEstimatedCost = value; }
     public boolean isExternalModelDataEgressEnabled() { return externalModelDataEgressEnabled; }
@@ -37,6 +43,10 @@ public class RagProperties {
         if (chunkOverlapChars < 0 || chunkOverlapChars >= chunkSizeChars / 2) throw new IllegalStateException("rag overlap must be non-negative and less than half the chunk size");
         if (retrievalLimit < 1 || retrievalLimit > 12) throw new IllegalStateException("rag retrieval limit must be between 1 and 12");
         if (maxQuestionChars < 10 || maxInputTokens < 100 || maxOutputTokens < 1) throw new IllegalStateException("rag limits are invalid");
+        if (maxDocumentChars < 1_000 || maxDocumentChars > 5_000_000
+                || maxDocumentBytes < 1_024 || maxDocumentBytes > 100L * 1024 * 1024) {
+            throw new IllegalStateException("rag document limits are invalid");
+        }
         if (maxEstimatedCost == null || maxEstimatedCost.signum() < 0) throw new IllegalStateException("rag cost limit must be non-negative");
     }
 }

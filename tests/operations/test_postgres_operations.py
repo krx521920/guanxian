@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
-from tools.operations import postgres_backup, postgres_restore_drill
+from tools.operations import postgres_backup, postgres_pitr_readiness, postgres_restore_drill
 from tools.operations.postgres_common import (
     EXECUTION_GUARD_NAME,
     EXECUTION_GUARD_VALUE,
@@ -91,6 +91,10 @@ class BackupTests(OperationFixture):
         self.assertEqual("postgres", plan.command[6])
         self.assertEqual("pg_dump", plan.command[7])
         self.assertNotIn(";", "".join(plan.command))
+
+    def test_cli_defaults_to_production_compose(self) -> None:
+        args = postgres_backup.parse_args(["--dry-run"])
+        self.assertEqual("compose.production.yml", args.compose_file.name)
 
     def test_backup_dry_run_never_invokes_subprocess_or_creates_output(self) -> None:
         output_dir = self.root / "backups"
@@ -193,6 +197,12 @@ class RestoreDrillTests(OperationFixture):
         self.assertEqual(0, result)
         run.assert_not_called()
 
+    def test_cli_defaults_to_production_compose(self) -> None:
+        args = postgres_restore_drill.parse_args(
+            ["--archive", str(self.create_archive()), "--target-database", "guanxian_restore_test_cli"]
+        )
+        self.assertEqual("compose.production.yml", args.compose_file.name)
+
     def test_restore_execute_requires_exact_confirmation(self) -> None:
         plan = self.build_plan()
         with self.assertRaises(OperationSafetyError):
@@ -243,7 +253,7 @@ class RestoreDrillTests(OperationFixture):
             return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr=b"")
 
         with mock.patch.object(postgres_restore_drill.subprocess, "run", side_effect=fake_run):
-            postgres_restore_drill.execute_restore(
+            report = postgres_restore_drill.execute_restore(
                 plan,
                 confirm_target=plan.target_database,
                 environment={EXECUTION_GUARD_NAME: EXECUTION_GUARD_VALUE},
@@ -252,6 +262,9 @@ class RestoreDrillTests(OperationFixture):
             [plan.drop_command, plan.create_command, plan.restore_command, plan.verify_command],
             observed,
         )
+        self.assertEqual("verified", report["status"])
+        self.assertTrue(report["verification"]["restoredUserTablePresent"])
+        self.assertEqual(sha256_file(plan.archive), report["archiveSha256"])
 
     def test_failed_restore_cleans_up_only_the_validated_test_database(self) -> None:
         plan = self.build_plan()
@@ -273,6 +286,25 @@ class RestoreDrillTests(OperationFixture):
             [plan.drop_command, plan.create_command, plan.restore_command, plan.drop_command],
             observed,
         )
+
+
+class PitrReadinessTests(OperationFixture):
+    def test_forced_wal_archive_must_advance_without_failures(self) -> None:
+        responses = iter([
+            "on|replica|test archive command",
+            "4|0|000000010000000000000004",
+            "000000010000000000000005",
+            "5|0|000000010000000000000005",
+        ])
+        with mock.patch.object(postgres_pitr_readiness, "query", side_effect=lambda *args: next(responses)):
+            report = postgres_pitr_readiness.execute(self.compose_file, "guanxian", "guanxian", 2)
+        self.assertEqual("verified", report["status"])
+        self.assertEqual(5, report["archivedCountAfter"])
+
+    def test_rejects_disabled_archive_mode(self) -> None:
+        with mock.patch.object(postgres_pitr_readiness, "query", return_value="off|replica|"):
+            with self.assertRaises(RuntimeError):
+                postgres_pitr_readiness.execute(self.compose_file, "guanxian", "guanxian", 1)
 
 
 if __name__ == "__main__":

@@ -102,6 +102,16 @@ public class OfferingController {
                 id, VersionEtags.requireVersion(ifMatch), actor(authentication)));
     }
 
+    @PostMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    ResponseEntity<ApiResponse<OfferingView>> enable(
+            @PathVariable UUID id,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
+            Authentication authentication) {
+        return versioned(service.enableOffering(
+                id, VersionEtags.requireVersion(ifMatch), actor(authentication)));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
     ResponseEntity<ApiResponse<OfferingView>> delete(

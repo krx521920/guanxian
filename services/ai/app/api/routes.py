@@ -8,10 +8,9 @@ from app.schemas.common import canonical_key
 from app.schemas.company import CompanyExtractionRequest, CompanyExtractionResponse
 from app.schemas.health import HealthResponse
 from app.schemas.matching import EnterpriseMatchRequest, EnterpriseMatchResponse
-from app.schemas.policy import PolicyQARequest, PolicyQAResponse
+from app.schemas.policy import PolicyQARequest
 from app.services.company_extraction import extract_company_profile
 from app.services.enterprise_matching import match_enterprises
-from app.services.policy_qa import answer_policy_question
 
 health_router = APIRouter(tags=["health"])
 api_router = APIRouter()
@@ -68,14 +67,14 @@ def match_enterprise_candidates(
 
 @api_router.post(
     "/qa/policy",
-    response_model=PolicyQAResponse,
-    responses={409: {"description": "政策文档标识冲突"}},
+    status_code=503,
+    responses={503: {"description": "政策问答能力未在 Python 服务启用"}},
     tags=["policy-qa"],
+    summary="政策问答兼容入口（未启用）",
 )
-def policy_qa(request: PolicyQARequest) -> PolicyQAResponse:
-    _ensure_unique_ids(
-        [document.document_id for document in request.documents],
-        "DUPLICATE_DOCUMENT_ID",
-        "政策文档标识 document_id 不能重复",
+def policy_qa(_: PolicyQARequest) -> None:
+    raise DomainError(
+        "POLICY_QA_NOT_ENABLED",
+        "Python 服务未启用政策问答，请使用 Java ai-adapter 的知识库问答接口",
+        status_code=503,
     )
-    return answer_policy_question(request)

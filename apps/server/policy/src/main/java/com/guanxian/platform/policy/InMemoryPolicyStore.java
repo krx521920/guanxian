@@ -1,6 +1,8 @@
 package com.guanxian.platform.policy;
 
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -24,6 +26,16 @@ class InMemoryPolicyStore implements PolicyStore {
     private final ConcurrentMap<UUID, List<PolicyHistoryView>> histories = new ConcurrentHashMap<>();
 
     InMemoryPolicyStore() {
+        this(false);
+    }
+
+    @Autowired
+    InMemoryPolicyStore(
+            @Value("${guanxian.business.seed-demo-data:${guanxian.member.seed-demo-data:false}}")
+            boolean seedDemoData) {
+        if (!seedDemoData) {
+            return;
+        }
         seed("10000000-0000-0000-0000-000000000001", "城市地下管线建设管理工作指导意见",
                 "住房和城乡建设部", "国家", "建设管理", LocalDate.of(2026, 8, 1),
                 LocalDate.of(2026, 9, 1), "强化地下管线全生命周期管理，推动数字化交付与风险分级管控。",
@@ -35,7 +47,7 @@ class InMemoryPolicyStore implements PolicyStore {
     }
 
     @Override
-    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, int offset, int limit) {
+    public List<PolicyView> list(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
         return policies.values().stream()
                 .filter(policy -> includeDeleted || !policy.deleted())
                 .filter(policy -> canRead(actor, policy))
@@ -171,7 +183,7 @@ class InMemoryPolicyStore implements PolicyStore {
 
     private static boolean canRead(ActorScope actor, PolicyView policy) {
         if (actor.isSystemAdmin()) {
-            return true;
+            return actor.associationId() == null || actor.associationId().equals(policy.associationId());
         }
         boolean ownAssociation = actor.associationId() != null
                 && actor.associationId().equals(policy.associationId());
@@ -181,7 +193,8 @@ class InMemoryPolicyStore implements PolicyStore {
         if (!"PUBLISHED".equals(policy.status()) || policy.disabled()) {
             return false;
         }
-        if (ownAssociation || "PUBLIC".equals(policy.visibility())) {
+        if (ownAssociation && !"PRIVATE".equals(policy.visibility())
+                || "PUBLIC".equals(policy.visibility())) {
             return true;
         }
         return actor.partnerAssociationIds().contains(policy.associationId())

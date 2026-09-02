@@ -8,7 +8,12 @@ import {
 import { defaultRouteForRole } from '../config/roles'
 import { ROLES, type SessionUser, type UserRole } from '../types/domain'
 import { request } from './http'
-import { setAccessToken } from './token-store'
+import {
+  getSystemContext,
+  setAccessToken,
+  setDemoRole,
+  setSystemContext as setTransportSystemContext,
+} from './token-store'
 
 const ROLE_STORAGE_KEY = 'guanxian.demo.role'
 const LEGACY_STORAGE_KEY = 'guanxian.demo.session'
@@ -16,11 +21,12 @@ const configuredMode = (import.meta.env.VITE_AUTH_MODE || 'oidc').trim().toLower
 const demoMode = import.meta.env.MODE !== 'production' && configuredMode === 'demo'
 
 const demoUsers: Record<UserRole, SessionUser> = {
-  SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [] },
-  ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [] },
-  ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [] },
-  ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [] },
-  ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [] },
+  SYSTEM_ADMIN: { id: 'u-001', name: '平台管理员', role: 'SYSTEM_ADMIN', organization: '管线智联平台', title: '系统管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+  ASSOCIATION_ADMIN: { id: 'u-002', name: '张全超', role: 'ASSOCIATION_ADMIN', organization: '北京地下管线协会', title: '协会管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+  ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
+  ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
+  ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
+  OBSERVER: { id: 'u-006', name: '只读观察员', role: 'OBSERVER', organization: '北京地下管线协会', title: '只读观察员', permissions: ['MEMBER_READ', 'POLICY_READ', 'NOTIFICATION_READ'], associationId: '00000000-0000-0000-0000-000000000106' },
 }
 
 interface CurrentUserView {
@@ -31,6 +37,8 @@ interface CurrentUserView {
   title: string
   roles: string[]
   permissions: string[]
+  associationId?: string | null
+  enterpriseId?: string | null
 }
 
 interface RedirectState {
@@ -84,6 +92,13 @@ const state = reactive<{
   error: null,
   postLoginRoute: null,
 })
+setDemoRole(demoMode ? state.user?.role ?? null : null)
+if (demoMode) {
+  setTransportSystemContext(
+    state.user?.role === 'SYSTEM_ADMIN' ? state.user.associationId || null : null,
+    state.user?.role === 'SYSTEM_ADMIN' ? state.user.enterpriseId || null : null,
+  )
+}
 
 let manager: UserManager | null = null
 let initialization: Promise<void> | null = null
@@ -111,6 +126,7 @@ function userManager(): UserManager {
   manager = new UserManager(settings)
   manager.events.addAccessTokenExpired(() => {
     setAccessToken(null)
+    setTransportSystemContext(null, null)
     state.user = null
   })
   return manager
@@ -118,6 +134,11 @@ function userManager(): UserManager {
 
 function setDemoUser(user: SessionUser | null) {
   state.user = user
+  setDemoRole(user?.role ?? null)
+  setTransportSystemContext(
+    user?.role === 'SYSTEM_ADMIN' ? user.associationId || null : null,
+    user?.role === 'SYSTEM_ADMIN' ? user.enterpriseId || null : null,
+  )
   clearLegacySession()
   try {
     if (user) sessionStorage.setItem(ROLE_STORAGE_KEY, user.role)
@@ -130,16 +151,40 @@ function setDemoUser(user: SessionUser | null) {
 async function loadVerifiedUser(oidcUser: User): Promise<void> {
   if (!oidcUser.access_token || oidcUser.expired) {
     setAccessToken(null)
+    setTransportSystemContext(null, null)
     state.user = null
     return
   }
+  const persistedContext = getSystemContext()
   setAccessToken(oidcUser.access_token)
-  const verified = await request<CurrentUserView>('/users/me')
-  const role = verified.roles.find(isUserRole)
+  // A persisted system-admin context must never influence the initial identity
+  // verification. Restore it only after the backend has confirmed the account
+  // is still a system administrator, then validate the selected scope again.
+  setTransportSystemContext(null, null)
+  const baseIdentity = await request<CurrentUserView>('/users/me')
+  const role = baseIdentity.roles.find(isUserRole)
   if (!role) {
     setAccessToken(null)
+    setTransportSystemContext(null, null)
     state.user = null
     throw new Error('当前账号没有平台角色')
+  }
+  let verified = baseIdentity
+  if (role === 'SYSTEM_ADMIN' && persistedContext.associationId) {
+    setTransportSystemContext(persistedContext.associationId, persistedContext.enterpriseId)
+    try {
+      const scopedIdentity = await request<CurrentUserView>('/users/me')
+      const contextMatches = scopedIdentity.roles.includes('SYSTEM_ADMIN')
+        && scopedIdentity.associationId === persistedContext.associationId
+        && (persistedContext.enterpriseId === null
+          || scopedIdentity.enterpriseId === persistedContext.enterpriseId)
+      if (!contextMatches) throw new Error('管理上下文已失效')
+      verified = scopedIdentity
+    } catch {
+      // Losing an old delegated scope must not invalidate the administrator's
+      // base login. Fall back to the unscoped platform identity.
+      setTransportSystemContext(null, null)
+    }
   }
   state.user = {
     id: verified.subject,
@@ -148,6 +193,8 @@ async function loadVerifiedUser(oidcUser: User): Promise<void> {
     organization: verified.organization || '未设置组织',
     title: verified.title || role,
     permissions: verified.permissions,
+    associationId: verified.associationId,
+    enterpriseId: verified.enterpriseId,
   }
   state.postLoginRoute = safeLocalPath(
     (oidcUser.state as RedirectState | null)?.returnTo,
@@ -168,6 +215,7 @@ async function initializeOidc(): Promise<void> {
       if (user) await loadVerifiedUser(user)
     } catch {
       setAccessToken(null)
+      setTransportSystemContext(null, null)
       state.user = null
       state.error = '身份验证失败，请重新登录；如持续失败请联系系统管理员检查 OIDC 配置。'
     } finally {
@@ -203,6 +251,16 @@ export function useAuth() {
       setDemoUser(demoUsers[role])
       return defaultRouteForRole(role)
     },
+    setSystemContext(associationId: string | null, associationName: string, enterpriseId: string | null) {
+      if (state.user?.role !== 'SYSTEM_ADMIN') throw new Error('仅系统管理员可切换管理上下文')
+      setTransportSystemContext(associationId, enterpriseId)
+      state.user = {
+        ...state.user,
+        associationId,
+        enterpriseId,
+        organization: associationId ? associationName : '全平台',
+      }
+    },
     takePostLoginRoute() {
       const route = state.postLoginRoute
       state.postLoginRoute = null
@@ -210,6 +268,7 @@ export function useAuth() {
     },
     async logout() {
       setAccessToken(null)
+      setTransportSystemContext(null, null)
       state.user = null
       if (demoMode) {
         setDemoUser(null)

@@ -1,5 +1,6 @@
 package com.guanxian.platform.storage;
 
+import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
@@ -16,13 +17,19 @@ import java.util.concurrent.ConcurrentMap;
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "memory")
 class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
     private final ConcurrentMap<UUID, AttachmentView> entries = new ConcurrentHashMap<>();
+    private final AttachmentEnterpriseScope enterpriseScope;
+
+    InMemoryAttachmentMetadataStore(AttachmentEnterpriseScope enterpriseScope) {
+        this.enterpriseScope = enterpriseScope;
+    }
 
     @Override
     public AttachmentView create(AttachmentDraft draft, ActorScope actor) {
+        requireCreateScope(draft, actor);
         Instant now = Instant.now();
         AttachmentView view = new AttachmentView(
                 draft.id(), draft.associationId(), draft.enterpriseId(), draft.bucketName(), draft.objectKey(),
-                draft.originalFilename(), draft.mediaType(), draft.sizeBytes(), draft.sha256(), "PENDING",
+                draft.originalFilename(), draft.mediaType(), draft.sizeBytes(), draft.sha256(), draft.scanStatus(),
                 draft.visibility(), "ACTIVE", 0, draft.uploadedBySubject(), now, now, null);
         if (entries.putIfAbsent(view.id(), view) != null) {
             throw new IllegalStateException("duplicate attachment id");
@@ -95,7 +102,9 @@ class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private static boolean canManage(AttachmentView value, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return true;
+            return actor.associationId() != null
+                    && actor.associationId().equals(value.associationId())
+                    && (actor.enterpriseId() == null || actor.enterpriseId().equals(value.enterpriseId()));
         }
         if (actor.associationId() == null || !actor.associationId().equals(value.associationId())) {
             return false;
@@ -107,7 +116,8 @@ class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
 
     private static boolean canRead(AttachmentView value, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return true;
+            return (actor.associationId() == null || actor.associationId().equals(value.associationId()))
+                    && (actor.enterpriseId() == null || actor.enterpriseId().equals(value.enterpriseId()));
         }
         if (actor.associationId() == null || !actor.associationId().equals(value.associationId())) {
             return false;
@@ -116,5 +126,32 @@ class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
             return true;
         }
         return actor.enterpriseId() != null && actor.enterpriseId().equals(value.enterpriseId());
+    }
+
+    private void requireCreateScope(AttachmentDraft draft, ActorScope actor) {
+        if (actor.isSystemAdmin()) {
+            if (actor.associationId() == null || !actor.associationId().equals(draft.associationId())
+                    || !java.util.Objects.equals(actor.enterpriseId(), draft.enterpriseId())) {
+                throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                        "attachment target is outside the selected system context");
+            }
+            requireEnterpriseAssociation(draft, actor);
+            return;
+        }
+        if (actor.associationId() == null || !actor.associationId().equals(draft.associationId())
+                || actor.isEnterpriseAdmin() && (actor.enterpriseId() == null
+                || !actor.enterpriseId().equals(draft.enterpriseId()))) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "attachment target is outside the actor scope");
+        }
+        requireEnterpriseAssociation(draft, actor);
+    }
+
+    private void requireEnterpriseAssociation(AttachmentDraft draft, ActorScope actor) {
+        if (draft.enterpriseId() != null && !enterpriseScope.contains(
+                draft.associationId(), draft.enterpriseId(), actor)) {
+            throw new ForbiddenException("ATTACHMENT_SCOPE_VIOLATION",
+                    "target enterprise does not belong to the attachment association");
+        }
     }
 }

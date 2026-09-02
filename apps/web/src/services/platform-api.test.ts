@@ -24,11 +24,13 @@ const profile: MemberProfile = {
   version: 7,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-08-20T00:00:00Z',
+  deletedAt: null,
+  deletedBySubject: null,
+  statusBeforeDelete: null,
 }
 
-async function loadApi(mockFallback = 'false') {
+async function loadApi() {
   vi.resetModules()
-  vi.stubEnv('VITE_MOCK_FALLBACK', mockFallback)
   vi.stubEnv('MODE', 'test')
   vi.stubEnv('VITE_API_BASE_URL', '/api/v1')
   return import('./platform-api')
@@ -205,6 +207,10 @@ describe('member ETag API contract', () => {
     await platformApi.policies()
     await platformApi.matches()
     await platformApi.collaborations()
+    await platformApi.notifications({ status: 'ARCHIVED', page: 2, size: 15 })
+    await platformApi.markNotificationRead('message /一')
+    await platformApi.archiveNotification('message /一')
+    await platformApi.restoreNotification('message /一')
 
     const calls = fetchMock.mock.calls.map(([url, init]) => ({
       url,
@@ -213,15 +219,19 @@ describe('member ETag API contract', () => {
     expect(calls).toEqual([
       { url: '/api/v1/dashboards/association', method: 'GET' },
       { url: '/api/v1/dashboards/enterprise', method: 'GET' },
-      { url: '/api/v1/members', method: 'GET' },
+      { url: '/api/v1/members/page?q=&status=&page=0&size=20&includeDeleted=false', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80', method: 'GET' },
       { url: '/api/v1/members/imports/batch%20%2F%E4%B8%80/commit', method: 'POST' },
-      { url: '/api/v1/policies', method: 'GET' },
-      { url: '/api/v1/matches', method: 'GET' },
-      { url: '/api/v1/collaborations', method: 'GET' },
+      { url: '/api/v1/policies/page?q=&page=0&size=20&includeDeleted=false', method: 'GET' },
+      { url: '/api/v1/matches?page=0&size=20', method: 'GET' },
+      { url: '/api/v1/collaborations/page?query=&stage=&page=0&size=20&includeDeleted=false', method: 'GET' },
+      { url: '/api/v1/notifications/messages?unreadOnly=false&page=2&size=15&status=ARCHIVED', method: 'GET' },
+      { url: '/api/v1/notifications/messages/message%20%2F%E4%B8%80/read', method: 'PUT' },
+      { url: '/api/v1/notifications/messages/message%20%2F%E4%B8%80/archive', method: 'PUT' },
+      { url: '/api/v1/notifications/messages/message%20%2F%E4%B8%80/restore', method: 'PUT' },
     ])
     expect(fetchMock.mock.calls.map(([, init]) => (init as RequestInit).body)).toEqual(
-      Array(8).fill(undefined),
+      Array(12).fill(undefined),
     )
   })
 
@@ -269,6 +279,173 @@ describe('member ETag API contract', () => {
     expect(fetchMock.mock.calls[3]?.[0]).toBe('/api/v1/members/import-template')
   })
 
+  it('uses server-side match paging, raw state filters and encoded detail paths', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      Response.json({ code: 'OK', data: { items: [], total: 0, page: 0, size: 20 } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.matches(2, 50, 'PARTIALLY_CONFIRMED')
+    await platformApi.match('match /一')
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/matches?page=2&size=50&state=PARTIALLY_CONFIRMED',
+      '/api/v1/matches/match%20%2F%E4%B8%80',
+    ])
+  })
+
+  it('uses server-side audit paging inside the selected enterprise scope', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({ code: 'OK', data: { items: [], total: 0, page: 2, size: 50, snapshotId: 99 } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.auditLogPage('enterprise /一', 2, 50, 99)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/audit-logs/page?enterpriseId=enterprise%20%2F%E4%B8%80&page=2&size=50&snapshotId=99')
+    expect(init.method ?? 'GET').toBe('GET')
+  })
+
+  it('uses versioned policy lifecycle, notification publish and subscription contracts', async () => {
+    const policy = {
+      id: 'policy /一', title: '政策标题', summary: '政策摘要', associationId: 'association-1', version: 7,
+    } as import('../types/domain').Policy
+    const subscription = {
+      id: 'subscription /一', version: 3, status: 'ACTIVE', subscriptionType: 'POLICY',
+      filters: {}, channels: ['IN_APP'],
+    } as import('../types/domain').Subscription
+    const fetchMock = vi.fn().mockImplementation(async () => Response.json({ code: 'OK', data: {} }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.policy(policy.id, true)
+    await platformApi.updatePolicy(policy.id, {} as import('../types/domain').PolicyUpsertPayload, 7)
+    await platformApi.disablePolicy(policy)
+    await platformApi.deletePolicy(policy)
+    await platformApi.restorePolicy(policy)
+    await platformApi.policyHistory(policy.id, 25)
+    await platformApi.updateSubscription(subscription, { subscriptionType: 'POLICY', filters: {}, channels: ['IN_APP'] })
+    await platformApi.publishPolicyNotification(policy)
+
+    expect(fetchMock.mock.calls.map(([url, init]) => ({
+      url,
+      method: (init as RequestInit).method ?? 'GET',
+      ifMatch: new Headers((init as RequestInit).headers).get('If-Match'),
+    }))).toEqual([
+      { url: '/api/v1/policies/policy%20%2F%E4%B8%80?includeDeleted=true', method: 'GET', ifMatch: null },
+      { url: '/api/v1/policies/policy%20%2F%E4%B8%80', method: 'PUT', ifMatch: '"7"' },
+      { url: '/api/v1/policies/policy%20%2F%E4%B8%80/disable', method: 'PUT', ifMatch: '"7"' },
+      { url: '/api/v1/policies/policy%20%2F%E4%B8%80', method: 'DELETE', ifMatch: '"7"' },
+      { url: '/api/v1/policies/policy%20%2F%E4%B8%80/restore', method: 'PUT', ifMatch: '"7"' },
+      { url: '/api/v1/policies/policy%20%2F%E4%B8%80/history?limit=25', method: 'GET', ifMatch: null },
+      { url: '/api/v1/notifications/subscriptions/subscription%20%2F%E4%B8%80', method: 'PUT', ifMatch: '"3"' },
+      { url: '/api/v1/notifications/policies', method: 'POST', ifMatch: null },
+    ])
+    expect(JSON.parse(String((fetchMock.mock.calls[7]?.[1] as RequestInit).body))).toMatchObject({
+      associationId: 'association-1', policyId: 'policy /一', idempotencyKey: 'policy-release-policy /一-7',
+    })
+  })
+
+  it('uses filtered paging and strong CAS contracts for the policy impact workflow', async () => {
+    const impact = {
+      id: 'impact /一', policyDocumentId: 'policy /一', enterpriseId: 'enterprise /一', version: 7,
+    } as import('../types/domain').PolicyImpactAnalysis
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      Response.json({ code: 'OK', data: {} }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.policyImpacts(2, 50, {
+      status: 'PENDING_REVIEW',
+      policyDocumentId: impact.policyDocumentId,
+      enterpriseId: impact.enterpriseId,
+    })
+    await platformApi.policyImpact(impact.id)
+    await platformApi.createPolicyImpact(impact.policyDocumentId, impact.enterpriseId)
+    await platformApi.reanalyzePolicyImpact(impact)
+    await platformApi.reviewPolicyImpact(impact, false, '  证据需补充  ')
+    await platformApi.policyImpactHistory(impact.id, 25)
+
+    expect(fetchMock.mock.calls.map(([url, init]) => ({
+      url,
+      method: (init as RequestInit).method ?? 'GET',
+      ifMatch: new Headers((init as RequestInit).headers).get('If-Match'),
+    }))).toEqual([
+      {
+        url: '/api/v1/policy-impact-analyses/page?page=2&size=50&status=PENDING_REVIEW&policyDocumentId=policy+%2F%E4%B8%80&enterpriseId=enterprise+%2F%E4%B8%80',
+        method: 'GET',
+        ifMatch: null,
+      },
+      { url: '/api/v1/policy-impact-analyses/impact%20%2F%E4%B8%80', method: 'GET', ifMatch: null },
+      { url: '/api/v1/policy-impact-analyses', method: 'POST', ifMatch: null },
+      { url: '/api/v1/policy-impact-analyses/impact%20%2F%E4%B8%80/reanalyze', method: 'PUT', ifMatch: '"7"' },
+      { url: '/api/v1/policy-impact-analyses/impact%20%2F%E4%B8%80/review', method: 'PUT', ifMatch: '"7"' },
+      { url: '/api/v1/policy-impact-analyses/impact%20%2F%E4%B8%80/history?limit=25', method: 'GET', ifMatch: null },
+    ])
+    expect(JSON.parse(String((fetchMock.mock.calls[2]?.[1] as RequestInit).body))).toEqual({
+      policyDocumentId: 'policy /一', enterpriseId: 'enterprise /一',
+    })
+    expect(JSON.parse(String((fetchMock.mock.calls[4]?.[1] as RequestInit).body))).toEqual({
+      approved: false, comment: '证据需补充',
+    })
+  })
+
+  it('sends strong CAS versions for match transitions and feedback replacement', async () => {
+    const match = {
+      id: 'match-1',
+      candidateEnterpriseId: 'enterprise-2',
+      version: 7,
+    } as import('../types/domain').PersistedMatch
+    const feedback = { id: 'feedback-1', version: 3 } as import('../types/domain').MatchFeedback
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      Response.json({ code: 'OK', data: {} }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.transitionMatch(match, 'confirm')
+    await platformApi.closeMatch(match, '需求变化')
+    await platformApi.inviteMatch(match, 'ENTERPRISE', '请确认', null)
+    await platformApi.submitMatchFeedback(match, {
+      rating: 5,
+      outcome: 'SUCCESS',
+      closeReason: null,
+      comment: '已达成合作',
+    }, feedback)
+
+    expect(fetchMock.mock.calls.map(([url, init]) => ({
+      url,
+      method: (init as RequestInit).method,
+      ifMatch: new Headers((init as RequestInit).headers).get('If-Match'),
+    }))).toEqual([
+      { url: '/api/v1/matches/match-1/confirm', method: 'POST', ifMatch: '"7"' },
+      { url: '/api/v1/matches/match-1/close', method: 'POST', ifMatch: '"7"' },
+      { url: '/api/v1/matches/match-1/invitations', method: 'POST', ifMatch: '"7"' },
+      { url: '/api/v1/matches/match-1/feedback', method: 'POST', ifMatch: '"3"' },
+    ])
+  })
+
+  it('does not send If-Match when creating a participant feedback row for the first time', async () => {
+    const match = { id: 'match-1', version: 7 } as import('../types/domain').PersistedMatch
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: {} }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await platformApi.submitMatchFeedback(match, {
+      rating: null,
+      outcome: 'NO_DEAL',
+      closeReason: '预算变化',
+      comment: null,
+    }, null)
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(new Headers(init.headers).has('If-Match')).toBe(false)
+  })
+
   it.each(['7', '"07"', 'x"7"', '"7"x', '"-1"', ''])('rejects invalid strong ETag %j before sending a write', async (etag) => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
@@ -297,15 +474,12 @@ describe('member ETag API contract', () => {
     })
   })
 
-  it('returns deterministic demo data only for an explicitly enabled network fallback', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
-    const { platformApi } = await loadApi('true')
+  it('propagates network failures instead of returning demo records', async () => {
+    const failure = new TypeError('offline')
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(failure))
+    const { platformApi } = await loadApi()
 
-    await expect(platformApi.associationDashboard()).resolves.toMatchObject({ metrics: expect.any(Array) })
-    await expect(platformApi.enterpriseDashboard()).resolves.toMatchObject({ metrics: expect.any(Array) })
-    await expect(platformApi.members()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.policies()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.matches()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.collaborations()).resolves.toEqual(expect.any(Array))
+    await expect(platformApi.associationDashboard()).rejects.toBe(failure)
+    await expect(platformApi.members()).rejects.toBe(failure)
   })
 })

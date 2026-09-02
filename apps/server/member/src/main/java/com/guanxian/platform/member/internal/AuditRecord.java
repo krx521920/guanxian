@@ -13,6 +13,8 @@ public record AuditRecord(
         String action,
         String resourceType,
         String resourceId,
+        Long resourceVersion,
+        String outcome,
         Map<String, Object> details,
         String requestId,
         Instant occurredAt) {
