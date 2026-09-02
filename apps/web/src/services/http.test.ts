@@ -354,7 +354,7 @@ describe('request', () => {
     const { request } = await loadRequest()
 
     const pendingRequest = request('/slow')
-    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 2500)
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 15_000)
     timeoutCallback?.()
 
     await expect(pendingRequest).rejects.toMatchObject({
@@ -364,6 +364,36 @@ describe('request', () => {
       code: 'REQUEST_TIMEOUT',
     })
     expect(clearTimeoutMock).toHaveBeenCalledWith(42)
+  })
+
+  it('supports a bounded timeout override without forwarding it to fetch', async () => {
+    const setTimeoutMock = vi.fn((_callback: () => void, _delay: number) => 45)
+    vi.stubGlobal('window', { setTimeout: setTimeoutMock, clearTimeout: vi.fn() })
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: 'done' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { request } = await loadRequest()
+
+    await expect(request('/slow-import', { timeoutMs: 60_000 })).resolves.toBe('done')
+
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), 60_000)
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit & { timeoutMs?: number }]
+    expect(init).not.toHaveProperty('timeoutMs')
+  })
+
+  it.each([
+    { value: Number.NaN, expected: 15_000 },
+    { value: 0, expected: 15_000 },
+    { value: 200, expected: 1_000 },
+    { value: 900_000, expected: 300_000 },
+  ])('normalizes timeout override $value to $expected ms', async ({ value, expected }) => {
+    const setTimeoutMock = vi.fn((_callback: () => void, _delay: number) => 46)
+    vi.stubGlobal('window', { setTimeout: setTimeoutMock, clearTimeout: vi.fn() })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: 'done' })))
+    const { request } = await loadRequest()
+
+    await request('/timeout-normalization', { timeoutMs: value })
+
+    expect(setTimeoutMock).toHaveBeenCalledWith(expect.any(Function), expected)
   })
 
   it('preserves caller cancellation and never falls back to mock data', async () => {

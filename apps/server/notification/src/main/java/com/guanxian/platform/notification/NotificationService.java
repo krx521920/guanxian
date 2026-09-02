@@ -1,10 +1,12 @@
 package com.guanxian.platform.notification;
 
+import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ConflictException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,8 @@ import java.util.UUID;
 public class NotificationService {
     private static final Set<String> TYPES = Set.of(
             "POLICY", "STANDARD", "ASSOCIATION", "COLLABORATION", "ECOSYSTEM_MATCH");
+    private static final Set<String> MESSAGE_STATUSES = Set.of(
+            "PENDING", "DELIVERED", "READ", "FAILED", "ARCHIVED");
 
     private final NotificationStore store;
 
@@ -85,12 +89,20 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public NotificationMessagePage messages(ActorScope actor, boolean unreadOnly, int page, int size) {
+        return messages(actor, unreadOnly, null, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationMessagePage messages(
+            ActorScope actor, boolean unreadOnly, String requestedStatus, int page, int size) {
         UUID userId = requireUser(actor);
+        String status = normalizeMessageStatus(unreadOnly, requestedStatus);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
+        long offset = (long) safePage * safeSize;
         return new NotificationMessagePage(
-                store.messages(userId, unreadOnly, safePage * safeSize, safeSize),
-                store.countMessages(userId, unreadOnly), safePage, safeSize);
+                store.messages(userId, unreadOnly, status, offset, safeSize),
+                store.countMessages(userId, unreadOnly, status), safePage, safeSize);
     }
 
     @Transactional
@@ -98,7 +110,7 @@ public class NotificationService {
         UUID userId = requireUser(actor);
         NotificationMessageView current = store.message(id, userId)
                 .orElseThrow(() -> new NotFoundException("notification_message", id));
-        if (current.readAt() != null) {
+        if ("ARCHIVED".equals(current.status()) || current.readAt() != null) {
             return current;
         }
         NotificationMessageView updated = store.markRead(id, userId)
@@ -168,6 +180,22 @@ public class NotificationService {
         }
         return new SubscriptionRequest(type,
                 request.filters() == null ? Map.of() : Map.copyOf(request.filters()), channels);
+    }
+
+    private static String normalizeMessageStatus(boolean unreadOnly, String requestedStatus) {
+        if (requestedStatus == null || requestedStatus.isBlank()) {
+            return null;
+        }
+        String status = requestedStatus.trim().toUpperCase(Locale.ROOT);
+        if (!MESSAGE_STATUSES.contains(status)) {
+            throw new ApiException("INVALID_NOTIFICATION_STATUS",
+                    "unsupported notification message status", HttpStatus.BAD_REQUEST);
+        }
+        if (unreadOnly) {
+            throw new ApiException("INVALID_NOTIFICATION_FILTER",
+                    "unreadOnly and status cannot be combined", HttpStatus.BAD_REQUEST);
+        }
+        return status;
     }
 
     private static UUID requireUser(ActorScope actor) {

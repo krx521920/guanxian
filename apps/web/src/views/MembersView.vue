@@ -56,8 +56,11 @@ async function openCreatePanel() {
 function closeCreatePanel() { showCreatePanel.value = false }
 async function handleCreated() {
   closeCreatePanel()
-  importMessage.value = '企业资料创建成功，会员列表已刷新。'
+  importMessage.value = '企业资料创建成功，正在刷新会员列表。'
   await load()
+  importMessage.value = error.value
+    ? '企业资料创建成功，但会员列表刷新失败，请点击重新加载。'
+    : '企业资料创建成功，会员列表已刷新。'
 }
 
 watch([filtered, pageSize], () => {
@@ -161,7 +164,8 @@ onMounted(load)
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else-if="items" class="panel flush-panel member-data-panel" :class="`density-${density}`">
       <div class="data-table-wrap"><table class="data-table member-table"><thead><tr><th>企业</th><th v-show="hasColumn('role')">业务角色 / 场景</th><th v-show="hasColumn('products')">主要产品与服务</th><th v-show="hasColumn('completeness')">资料完整度</th><th v-show="hasColumn('status')">状态</th><th v-show="hasColumn('updatedAt')">更新日期</th><th></th></tr></thead><tbody>
-        <tr v-for="item in paginated" :key="item.id"><td><div class="enterprise-cell"><span class="enterprise-logo">{{ item.shortName.slice(0, 2) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.city || '未填写地址' }} · 联系人：{{ item.contact || '未填写' }}</small></div></div></td><td v-show="hasColumn('role')"><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td><td v-show="hasColumn('products')">{{ item.products.join('、') || '—' }}</td><td v-show="hasColumn('completeness')"><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td><td v-show="hasColumn('status')"><StatusBadge :value="item.status" /></td><td v-show="hasColumn('updatedAt')" class="table-muted">{{ formatDate(item.updatedAt) }}</td><td><RouterLink v-if="item.canEdit || item.canReview" class="row-action" :to="`/members/${item.id}/edit`">{{ item.canReview && item.status === '待审核' ? '审核' : '编辑' }}</RouterLink><span v-else class="table-muted">查看</span></td></tr>
+        <tr v-for="item in paginated" :key="item.id"><td><div class="enterprise-cell"><span class="enterprise-logo">{{ item.shortName.slice(0, 2) }}</span><div><strong>{{ item.name }}</strong><small>{{ item.city || '未填写地址' }} · 联系人：{{ item.contact || '未填写' }}</small></div></div></td><td v-show="hasColumn('role')"><span class="table-muted">{{ item.role }}</span><div class="tags"><span v-for="scene in item.scenes" :key="scene">{{ scene }}</span></div></td><td v-show="hasColumn('products')">{{ item.products.join('、') || '—' }}</td><td v-show="hasColumn('completeness')"><div class="completion-cell"><div class="progress-track"><i :style="{ width: `${item.completeness}%` }" /></div><strong>{{ item.completeness }}%</strong></div></td><td v-show="hasColumn('status')"><StatusBadge :value="item.status" /></td><td v-show="hasColumn('updatedAt')" class="table-muted">{{ formatDate(item.updatedAt) }}</td><td><RouterLink v-if="item.canEdit || item.canReview" class="row-action" :to="`/members/${item.id}/edit`">{{ item.canReview && item.status === '待审核' ? '审核' : '编辑' }}</RouterLink><span v-else class="table-muted">无维护权限</span></td></tr>
+        <tr v-if="paginated.length === 0"><td :colspan="visibleColumns.length + 2"><div class="resource-error"><h2>{{ filtered.length === 0 && (keyword || status !== '全部') ? '没有符合条件的企业' : '当前范围暂无会员企业' }}</h2><p>{{ filtered.length === 0 && (keyword || status !== '全部') ? '请调整搜索词或状态筛选后重试。' : '接口返回了真实空列表；有采集权限的用户可以新增或批量导入企业资料。' }}</p></div></td></tr>
       </tbody></table></div>
       <footer class="table-pagination"><span>第 {{ page }} / {{ totalPages }} 页</span><label>每页<select v-model="pageSize"><option :value="10">10</option><option :value="20">20</option><option :value="50">50</option></select>条</label><div><button type="button" :disabled="page <= 1" @click="page--">上一页</button><button type="button" :disabled="page >= totalPages" @click="page++">下一页</button></div></footer>
     </section>

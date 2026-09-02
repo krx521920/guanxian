@@ -176,6 +176,52 @@ export interface EcosystemMatch {
   updatedAt: string
 }
 
+export type PersistedMatchState = 'PENDING_CONFIRMATION' | 'RECOMMENDED' | 'CONFIRMED' | 'CLOSED'
+
+export interface PersistedEcosystemMatch {
+  id: string
+  demandId: string
+  demandEnterpriseId: string
+  candidateEnterpriseId: string
+  demandCompany: string | null
+  demandTitle: string
+  scene: string | null
+  supplierCompany: string | null
+  solution: string | null
+  score: number
+  reasons: readonly string[]
+  state: PersistedMatchState
+  closedReason: string | null
+  version: number
+  updatedAt: string
+}
+
+export interface EcosystemDemand {
+  id: string
+  enterpriseId: string
+  enterpriseName: string | null
+  title: string
+  description: string
+  scenarios: string[]
+  requiredCapabilities: string[]
+  visibility: string
+  budgetMin: number | null
+  budgetMax: number | null
+  responseDeadline: string | null
+  status: string
+  closeReason: string | null
+  version: number
+  disabled: boolean
+  updatedAt: string
+}
+
+export interface EcosystemPage<T> {
+  items: T[]
+  total: number
+  page: number
+  size: number
+}
+
 export interface Collaboration {
   id: string
   title: string

@@ -328,6 +328,23 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
+    public boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        if (enterpriseId == null || associationId == null) {
+            return false;
+        }
+        Boolean belongs = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM enterprise
+                    WHERE id = :enterpriseId AND association_id = :associationId
+                      AND status = 'ACTIVE' AND deleted_at IS NULL
+                )
+                """, new MapSqlParameterSource("enterpriseId", enterpriseId)
+                .addValue("associationId", associationId), Boolean.class);
+        return Boolean.TRUE.equals(belongs);
+    }
+
+    @Override
     public void recordChange(
             ActorScope actor,
             String action,

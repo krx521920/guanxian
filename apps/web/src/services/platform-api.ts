@@ -1,8 +1,9 @@
-import { associationDashboard, collaborations, enterpriseDashboard, matches, members, notifications, policies } from '../mocks/data'
+import { associationDashboard, collaborations, enterpriseDashboard, members, policies } from '../mocks/data'
 import type {
   Collaboration,
   DashboardData,
-  EcosystemMatch,
+  EcosystemDemand,
+  EcosystemPage,
   EnterpriseDashboardData,
   MemberEnterprise,
   MemberImportCommitResult,
@@ -12,6 +13,7 @@ import type {
   NotificationMessage,
   NotificationMessagePage,
   Policy,
+  PersistedEcosystemMatch,
   VersionedMember,
 } from '../types/domain'
 import { ApiRequestError, request, requestBlob } from './http'
@@ -22,20 +24,6 @@ const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/
 const mock = <T>(data: T) => async () => {
   await new Promise((resolve) => window.setTimeout(resolve, 120))
   return data
-}
-
-const mockNotificationPage = (unreadOnly: boolean): NotificationMessagePage => {
-  const items = unreadOnly ? notifications.filter((item) => item.readAt === null) : notifications
-  return { items, total: items.length, page: 0, size: 20 }
-}
-
-const mockMarkNotificationRead = (id: string) => async (): Promise<NotificationMessage> => {
-  await new Promise((resolve) => window.setTimeout(resolve, 120))
-  const index = notifications.findIndex((item) => item.id === id)
-  if (index < 0) throw new Error('通知不存在')
-  const updated = { ...notifications[index], status: 'READ', readAt: new Date().toISOString() }
-  notifications[index] = updated
-  return updated
 }
 
 function requiredEtag(response: Response | null): string {
@@ -140,16 +128,31 @@ export const platformApi = {
   memberImportPreview: (batchId: string) => request<MemberImportPreview>(`/members/imports/${encodeURIComponent(batchId)}`),
   commitMemberImport: (batchId: string) => request<MemberImportCommitResult>(`/members/imports/${encodeURIComponent(batchId)}/commit`, { method: 'POST' }),
   policies: () => request<Policy[]>('/policies', {}, mock(policies)),
-  matches: () => request<EcosystemMatch[]>('/matches', {}, mock(matches)),
-  collaborations: () => request<Collaboration[]>('/collaborations', {}, mock(collaborations)),
-  notificationMessages: (unreadOnly = false) => request<NotificationMessagePage>(
-    `/notifications/messages?unreadOnly=${unreadOnly}&page=0&size=20`,
-    {},
-    mock(mockNotificationPage(unreadOnly)),
+  matches: () => request<PersistedEcosystemMatch[]>('/matches'),
+  matchingDemands: (page = 0, size = 100) => request<EcosystemPage<EcosystemDemand>>(
+    `/demands?includeDeleted=false&page=${Math.max(0, page)}&size=${Math.min(100, Math.max(1, size))}`,
   ),
+  generateMatches: (demandId: string, limit: number) => request<PersistedEcosystemMatch[]>(
+    `/matches/demand/${encodeURIComponent(demandId)}/generate`,
+    { method: 'POST', body: JSON.stringify({ limit: Math.min(20, Math.max(1, limit)) }) },
+  ),
+  collaborations: () => request<Collaboration[]>('/collaborations', {}, mock(collaborations)),
+  notificationMessages: (query: {
+    unreadOnly?: boolean
+    status?: 'ARCHIVED'
+    page?: number
+    size?: number
+  } = {}) => {
+    const parameters = new URLSearchParams({
+      unreadOnly: String(query.unreadOnly ?? false),
+      page: String(query.page ?? 0),
+      size: String(query.size ?? 20),
+    })
+    if (query.status) parameters.set('status', query.status)
+    return request<NotificationMessagePage>(`/notifications/messages?${parameters.toString()}`)
+  },
   markNotificationRead: (id: string) => request<NotificationMessage>(
     `/notifications/messages/${encodeURIComponent(id)}/read`,
     { method: 'PUT' },
-    mockMarkNotificationRead(id),
   ),
 }

@@ -43,6 +43,8 @@ interface EcosystemCatalogStore {
 
     Optional<DemandView> restoreDemand(UUID id, long expectedVersion, ActorScope actor);
 
+    boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId);
+
     void recordChange(
             ActorScope actor,
             String action,

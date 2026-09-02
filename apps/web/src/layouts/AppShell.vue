@@ -5,6 +5,13 @@ import NavIcon from '../components/NavIcon.vue'
 import NotificationPopover from '../components/NotificationPopover.vue'
 import { navigationForRole } from '../config/navigation'
 import { useAuth } from '../services/auth'
+import {
+  applyUiPreferences,
+  readUiPreferences,
+  saveUiPreferences,
+  type Appearance,
+  type PrimaryTheme,
+} from '../services/ui-preferences'
 import type { UserRole } from '../types/domain'
 
 const route = useRoute()
@@ -16,6 +23,10 @@ const keyboardNavigation = ref(false)
 const profileOpen = ref(false)
 const notificationOpen = ref(false)
 const notificationUnreadCount = ref(0)
+const settingsOpen = ref(false)
+const settingsPrimaryTheme = ref<PrimaryTheme>('teal')
+const settingsAppearance = ref<Appearance>('light')
+const settingsMessage = ref('')
 const roleMenuOpen = ref(false)
 const themeMenuOpen = ref(false)
 const appearanceMenuOpen = ref(false)
@@ -26,8 +37,8 @@ const profileButtonRef = ref<HTMLElement | null>(null)
 const profileMenuRef = ref<HTMLElement | null>(null)
 const notificationButtonRef = ref<HTMLElement | null>(null)
 const notificationPopoverRef = ref<HTMLElement | null>(null)
-const primaryTheme = ref('teal')
-const appearance = ref<'light' | 'dark'>('light')
+const primaryTheme = ref<PrimaryTheme>('teal')
+const appearance = ref<Appearance>('light')
 
 const primaryThemes = [
   { value: 'teal', label: '管网青', lightColor: '#2f6f68', darkColor: '#5fa89e' },
@@ -35,7 +46,7 @@ const primaryThemes = [
   { value: 'violet', label: '岩层靛', lightColor: '#5d607c', darkColor: '#888ba8' },
   { value: 'orange', label: '黄铜棕', lightColor: '#94613c', darkColor: '#bd8964' },
   { value: 'rose', label: '勃艮第红', lightColor: '#884a59', darkColor: '#b97888' }
-]
+] as const
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
 const breadcrumbSection = computed(() => {
@@ -115,24 +126,68 @@ function closeNotification() {
 }
 
 function applyPreferences() {
-  const root = document.documentElement
-  root.dataset.primary = primaryTheme.value
-  delete root.dataset.neutral
-  root.dataset.appearance = appearance.value
+  applyUiPreferences(document.documentElement, {
+    primaryTheme: primaryTheme.value,
+    appearance: appearance.value,
+  })
 }
 
-function setPrimaryTheme(value: string) {
-  primaryTheme.value = value
-  localStorage.setItem('guanxian-primary-theme', value)
+function persistPreferences(nextPrimaryTheme: PrimaryTheme, nextAppearance: Appearance): boolean {
+  const saved = saveUiPreferences(localStorage, {
+    primaryTheme: nextPrimaryTheme,
+    appearance: nextAppearance,
+  })
+  if (!saved) return false
+  primaryTheme.value = nextPrimaryTheme
+  appearance.value = nextAppearance
   applyPreferences()
-  closeProfile()
+  return true
 }
 
-function setAppearance(value: 'light' | 'dark') {
-  appearance.value = value
-  localStorage.setItem('guanxian-appearance', value)
-  applyPreferences()
+function setPrimaryTheme(value: PrimaryTheme) {
+  if (persistPreferences(value, appearance.value)) {
+    closeProfile()
+    return
+  }
+  settingsPrimaryTheme.value = value
+  settingsAppearance.value = appearance.value
+  settingsMessage.value = '当前浏览器未允许保存界面偏好，请检查浏览器存储权限后重试。'
   closeProfile()
+  settingsOpen.value = true
+}
+
+function setAppearance(value: Appearance) {
+  if (persistPreferences(primaryTheme.value, value)) {
+    closeProfile()
+    return
+  }
+  settingsPrimaryTheme.value = primaryTheme.value
+  settingsAppearance.value = value
+  settingsMessage.value = '当前浏览器未允许保存界面偏好，请检查浏览器存储权限后重试。'
+  closeProfile()
+  settingsOpen.value = true
+}
+
+function openSettings() {
+  settingsPrimaryTheme.value = primaryTheme.value
+  settingsAppearance.value = appearance.value
+  settingsMessage.value = ''
+  closeProfile()
+  closeNotification()
+  settingsOpen.value = true
+}
+
+function closeSettings() {
+  settingsOpen.value = false
+  settingsMessage.value = ''
+}
+
+function saveSettings() {
+  if (!persistPreferences(settingsPrimaryTheme.value, settingsAppearance.value)) {
+    settingsMessage.value = '当前浏览器未允许保存界面偏好，请检查浏览器存储权限后重试。'
+    return
+  }
+  closeSettings()
 }
 
 function handleDocumentPointerDown(event: PointerEvent) {
@@ -155,15 +210,14 @@ function handleDocumentKeyDown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     closeProfile()
     closeNotification()
+    closeSettings()
   }
 }
 
 onMounted(() => {
-  const savedPrimary = localStorage.getItem('guanxian-primary-theme')
-  const savedAppearance = localStorage.getItem('guanxian-appearance')
-  if (primaryThemes.some((item) => item.value === savedPrimary)) primaryTheme.value = savedPrimary!
-  if (savedAppearance === 'light' || savedAppearance === 'dark') appearance.value = savedAppearance
-  localStorage.removeItem('guanxian-neutral-theme')
+  const savedPreferences = readUiPreferences(localStorage)
+  primaryTheme.value = savedPreferences.primaryTheme
+  appearance.value = savedPreferences.appearance
   applyPreferences()
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   document.addEventListener('keydown', handleDocumentKeyDown)
@@ -178,6 +232,7 @@ onBeforeUnmount(() => {
 async function logout() {
   closeProfile()
   closeNotification()
+  closeSettings()
   await auth.logout()
   if (auth.isDemoMode) await router.push('/login')
 }
@@ -194,14 +249,13 @@ async function logout() {
     <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
-        <div><strong>管线智联</strong><small>AI 管理协作平台</small></div>
+        <div><strong>管线智联</strong><small>管理协作平台</small></div>
       </div>
 
       <nav class="main-nav">
         <RouterLink v-for="item in navItems" :key="item.to" :to="item.to" @click="mobileOpen = false">
           <NavIcon :name="item.icon" />
           <span>{{ item.label }}</span>
-          <em v-if="item.badge">{{ item.badge }}</em>
         </RouterLink>
       </nav>
 
@@ -321,7 +375,7 @@ async function logout() {
                 </button>
               </div>
             </div>
-            <button class="profile-menu-item" type="button" @click="closeProfile">
+            <button class="profile-menu-item" type="button" @click="openSettings">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.09a2 2 0 0 1 1 1.74v.5a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.09a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>
               <span>设置</span>
             </button>
@@ -334,6 +388,43 @@ async function logout() {
       </div>
     </aside>
     <button v-if="mobileOpen" class="sidebar-mask" aria-label="关闭导航" @click="mobileOpen = false" />
+
+    <div v-if="settingsOpen" class="settings-backdrop" @click.self="closeSettings">
+      <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header class="settings-dialog-head">
+          <div>
+            <span>界面偏好</span>
+            <h2 id="settings-title">设置</h2>
+          </div>
+          <button class="icon-button" type="button" aria-label="关闭设置" @click="closeSettings">×</button>
+        </header>
+        <form class="settings-form" @submit.prevent="saveSettings">
+          <fieldset>
+            <legend>主题色</legend>
+            <div class="settings-theme-options">
+              <label v-for="item in primaryThemes" :key="item.value" :class="{ selected: settingsPrimaryTheme === item.value }">
+                <input v-model="settingsPrimaryTheme" type="radio" name="primary-theme" :value="item.value">
+                <i :style="{ '--swatch': settingsAppearance === 'dark' ? item.darkColor : item.lightColor }" />
+                <span>{{ item.label }}</span>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>明暗模式</legend>
+            <div class="settings-appearance-options">
+              <label :class="{ selected: settingsAppearance === 'light' }"><input v-model="settingsAppearance" type="radio" name="appearance" value="light"><span>浅色</span></label>
+              <label :class="{ selected: settingsAppearance === 'dark' }"><input v-model="settingsAppearance" type="radio" name="appearance" value="dark"><span>深色</span></label>
+            </div>
+          </fieldset>
+          <p class="settings-note">界面偏好仅保存在当前浏览器。账户、身份和组织信息由统一身份服务管理。</p>
+          <p v-if="settingsMessage" class="settings-error" role="alert">{{ settingsMessage }}</p>
+          <footer class="settings-actions">
+            <button class="secondary-button" type="button" @click="closeSettings">取消</button>
+            <button class="primary-button" type="submit">保存设置</button>
+          </footer>
+        </form>
+      </section>
+    </div>
 
     <main class="main-area">
       <header class="topbar">
@@ -354,3 +445,71 @@ async function logout() {
     </main>
   </div>
 </template>
+
+<style scoped>
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 24px;
+  background: rgba(10, 20, 28, .52);
+  display: grid;
+  place-items: center;
+}
+.settings-dialog {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgba(8, 20, 32, .28);
+}
+.settings-dialog-head {
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.settings-dialog-head span {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+}
+.settings-dialog-head h2 { margin: 4px 0 0; font-size: 21px; }
+.settings-form { padding: 22px; display: grid; gap: 22px; }
+.settings-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.settings-form legend { margin-bottom: 10px; font-size: 13px; font-weight: 700; }
+.settings-theme-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.settings-theme-options label,
+.settings-appearance-options label {
+  min-height: 48px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.settings-theme-options label.selected,
+.settings-appearance-options label.selected { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.settings-theme-options input,
+.settings-appearance-options input { position: absolute; opacity: 0; pointer-events: none; }
+.settings-theme-options i { width: 18px; height: 18px; border-radius: 50%; background: var(--swatch); box-shadow: 0 0 0 1px var(--line); }
+.settings-appearance-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.settings-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.settings-error { margin: -8px 0 0; padding: 10px 12px; border-radius: 8px; color: #9a3412; background: #fff2e8; font-size: 12px; }
+.settings-actions { padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
+@media (max-width: 560px) {
+  .settings-backdrop { padding: 12px; }
+  .settings-theme-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>

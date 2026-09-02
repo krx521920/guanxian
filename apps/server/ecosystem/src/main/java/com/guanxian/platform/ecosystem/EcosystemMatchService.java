@@ -39,14 +39,9 @@ public class EcosystemMatchService {
         this.catalogStore = catalogStore;
     }
 
-    public List<EcosystemMatch> demoMatches() {
-        return List.of(
-                new EcosystemMatch("M001", "北京市政建设集团", "高压燃气管道零泄漏阀门采购", "燃气管网 · 更新改造",
-                        "北方阀门制造有限公司", "智能零泄漏球阀及远程控制方案", 94,
-                        List.of("介质与压力等级匹配", "具备同类产品能力", "北京周边可快速交付"), "沟通中", "今天 10:30"),
-                new EcosystemMatch("M002", "首都城市更新发展有限公司", "老旧街区地下管线综合探测", "城市更新 · 探测测绘",
-                        "京城管网科技有限公司", "多源监测与三维管线建模服务", 88,
-                        List.of("城市更新场景匹配", "具备数字孪生能力", "服务覆盖北京地区"), "已推荐", "昨天 16:18"));
+    @Transactional(readOnly = true)
+    public List<PersistedMatchView> list(ActorScope actor) {
+        return matchStore.list(actor);
     }
 
     public List<EcosystemMatch> match(MatchRequest request, ActorScope actor) {
@@ -165,9 +160,12 @@ public class EcosystemMatchService {
         return updated;
     }
 
-    private static void requireDemandOwnerOrAssociation(DemandView demand, ActorScope actor) {
-        if (actor.isSystemAdmin() || actor.isAssociationStaff()
-                || demand.enterpriseId().equals(actor.enterpriseId())) {
+    private void requireDemandOwnerOrAssociation(DemandView demand, ActorScope actor) {
+        if (actor.isSystemAdmin() || demand.enterpriseId().equals(actor.enterpriseId())) {
+            return;
+        }
+        if (actor.isAssociationStaff() && actor.associationId() != null
+                && catalogStore.enterpriseBelongsToAssociation(demand.enterpriseId(), actor.associationId())) {
             return;
         }
         throw new ForbiddenException(

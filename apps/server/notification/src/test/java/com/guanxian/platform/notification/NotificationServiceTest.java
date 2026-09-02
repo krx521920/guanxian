@@ -1,5 +1,6 @@
 package com.guanxian.platform.notification;
 
+import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
@@ -7,6 +8,7 @@ import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,6 +17,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -96,6 +100,60 @@ class NotificationServiceTest {
     }
 
     @Test
+    void archivedMessagesUseServerSideStatusFilteringCountingAndPagination() {
+        ActorScope userA = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+        Instant now = Instant.parse("2026-08-31T10:00:00Z");
+        NotificationMessageView newestArchived = message(
+                USER_A, "ARCHIVED", now, now.minusSeconds(60));
+        NotificationMessageView olderArchivedWithLegacyUnreadTimestamp = message(
+                USER_A, "ARCHIVED", null, now.minusSeconds(120));
+        NotificationMessageView delivered = message(
+                USER_A, "DELIVERED", null, now.minusSeconds(180));
+        store.addMessage(newestArchived);
+        store.addMessage(olderArchivedWithLegacyUnreadTimestamp);
+        store.addMessage(delivered);
+        store.addMessage(message(USER_B, "ARCHIVED", now, now.minusSeconds(30)));
+
+        NotificationMessagePage first = service.messages(userA, false, " archived ", 0, 1);
+        NotificationMessagePage second = service.messages(userA, false, "ARCHIVED", 1, 1);
+
+        assertEquals(2, first.total());
+        assertEquals(0, first.page());
+        assertEquals(1, first.size());
+        assertEquals(List.of(newestArchived), first.items());
+        assertEquals(List.of(olderArchivedWithLegacyUnreadTimestamp), second.items());
+        assertEquals(1, service.messages(userA, true, null, 0, 20).total());
+        assertEquals(3, service.messages(userA, false, null, 0, 20).total());
+    }
+
+    @Test
+    void messageFiltersRejectUnsupportedOrAmbiguousRequests() {
+        ActorScope userA = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+
+        assertThrows(ApiException.class,
+                () -> service.messages(userA, false, "NOT_A_STATUS", 0, 20));
+        assertThrows(ApiException.class,
+                () -> service.messages(userA, true, "ARCHIVED", 0, 20));
+    }
+
+    @Test
+    void archivedMessageCannotBeChangedBackToRead() {
+        ActorScope userA = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+        NotificationMessageView archived = message(USER_A, "ARCHIVED", null,
+                Instant.parse("2026-08-31T10:00:00Z"));
+        store.addMessage(archived);
+
+        NotificationMessageView result = service.markRead(archived.id(), userA);
+
+        assertSame(archived, result);
+        assertEquals("ARCHIVED", result.status());
+        assertNull(result.readAt());
+        assertEquals(0, store.auditCount());
+        assertTrue(store.markRead(archived.id(), USER_A).isEmpty());
+        assertEquals("ARCHIVED", store.message(archived.id(), USER_A).orElseThrow().status());
+    }
+
+    @Test
     void unboundJwtIdentityCannotUsePersonalNotificationData() {
         ActorScope unbound = new ActorScope(null, "oidc-sub", "user", ASSOCIATION_A,
                 null, Set.of("ENTERPRISE_MEMBER"), Set.of());
@@ -108,5 +166,12 @@ class NotificationServiceTest {
     private static ActorScope actor(UUID userId, UUID associationId, String role) {
         return new ActorScope(userId, "subject-" + userId, "user-" + userId,
                 associationId, null, Set.of(role), Set.of());
+    }
+
+    private static NotificationMessageView message(
+            UUID userId, String status, Instant readAt, Instant createdAt) {
+        return new NotificationMessageView(UUID.randomUUID(), userId, ASSOCIATION_A,
+                "POLICY", "测试通知", "测试正文", "POLICY_DOCUMENT", UUID.randomUUID(),
+                status, readAt, createdAt, createdAt);
     }
 }

@@ -93,18 +93,22 @@ class InMemoryNotificationStore implements NotificationStore {
 
     @Override
     public synchronized List<NotificationMessageView> messages(
-            UUID userId, boolean unreadOnly, int offset, int limit) {
+            UUID userId, boolean unreadOnly, String status, long offset, int limit) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
-                .filter(value -> !unreadOnly || value.readAt() == null)
+                .filter(value -> !unreadOnly
+                        || (value.readAt() == null && !"ARCHIVED".equals(value.status())))
+                .filter(value -> status == null || status.equals(value.status()))
                 .sorted(Comparator.comparing(NotificationMessageView::createdAt).reversed()
                         .thenComparing(NotificationMessageView::id))
                 .skip(offset).limit(limit).toList();
     }
 
     @Override
-    public synchronized long countMessages(UUID userId, boolean unreadOnly) {
+    public synchronized long countMessages(UUID userId, boolean unreadOnly, String status) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
-                .filter(value -> !unreadOnly || value.readAt() == null).count();
+                .filter(value -> !unreadOnly
+                        || (value.readAt() == null && !"ARCHIVED".equals(value.status())))
+                .filter(value -> status == null || status.equals(value.status())).count();
     }
 
     @Override
@@ -119,6 +123,9 @@ class InMemoryNotificationStore implements NotificationStore {
             return Optional.empty();
         }
         NotificationMessageView current = found.get();
+        if ("ARCHIVED".equals(current.status())) {
+            return Optional.empty();
+        }
         NotificationMessageView updated = new NotificationMessageView(
                 current.id(), current.userId(), current.associationId(), current.notificationType(),
                 current.title(), current.body(), current.resourceType(), current.resourceId(),
@@ -177,5 +184,9 @@ class InMemoryNotificationStore implements NotificationStore {
 
     synchronized int outboxCount() {
         return outboxKeys.size();
+    }
+
+    synchronized void addMessage(NotificationMessageView message) {
+        messages.put(message.id(), message);
     }
 }

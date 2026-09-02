@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Building2, FileText, GitMerge, Handshake, MessageSquareText } from '@lucide/vue'
-import { notifications as notificationSamples } from '../mocks/data'
 import { platformApi } from '../services/platform-api'
-import type { NotificationMessage } from '../types/domain'
-
-type NotificationTab = 'all' | 'unread' | 'archived'
+import type { NotificationMessage, NotificationMessagePage } from '../types/domain'
+import {
+  acknowledgeNotificationRead,
+  isUnreadNotification,
+  notificationPageCorrection,
+  notificationPageCount,
+  notificationPageInRange,
+  notificationQueryFor,
+  type NotificationTab,
+} from './notification-popover'
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{
@@ -16,11 +22,15 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const activeTab = ref<NotificationTab>('all')
-const fallbackItems = ref(notificationSamples.map((item) => ({ ...item })))
-const items = ref<NotificationMessage[]>(fallbackItems.value.map((item) => ({ ...item })))
+const items = ref<NotificationMessage[]>([])
+const resultPage = ref<NotificationMessagePage | null>(null)
 const loading = ref(false)
-const tabCache = new Map<NotificationTab, NotificationMessage[]>()
+const loadError = ref('')
+const interactionError = ref('')
+const markingId = ref<string | null>(null)
+const currentPage = ref(0)
 let requestSequence = 0
+let unreadCountSequence = 0
 
 const tabs: Array<{ value: NotificationTab; label: string }> = [
   { value: 'all', label: '全部' },
@@ -28,9 +38,9 @@ const tabs: Array<{ value: NotificationTab; label: string }> = [
   { value: 'archived', label: '已归档' },
 ]
 
-const visibleItems = computed(() => activeTab.value === 'archived'
-  ? items.value.filter((item) => item.status === 'ARCHIVED')
-  : items.value)
+const totalPages = computed(() => notificationPageCount(resultPage.value?.total ?? 0))
+const hasPreviousPage = computed(() => currentPage.value > 0)
+const hasNextPage = computed(() => currentPage.value + 1 < totalPages.value)
 
 const notificationIcons = {
   POLICY: FileText,
@@ -43,50 +53,52 @@ function iconFor(type: string) {
   return notificationIcons[type as keyof typeof notificationIcons] || MessageSquareText
 }
 
-function fallbackFor(tab: NotificationTab): NotificationMessage[] {
-  if (tab === 'unread') {
-    return fallbackItems.value.filter((item) => item.readAt === null && item.status !== 'ARCHIVED')
-  }
-  if (tab === 'archived') return fallbackItems.value.filter((item) => item.status === 'ARCHIVED')
-  return fallbackItems.value
-}
-
-function emitFallbackUnreadCount() {
-  emit('unreadCount', fallbackFor('unread').length)
-}
-
 async function refreshUnreadCount() {
+  const sequence = ++unreadCountSequence
   try {
-    const page = await platformApi.notificationMessages(true)
-    emit('unreadCount', page.total || fallbackFor('unread').length)
-  } catch {
-    emitFallbackUnreadCount()
-  }
+    const page = await platformApi.notificationMessages({ unreadOnly: true, page: 0, size: 1 })
+    if (sequence === unreadCountSequence) emit('unreadCount', page.total)
+  } catch { /* Keep the last confirmed server count; never invent one. */ }
 }
 
-async function loadNotifications() {
+async function loadNotifications(page = currentPage.value, allowPageCorrection = true) {
   if (!props.open) return
   const sequence = ++requestSequence
   const requestedTab = activeTab.value
-  const cachedItems = tabCache.get(requestedTab)
-  items.value = cachedItems || fallbackFor(requestedTab)
-  loading.value = items.value.length === 0
+  loading.value = true
+  loadError.value = ''
+  interactionError.value = ''
+  items.value = []
+  resultPage.value = null
   try {
-    const page = await platformApi.notificationMessages(requestedTab === 'unread')
+    const response = await platformApi.notificationMessages(notificationQueryFor(requestedTab, page))
     if (sequence !== requestSequence) return
-    const nextItems = page.items.length > 0 ? page.items : fallbackFor(requestedTab)
-    tabCache.set(requestedTab, nextItems)
-    if (activeTab.value === requestedTab) items.value = nextItems
-    if (requestedTab === 'unread') emit('unreadCount', page.total || fallbackFor('unread').length)
+    if (activeTab.value !== requestedTab) return
+    const correctedPage = notificationPageCorrection(response.page, response.total, response.size)
+    if (correctedPage !== null) {
+      if (allowPageCorrection) {
+        await loadNotifications(correctedPage, false)
+        return
+      }
+      loadError.value = '通知分页信息异常，请重新加载。'
+      return
+    }
+    resultPage.value = response
+    items.value = response.items
+    currentPage.value = response.page
+    if (requestedTab === 'unread') emit('unreadCount', response.total)
   } catch {
     if (sequence !== requestSequence) return
-    const nextItems = fallbackFor(requestedTab)
-    tabCache.set(requestedTab, nextItems)
-    if (activeTab.value === requestedTab) items.value = nextItems
-    emitFallbackUnreadCount()
+    if (activeTab.value !== requestedTab) return
+    loadError.value = '通知暂时无法加载，请稍后重试。'
   } finally {
     if (sequence === requestSequence) loading.value = false
   }
+}
+
+function changePage(page: number) {
+  if (loading.value || !notificationPageInRange(page, resultPage.value?.total ?? 0)) return
+  void loadNotifications(page)
 }
 
 function relativeTime(value: string) {
@@ -111,28 +123,27 @@ function resourcePath(item: NotificationMessage) {
 }
 
 async function openNotification(item: NotificationMessage) {
-  if (item.readAt === null) {
-    try {
-      const updated = await platformApi.markNotificationRead(item.id)
-      items.value = items.value.map((value) => value.id === updated.id ? updated : value)
-      tabCache.forEach((values, tab) => {
-        tabCache.set(tab, values.map((value) => value.id === updated.id ? updated : value))
-      })
-      await refreshUnreadCount()
-    } catch {
-      const readAt = new Date().toISOString()
-      fallbackItems.value = fallbackItems.value.map((value) => value.id === item.id
-        ? { ...value, status: 'READ', readAt }
-        : value)
-      items.value = items.value.map((value) => value.id === item.id
-        ? { ...value, status: 'READ', readAt }
-        : value)
-      tabCache.forEach((values, tab) => {
-        tabCache.set(tab, values.map((value) => value.id === item.id
-          ? { ...value, status: 'READ', readAt }
-          : value))
-      })
-      emitFallbackUnreadCount()
+  if (markingId.value !== null) return
+  interactionError.value = ''
+  if (isUnreadNotification(item)) {
+    markingId.value = item.id
+    const result = await acknowledgeNotificationRead(
+      items.value,
+      item,
+      platformApi.markNotificationRead,
+    )
+    markingId.value = null
+    if (result.error) {
+      interactionError.value = result.error
+      return
+    }
+    items.value = result.items
+    if (result.acknowledged) await refreshUnreadCount()
+    if (activeTab.value === 'unread') {
+      await loadNotifications(currentPage.value)
+      if (!loadError.value && items.value.length === 0 && currentPage.value > 0) {
+        await loadNotifications(currentPage.value - 1)
+      }
     }
   }
   const path = resourcePath(item)
@@ -143,8 +154,15 @@ async function openNotification(item: NotificationMessage) {
 watch(() => props.open, (open) => {
   if (open) loadNotifications()
 }, { immediate: true })
-watch(activeTab, () => loadNotifications())
+watch(activeTab, () => {
+  currentPage.value = 0
+  void loadNotifications(0)
+})
 onMounted(refreshUnreadCount)
+onBeforeUnmount(() => {
+  requestSequence += 1
+  unreadCountSequence += 1
+})
 </script>
 
 <template>
@@ -163,18 +181,26 @@ onMounted(refreshUnreadCount)
       </button>
     </header>
 
-    <div class="notification-list" aria-live="polite">
-      <div v-if="loading && visibleItems.length === 0" class="notification-state">正在加载通知…</div>
-      <div v-else-if="visibleItems.length === 0" class="notification-state">
+    <div class="notification-list" aria-live="polite" :aria-busy="loading">
+      <div v-if="loading" class="notification-state">正在加载通知…</div>
+      <div v-else-if="loadError" class="notification-state notification-error" role="alert">
+        <span>{{ loadError }}</span>
+        <button type="button" @click="loadNotifications()">重新加载</button>
+      </div>
+      <div v-else-if="items.length === 0" class="notification-state">
         {{ activeTab === 'unread' ? '暂无未读通知' : activeTab === 'archived' ? '暂无已归档通知' : '暂无通知' }}
       </div>
       <template v-else>
+        <div v-if="interactionError" class="notification-inline-error" role="alert">
+          {{ interactionError }}
+        </div>
         <button
-          v-for="item in visibleItems"
+          v-for="item in items"
           :key="item.id"
           class="notification-item"
-          :class="{ unread: item.readAt === null }"
+          :class="{ unread: isUnreadNotification(item) }"
           type="button"
+          :disabled="markingId !== null"
           @click="openNotification(item)"
         >
           <span class="notification-type-icon" :data-type="item.notificationType" aria-hidden="true">
@@ -185,10 +211,17 @@ onMounted(refreshUnreadCount)
             <span>{{ item.body }}</span>
             <time :datetime="item.createdAt">{{ relativeTime(item.createdAt) }}</time>
           </span>
-          <i v-if="item.readAt === null" class="unread-indicator" aria-label="未读" />
+          <i v-if="isUnreadNotification(item)" class="unread-indicator" aria-label="未读" />
         </button>
       </template>
     </div>
+    <footer v-if="!loading && !loadError && resultPage && resultPage.total > 0" class="notification-pagination">
+      <span>第 {{ currentPage + 1 }} / {{ totalPages }} 页 · 共 {{ resultPage.total }} 条</span>
+      <div>
+        <button type="button" :disabled="!hasPreviousPage" @click="changePage(currentPage - 1)">上一页</button>
+        <button type="button" :disabled="!hasNextPage" @click="changePage(currentPage + 1)">下一页</button>
+      </div>
+    </footer>
   </section>
 </template>
 
@@ -199,8 +232,9 @@ onMounted(refreshUnreadCount)
 .notification-tabs button::after { content: ''; position: absolute; right: 0; bottom: 0; left: 0; height: 2px; border-radius: 2px 2px 0 0; background: transparent; }
 .notification-tabs button.active { color: var(--ink); }
 .notification-tabs button.active::after { background: var(--primary); }
-.notification-list { height: 380px; overflow-y: auto; overscroll-behavior: contain; }
+.notification-list { height: 332px; overflow-y: auto; overscroll-behavior: contain; }
 .notification-item { width: 100%; min-height: 76px; padding: 11px 14px; border: 0; border-bottom: 1px solid var(--line); color: var(--ink); background: transparent; display: grid; grid-template-columns: 32px minmax(0, 1fr) 8px; gap: 10px; align-items: start; text-align: left; transition: background-color .16s ease; }
+.notification-item:disabled { cursor: wait; opacity: .62; }
 .notification-item:last-child { border-bottom: 0; }
 .notification-item:hover { background: var(--surface-hover); }
 .notification-item.unread { background: color-mix(in srgb, var(--primary-soft) 42%, var(--panel)); }
@@ -214,4 +248,10 @@ onMounted(refreshUnreadCount)
 .unread-indicator { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--primary); }
 .notification-state { min-height: 220px; padding: 28px; color: var(--muted); display: grid; place-content: center; gap: 12px; text-align: center; font-size: 12px; }
 .notification-state button { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; color: var(--primary); background: var(--panel); }
+.notification-error { color: var(--danger); }
+.notification-inline-error { padding: 9px 14px; border-bottom: 1px solid color-mix(in srgb, var(--danger) 25%, var(--line)); color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, var(--panel)); font-size: 11px; line-height: 1.5; }
+.notification-pagination { min-height: 48px; padding: 8px 12px; border-top: 1px solid var(--line); color: var(--muted); display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 10px; }
+.notification-pagination > div { display: flex; gap: 6px; }
+.notification-pagination button { padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--primary); background: var(--panel); font-size: 10px; }
+.notification-pagination button:disabled { color: var(--muted); cursor: not-allowed; opacity: .55; }
 </style>

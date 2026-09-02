@@ -30,6 +30,8 @@ zap-reports/
 **/coverage/
 **/reports/mutation/
 **/.stryker-tmp/
+/.pnpm-store/
+/.worktrees/
 
 # Python
 **/__pycache__/

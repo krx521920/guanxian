@@ -107,21 +107,28 @@ class PostgresNotificationStore implements NotificationStore {
 
     @Override
     public List<NotificationMessageView> messages(
-            UUID userId, boolean unreadOnly, int offset, int limit) {
+            UUID userId, boolean unreadOnly, String status, long offset, int limit) {
         MapSqlParameterSource params = new MapSqlParameterSource("userId", userId)
-                .addValue("offset", offset).addValue("limit", limit);
+                .addValue("status", status).addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(MESSAGE_SELECT + " WHERE user_id = :userId"
-                        + (unreadOnly ? " AND read_at IS NULL" : "")
+                        + messageFilterClause(unreadOnly, status)
                         + " ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset",
                 params, messageMapper);
     }
 
     @Override
-    public long countMessages(UUID userId, boolean unreadOnly) {
+    public long countMessages(UUID userId, boolean unreadOnly, String status) {
         Long count = jdbc.queryForObject("SELECT count(*) FROM notification_message WHERE user_id = :userId"
-                        + (unreadOnly ? " AND read_at IS NULL" : ""),
-                new MapSqlParameterSource("userId", userId), Long.class);
+                        + messageFilterClause(unreadOnly, status),
+                new MapSqlParameterSource("userId", userId).addValue("status", status), Long.class);
         return count == null ? 0 : count;
+    }
+
+    static String messageFilterClause(boolean unreadOnly, String status) {
+        if (unreadOnly) {
+            return " AND read_at IS NULL AND status <> 'ARCHIVED'";
+        }
+        return status == null ? "" : " AND status = :status";
     }
 
     @Override
@@ -136,9 +143,14 @@ class PostgresNotificationStore implements NotificationStore {
                 UPDATE notification_message
                    SET read_at = COALESCE(read_at, now()), status = 'READ'
                  WHERE id = :id AND user_id = :userId
+                """ + markReadStatusClause() + """
                 RETURNING id, user_id, association_id, notification_type, title, body, resource_type,
                           resource_id, status, read_at, created_at, delivered_at
                 """, ids(id, userId), messageMapper).stream().findFirst();
+    }
+
+    static String markReadStatusClause() {
+        return " AND status <> 'ARCHIVED'";
     }
 
     @Override

@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentMap;
 @ConditionalOnProperty(name = "guanxian.business.repository", havingValue = "memory")
 class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     private final ConcurrentMap<UUID, PersistedMatchView> matches = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> demandAssociations = new ConcurrentHashMap<>();
 
     @Override
     public synchronized List<PersistedMatchView> upsert(
@@ -42,6 +43,9 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                     existing == null ? 0 : existing.version() + 1,
                     Instant.now());
             matches.put(id, value);
+            if (actor.associationId() != null) {
+                demandAssociations.putIfAbsent(id, actor.associationId());
+            }
         }
         return list(demand.id(), actor);
     }
@@ -53,6 +57,16 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                 .filter(value -> canRead(value, actor))
                 .sorted(Comparator.comparingInt(PersistedMatchView::score).reversed()
                         .thenComparing(PersistedMatchView::supplierCompany)
+                        .thenComparing(PersistedMatchView::id))
+                .toList();
+    }
+
+    @Override
+    public List<PersistedMatchView> list(ActorScope actor) {
+        return matches.values().stream()
+                .filter(value -> canRead(value, actor))
+                .sorted(Comparator.comparing(PersistedMatchView::updatedAt).reversed()
+                        .thenComparing(Comparator.comparingInt(PersistedMatchView::score).reversed())
                         .thenComparing(PersistedMatchView::id))
                 .toList();
     }
@@ -79,8 +93,11 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
         return Optional.of(updated);
     }
 
-    private static boolean canRead(PersistedMatchView value, ActorScope actor) {
-        return actor.isSystemAdmin() || actor.isAssociationStaff()
+    private boolean canRead(PersistedMatchView value, ActorScope actor) {
+        return actor.isSystemAdmin()
+                || actor.isAssociationStaff()
+                && actor.associationId() != null
+                && actor.associationId().equals(demandAssociations.get(value.id()))
                 || value.demandEnterpriseId().equals(actor.enterpriseId())
                 || value.candidateEnterpriseId().equals(actor.enterpriseId());
     }

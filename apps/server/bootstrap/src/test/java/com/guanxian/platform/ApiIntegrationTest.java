@@ -120,7 +120,8 @@ class ApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/matches").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].score").isNumber());
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
 
         mockMvc.perform(get("/api/v1/collaborations").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())

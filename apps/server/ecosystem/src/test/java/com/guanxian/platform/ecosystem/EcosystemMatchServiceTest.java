@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class EcosystemMatchServiceTest {
@@ -40,13 +41,23 @@ class EcosystemMatchServiceTest {
                 member(DEMAND_ENTERPRISE, "需求企业", List.of("管线施工"), List.of()),
                 member(SUPPLIER_ENTERPRISE, "供应企业", List.of("阀门"), List.of("零泄漏球阀"))));
         AiTextService tags = text -> List.of("阀门");
+        InMemoryEcosystemMatchStore matchStore = new InMemoryEcosystemMatchStore();
         EcosystemMatchService service = new EcosystemMatchService(
-                directory, tags, catalogService, new InMemoryEcosystemMatchStore(), catalogStore);
+                directory, tags, catalogService, matchStore, catalogStore);
+
+        assertTrue(service.list(demandOwner).isEmpty(),
+                "an empty match repository must not be filled with demo records");
 
         List<PersistedMatchView> generated = service.generate(opened.id(), 5, demandOwner);
         assertEquals(1, generated.size());
         assertEquals(SUPPLIER_ENTERPRISE, generated.getFirst().candidateEnterpriseId());
         assertEquals("PENDING_CONFIRMATION", generated.getFirst().state());
+        assertEquals(generated, service.list(demandOwner));
+        assertEquals(generated, service.list(supplier));
+        assertEquals(generated, service.list(reviewer));
+        assertEquals(generated, service.list(system()));
+        assertTrue(service.list(enterprise(UUID.randomUUID())).isEmpty());
+        assertTrue(service.list(reviewer(UUID.randomUUID())).isEmpty());
 
         PersistedMatchView confirmed = service.confirm(
                 generated.getFirst().id(), generated.getFirst().version(), supplier);
@@ -70,9 +81,19 @@ class EcosystemMatchServiceTest {
     }
 
     private static ActorScope reviewer() {
+        return reviewer(ASSOCIATION_ID);
+    }
+
+    private static ActorScope reviewer(UUID associationId) {
         return new ActorScope(
                 UUID.randomUUID(), "reviewer", "reviewer",
-                ASSOCIATION_ID, null, Set.of("ASSOCIATION_ADMIN"), Set.of());
+                associationId, null, Set.of("ASSOCIATION_ADMIN"), Set.of());
+    }
+
+    private static ActorScope system() {
+        return new ActorScope(
+                UUID.randomUUID(), "system", "system",
+                null, null, Set.of("SYSTEM_ADMIN"), Set.of());
     }
 
     private static MemberProfile member(

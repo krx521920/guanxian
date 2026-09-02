@@ -10,6 +10,8 @@ const toneMap: Record<string, string> = {
   现行有效: 'success',
   已完成: 'success',
   已达成: 'success',
+  已确认: 'success',
+  已关闭: 'neutral',
   待完善: 'warning',
   即将施行: 'warning',
   沟通中: 'warning',

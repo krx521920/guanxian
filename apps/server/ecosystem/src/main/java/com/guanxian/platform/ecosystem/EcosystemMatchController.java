@@ -32,8 +32,8 @@ public class EcosystemMatchController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('MATCH_REQUEST')")
-    ApiResponse<List<EcosystemMatch>> list() {
-        return ApiResponse.ok(matchService.demoMatches());
+    ApiResponse<List<PersistedMatchView>> list(Authentication authentication) {
+        return ApiResponse.ok(matchService.list(actor(authentication)));
     }
 
     @PostMapping

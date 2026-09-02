@@ -98,6 +98,14 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
     }
 
     @Override
+    public List<PersistedMatchView> list(ActorScope actor) {
+        return jdbc.query(SELECT + scope(actor)
+                        + " AND m.deleted_at IS NULL"
+                        + " ORDER BY m.updated_at DESC, m.score DESC, m.id",
+                scopeParams(actor), mapper);
+    }
+
+    @Override
     public Optional<PersistedMatchView> find(UUID id, ActorScope actor) {
         MapSqlParameterSource params = scopeParams(actor).addValue("id", id);
         return jdbc.query(SELECT + scope(actor)

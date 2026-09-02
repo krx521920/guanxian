@@ -8,7 +8,6 @@ export interface NavItem {
   to: string
   icon: NavIcon
   roles: UserRole[]
-  badge?: string
 }
 
 export const navigation: NavItem[] = [
@@ -17,8 +16,8 @@ export const navigation: NavItem[] = [
   { label: '生态全景', to: '/ecosystem', icon: 'ecosystem', roles: allRoles },
   { label: '会员企业', to: '/members', icon: 'enterprise', roles: allRoles },
   { label: '政策标准', to: '/policies', icon: 'policy', roles: allRoles },
-  { label: '生态匹配', to: '/matching', icon: 'match', roles: allRoles, badge: '6' },
-  { label: '协作事项', to: '/collaborations', icon: 'task', roles: allRoles, badge: '3' },
+  { label: '生态匹配', to: '/matching', icon: 'match', roles: allRoles },
+  { label: '协作事项', to: '/collaborations', icon: 'task', roles: allRoles },
 ]
 
 export function navigationForRole(role: UserRole): NavItem[] {

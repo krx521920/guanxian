@@ -13,6 +13,17 @@ const allowMockFallback = import.meta.env.MODE !== 'production' && import.meta.e
 const successCodes = new Set<string | number>(['OK', 'SUCCESS', 0, 200])
 const requestIdHeader = 'X-Request-Id'
 const requestIdPattern = /^[A-Za-z0-9._:-]{1,128}$/
+export const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
+const MAX_REQUEST_TIMEOUT_MS = 300_000
+
+export interface ApiRequestOptions extends RequestInit {
+  timeoutMs?: number
+}
+
+function requestTimeout(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value) || value <= 0) return DEFAULT_REQUEST_TIMEOUT_MS
+  return Math.min(MAX_REQUEST_TIMEOUT_MS, Math.max(1_000, Math.trunc(value)))
+}
 
 export class ApiRequestError extends Error {
   constructor(
@@ -101,14 +112,15 @@ function errorFromResponse(
 
 export async function request<T>(
   path: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
   mock?: () => Promise<T> | T,
   observeResponse?: (response: Response) => void,
   responseKind: 'json' | 'blob' = 'json',
 ): Promise<T> {
-  const { headers, requestId } = prepareHeaders(options.headers, options.body)
+  const { timeoutMs, ...fetchOptions } = options
+  const { headers, requestId } = prepareHeaders(fetchOptions.headers, fetchOptions.body)
   const controller = new AbortController()
-  const externalSignal = options.signal
+  const externalSignal = fetchOptions.signal
   let abortSource: 'external' | 'timeout' | undefined
 
   const externalAbortError = () => externalSignal!.reason instanceof Error
@@ -127,7 +139,7 @@ export async function request<T>(
     if (controller.signal.aborted) return
     abortSource = 'timeout'
     controller.abort()
-  }, 2500)
+  }, requestTimeout(timeoutMs))
 
   try {
     if (abortSource === 'external') throw externalAbortError()
@@ -135,7 +147,7 @@ export async function request<T>(
     let response: Response
     try {
       response = await fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, {
-        ...options,
+        ...fetchOptions,
         headers,
         signal: controller.signal,
       })
@@ -195,6 +207,6 @@ export async function request<T>(
   }
 }
 
-export function requestBlob(path: string, options: RequestInit = {}): Promise<Blob> {
+export function requestBlob(path: string, options: ApiRequestOptions = {}): Promise<Blob> {
   return request<Blob>(path, options, undefined, undefined, 'blob')
 }

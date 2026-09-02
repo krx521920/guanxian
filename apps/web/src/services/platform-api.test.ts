@@ -225,6 +225,33 @@ describe('member ETag API contract', () => {
     )
   })
 
+  it('uses the persisted matching list, demand precondition and generation contracts', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: [] }))
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: { items: [], total: 0, page: 2, size: 100 } }))
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi('true')
+
+    await expect(platformApi.matches()).resolves.toEqual([])
+    await expect(platformApi.matchingDemands(2, 500)).resolves.toMatchObject({ total: 0 })
+    await expect(platformApi.generateMatches('demand /一', 999)).resolves.toEqual([])
+
+    expect(fetchMock.mock.calls.map(([url, init]) => ({
+      url,
+      method: (init as RequestInit).method ?? 'GET',
+      body: (init as RequestInit).body,
+    }))).toEqual([
+      { url: '/api/v1/matches', method: 'GET', body: undefined },
+      { url: '/api/v1/demands?includeDeleted=false&page=2&size=100', method: 'GET', body: undefined },
+      {
+        url: '/api/v1/matches/demand/demand%20%2F%E4%B8%80/generate',
+        method: 'POST',
+        body: JSON.stringify({ limit: 20 }),
+      },
+    ])
+  })
+
   it('uses the notification message and read acknowledgement contracts', async () => {
     const message = {
       id: 'notification /一', userId: 'user-1', associationId: null, notificationType: 'POLICY',
@@ -232,20 +259,24 @@ describe('member ETag API contract', () => {
       status: 'DELIVERED', readAt: null, createdAt: '2026-08-31T00:00:00Z', deliveredAt: null,
     }
     const page = { items: [message], total: 1, page: 0, size: 20 }
+    const archivedPage = { items: [], total: 0, page: 3, size: 5 }
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(Response.json({ code: 'OK', data: page }))
+      .mockResolvedValueOnce(Response.json({ code: 'OK', data: archivedPage }))
       .mockResolvedValueOnce(Response.json({ code: 'OK', data: { ...message, status: 'READ', readAt: '2026-08-31T01:00:00Z' } }))
     vi.stubGlobal('fetch', fetchMock)
     const { platformApi } = await loadApi()
 
-    await expect(platformApi.notificationMessages(true)).resolves.toEqual(page)
+    await expect(platformApi.notificationMessages({ unreadOnly: true, page: 2, size: 15 })).resolves.toEqual(page)
+    await expect(platformApi.notificationMessages({ status: 'ARCHIVED', page: 3, size: 5 })).resolves.toEqual(archivedPage)
     await expect(platformApi.markNotificationRead(message.id)).resolves.toMatchObject({ status: 'READ' })
 
     expect(fetchMock.mock.calls.map(([url, init]) => ({
       url,
       method: (init as RequestInit).method ?? 'GET',
     }))).toEqual([
-      { url: '/api/v1/notifications/messages?unreadOnly=true&page=0&size=20', method: 'GET' },
+      { url: '/api/v1/notifications/messages?unreadOnly=true&page=2&size=15', method: 'GET' },
+      { url: '/api/v1/notifications/messages?unreadOnly=false&page=3&size=5&status=ARCHIVED', method: 'GET' },
       { url: '/api/v1/notifications/messages/notification%20%2F%E4%B8%80/read', method: 'PUT' },
     ])
   })
@@ -330,7 +361,9 @@ describe('member ETag API contract', () => {
     await expect(platformApi.enterpriseDashboard()).resolves.toMatchObject({ metrics: expect.any(Array) })
     await expect(platformApi.members()).resolves.toEqual(expect.any(Array))
     await expect(platformApi.policies()).resolves.toEqual(expect.any(Array))
-    await expect(platformApi.matches()).resolves.toEqual(expect.any(Array))
+    await expect(platformApi.matches()).rejects.toBeInstanceOf(TypeError)
     await expect(platformApi.collaborations()).resolves.toEqual(expect.any(Array))
+    await expect(platformApi.notificationMessages()).rejects.toBeInstanceOf(TypeError)
+    await expect(platformApi.markNotificationRead('missing')).rejects.toBeInstanceOf(TypeError)
   })
 })

@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentMap;
 class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     private final ConcurrentMap<UUID, StoredOffering> offerings = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, StoredDemand> demands = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> enterpriseAssociations = new ConcurrentHashMap<>();
 
     @Override
     public List<OfferingView> listOfferings(
@@ -57,6 +58,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public synchronized OfferingView createOffering(
             UUID enterpriseId, OfferingUpsertRequest request, ActorScope actor) {
+        rememberEnterpriseAssociation(enterpriseId, actor);
         UUID id = UUID.randomUUID();
         OfferingView value = new OfferingView(
                 id, enterpriseId, null, request.name().trim(), request.kind(),
@@ -163,6 +165,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     @Override
     public synchronized DemandView createDemand(
             UUID enterpriseId, DemandUpsertRequest request, ActorScope actor) {
+        rememberEnterpriseAssociation(enterpriseId, actor);
         UUID id = UUID.randomUUID();
         DemandView value = new DemandView(
                 id, enterpriseId, null, request.title().trim(), request.description().trim(),
@@ -231,6 +234,18 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
         DemandView updated = copyDemand(old, "DRAFT", null, old.version() + 1, false);
         demands.put(id, new StoredDemand(updated, false));
         return Optional.of(updated);
+    }
+
+    @Override
+    public boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId) {
+        return enterpriseId != null && associationId != null
+                && associationId.equals(enterpriseAssociations.get(enterpriseId));
+    }
+
+    private void rememberEnterpriseAssociation(UUID enterpriseId, ActorScope actor) {
+        if (enterpriseId != null && actor.associationId() != null) {
+            enterpriseAssociations.putIfAbsent(enterpriseId, actor.associationId());
+        }
     }
 
     @Override

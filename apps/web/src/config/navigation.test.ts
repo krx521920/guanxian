@@ -76,15 +76,16 @@ describe('role navigation', () => {
     })
   })
 
-  it('keeps navigation labels, icons and badges stable for the application shell', () => {
-    expect(navigation.map(({ label, to, icon, badge }) => ({ label, to, icon, badge }))).toEqual([
-      { label: '协会工作台', to: '/association', icon: 'dashboard', badge: undefined },
-      { label: '企业工作台', to: '/enterprise', icon: 'dashboard', badge: undefined },
-      { label: '生态全景', to: '/ecosystem', icon: 'ecosystem', badge: undefined },
-      { label: '会员企业', to: '/members', icon: 'enterprise', badge: undefined },
-      { label: '政策标准', to: '/policies', icon: 'policy', badge: undefined },
-      { label: '生态匹配', to: '/matching', icon: 'match', badge: '6' },
-      { label: '协作事项', to: '/collaborations', icon: 'task', badge: '3' },
+  it('keeps navigation labels and icons stable without invented counters', () => {
+    expect(navigation.map(({ label, to, icon }) => ({ label, to, icon }))).toEqual([
+      { label: '协会工作台', to: '/association', icon: 'dashboard' },
+      { label: '企业工作台', to: '/enterprise', icon: 'dashboard' },
+      { label: '生态全景', to: '/ecosystem', icon: 'ecosystem' },
+      { label: '会员企业', to: '/members', icon: 'enterprise' },
+      { label: '政策标准', to: '/policies', icon: 'policy' },
+      { label: '生态匹配', to: '/matching', icon: 'match' },
+      { label: '协作事项', to: '/collaborations', icon: 'task' },
     ])
+    expect(navigation.every((item) => !('badge' in item))).toBe(true)
   })
 })

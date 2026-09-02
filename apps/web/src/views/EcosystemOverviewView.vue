@@ -1,122 +1,224 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { BadgeCheck, Building2, Check, Grid3X3, ShieldAlert } from '@lucide/vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import { roleLabels } from '../config/roles'
+import { useAsyncResource } from '../composables/useAsyncResource'
+import { protectedRouteRoles } from '../router/permissions'
+import { useAuth } from '../services/auth'
+import { ROLES, type UserRole } from '../types/domain'
+import {
+  catalogSampleDescription,
+  hasOverviewData,
+  loadEcosystemOverview,
+  summarizeScenarios,
+} from './ecosystem-overview'
 
-const sectors = [
-  { name: '水', count: 18, note: '供水与再生水' },
-  { name: '电', count: 12, note: '电力与综合管廊' },
-  { name: '气', count: 21, note: '燃气安全运行' },
-  { name: '热', count: 15, note: '供热与节能改造' },
-  { name: '排', count: 17, note: '排水与防涝治理' },
-]
+const auth = useAuth()
+const permissionOpen = ref(false)
+const permissionDialog = ref<HTMLElement | null>(null)
+const { data: snapshot, loading, error, load } = useAsyncResource(loadEcosystemOverview)
 
-const memberPools = [
-  { label: '设备供应商', value: 42, tone: 'teal' },
-  { label: '工程服务商', value: 31, tone: 'blue' },
-  { label: '技术与设计', value: 21, tone: 'amber' },
-  { label: '科研及其他', value: 12, tone: 'violet' },
-]
+const scenarioSummary = computed(() => snapshot.value ? summarizeScenarios(snapshot.value) : [])
+const hasEcosystemData = computed(() => snapshot.value ? hasOverviewData(snapshot.value) : false)
+const sampleDescription = computed(() => snapshot.value ? catalogSampleDescription(snapshot.value) : '')
 
-const trialAreas = [
-  { name: '回龙观', units: 37, grids: 286, claimed: 92, alerts: 4, streets: ['龙泽园', '回龙观', '霍营'] },
-  { name: '天通苑', units: 31, grids: 248, claimed: 88, alerts: 7, streets: ['天通苑北', '天通苑南', '太平庄'] },
-]
+const statusLabels: Record<string, string> = {
+  DRAFT: '草稿',
+  PENDING_REVIEW: '待审核',
+  ACTIVE: '已发布',
+  OPEN: '开放中',
+  CLOSED: '已关闭',
+  DISABLED: '已停用',
+}
 
-const selectedArea = ref(trialAreas[0])
-const selectedCell = ref(18)
-const gridCells = Array.from({ length: 70 }, (_, index) => ({
-  id: index,
-  level: [6, 18, 19, 33, 46, 47, 61].includes(index) ? 'hot' : [5, 17, 20, 32, 34, 45, 48, 60, 62].includes(index) ? 'warm' : 'normal',
-}))
+const workspaceRoutes = [
+  { to: '/members', label: '会员企业', description: '查看当前身份被授权访问的企业资料。' },
+  { to: '/policies', label: '政策标准', description: '查询平台已入库并处于可见范围内的政策资料。' },
+  { to: '/matching', label: '生态匹配', description: '查看真实匹配记录及其后续协作状态。' },
+  { to: '/collaborations', label: '协作事项', description: '跟进已建立的洽谈与协作任务。' },
+] as const
 
-const activeGrid = computed(() => ({
-  name: `${selectedArea.value.name} · HT-${String(selectedCell.value + 1).padStart(3, '0')}`,
-  services: selectedCell.value % 3 === 0 ? ['燃气', '排水', '供热'] : ['供水', '电力', '燃气'],
-  units: selectedCell.value % 3 === 0 ? 7 : 5,
-  activity: selectedCell.value % 3 === 0 ? '高' : '中',
-}))
+const currentRole = computed<UserRole | null>(() => auth.user.value?.role ?? null)
+const currentRoleLabel = computed(() => currentRole.value ? roleLabels[currentRole.value] : '未识别身份')
+const availableWorkspaces = computed(() => {
+  const role = currentRole.value
+  if (!role) return []
+  return workspaceRoutes.filter((item) => protectedRouteRoles[item.to]?.includes(role))
+})
 
-const tiers = [
-  { name: '副理事长单位', level: '战略共建', accent: '最高权限', features: ['查看全平台生态池', '跨区域需求对接', '行业报告与政策洞察', '优先参与联合项目'] },
-  { name: '理事单位', level: '协同连接', accent: '扩展权限', features: ['查看授权会员能力', '发布供需与产品', 'AI 生成定向宣传册', '参与专业部门协作'] },
-  { name: '普通会员单位', level: '基础服务', accent: '本域权限', features: ['管理本企业资料', '查看公开政策信息', '接收匹配与合规提示', '使用一键海报工具'] },
-]
+function canAccess(role: UserRole, path: string): boolean {
+  return Boolean(protectedRouteRoles[path]?.includes(role))
+}
 
+function statusLabel(value: string): string {
+  return statusLabels[value] ?? value
+}
+
+function enterpriseLabel(value: string | null): string {
+  return value?.trim() || '企业名称未授权展示'
+}
+
+async function openPermissions() {
+  permissionOpen.value = true
+  await nextTick()
+  permissionDialog.value?.focus()
+}
+
+onMounted(load)
 </script>
 
 <template>
   <div class="ecosystem-page">
-    <PageHeader title="地下管线 AI 生态全景" description="连接政府生态位、会员能力与社区网格，让政策、产品和需求形成可持续协作闭环">
-      <RouterLink class="primary-button ecosystem-link-button" to="/matching">进入智能匹配 →</RouterLink>
+    <PageHeader
+      title="产业生态数据概览"
+      description="所有数量均来自当前账号可见的真实业务数据；数据范围由服务端按身份和协会关系校验"
+    >
+      <RouterLink class="primary-button ecosystem-link-button" to="/matching">进入生态匹配 →</RouterLink>
     </PageHeader>
 
-    <section class="ecosystem-hero panel">
-      <div class="ecosystem-water-copy">
-        <span class="ecosystem-kicker">需求 / 监管侧</span>
-        <h2>城市服务生态位</h2>
-        <p>承接政策要求与城市治理需求，形成面向行业的服务采购与监管协同入口。</p>
-      </div>
-      <div class="sector-row">
-        <article v-for="sector in sectors" :key="sector.name" class="sector-node">
-          <span>{{ sector.name }}</span><div><strong>{{ sector.count }}</strong><small>家需求单位</small></div><p>{{ sector.note }}</p>
+    <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
+
+    <template v-else-if="snapshot">
+      <section class="metrics-grid" aria-label="生态数据摘要">
+        <article class="metric-card tone-info">
+          <div class="metric-top"><span class="metric-label">当前可见会员</span><span class="metric-symbol">企</span></div>
+          <strong>{{ snapshot.members.length }}</strong>
+          <p>按当前账号的数据权限返回，不代表全平台总量</p>
         </article>
-      </div>
-
-      <div class="waterline"><span>政策 · 标准 · 需求</span><i /><div class="ai-orbit"><b>AI</b><small>生态中枢</small></div><i /><span>产品 · 能力 · 服务</span></div>
-
-      <div class="ecosystem-water-copy underwater-copy">
-        <span class="ecosystem-kicker">会员 / 服务侧</span>
-        <h2>106 家会员能力池</h2>
-        <p>企业拥有独立数字名片与产品 IP，由 AI 持续识别上下游关系、政策影响及合作机会。</p>
-      </div>
-      <div class="member-pool-row">
-        <article v-for="pool in memberPools" :key="pool.label" class="member-pool" :class="pool.tone">
-          <span>{{ pool.label }}</span><strong>{{ pool.value }}</strong><small>家</small><i :style="{ width: `${pool.value * 2}%` }" />
+        <article class="metric-card tone-success">
+          <div class="metric-top"><span class="metric-label">产品与服务档案</span><span class="metric-symbol">供</span></div>
+          <strong>{{ snapshot.offerings.total }}</strong>
+          <p>来自产品与服务目录接口的可见记录总数</p>
         </article>
-      </div>
-      <div class="ecosystem-flow">
-        <span>企业资料上传</span><b>→</b><span>AI 结构化诊断</span><b>→</b><span>政策关联筛查</span><b>→</b><span>供需智能匹配</span><b>→</b><span>人工确认发布</span>
-      </div>
-    </section>
+        <article class="metric-card tone-warning">
+          <div class="metric-top"><span class="metric-label">合作需求档案</span><span class="metric-symbol">需</span></div>
+          <strong>{{ snapshot.demands.total }}</strong>
+          <p>包含当前身份可查看的各状态需求</p>
+        </article>
+        <article class="metric-card">
+          <div class="metric-top"><span class="metric-label">匹配记录</span><span class="metric-symbol">合</span></div>
+          <strong>{{ snapshot.matches.length }}</strong>
+          <p>仅统计服务端授权返回的匹配记录</p>
+        </article>
+      </section>
 
-    <section class="ecosystem-section-heading">
-      <div><h2>回天地区网格化试点</h2><p>仅展示社区级服务覆盖，不呈现涉密管线位置</p></div>
-      <div class="pilot-tabs"><button v-for="area in trialAreas" :key="area.name" :class="{ active: selectedArea.name === area.name }" @click="selectedArea = area">{{ area.name }}</button></div>
-    </section>
+      <section v-if="!hasEcosystemData" class="resource-error panel" aria-live="polite">
+        <span class="resource-error-icon" aria-hidden="true">○</span>
+        <h2>当前范围暂无生态数据</h2>
+        <p>请先维护企业资料、产品服务或合作需求；平台不会用演示数据填充空状态。</p>
+        <RouterLink class="primary-button" to="/members">查看会员企业</RouterLink>
+      </section>
 
-    <section class="pilot-grid-layout">
-      <article class="matrix-panel panel">
-        <div class="panel-header"><div><h2>管线矩阵</h2><p>点击网格查看街道级服务覆盖与活跃度</p></div><div class="matrix-header-tools"><div class="matrix-legend"><span><i class="normal" />稳定</span><span><i class="warm" />关注</span><span><i class="hot" />活跃</span></div><span class="live-badge"><i /> 实时</span></div></div>
-        <div class="matrix-content">
-          <div class="matrix-map">
-            <button v-for="cell in gridCells" :key="cell.id" :class="['matrix-cell', cell.level, { selected: selectedCell === cell.id }]" :aria-label="`网格 ${cell.id + 1}`" @click="selectedCell = cell.id"><i v-if="cell.level !== 'normal'" /></button>
-          </div>
-          <aside class="grid-detail">
-            <span class="eyebrow">当前网格</span><h3>{{ activeGrid.name }}</h3>
-            <dl><div><dt>服务单位</dt><dd>{{ activeGrid.units }} 家</dd></div><div><dt>覆盖专业</dt><dd>{{ activeGrid.services.length }} 类</dd></div><div><dt>区域活跃度</dt><dd class="activity-high">{{ activeGrid.activity }}</dd></div></dl>
-            <div class="service-tags"><span v-for="service in activeGrid.services" :key="service">{{ service }}</span></div>
-            <p>AI 提示：近期施工咨询与燃气安全查询增加，建议核验服务响应资源。</p>
+      <template v-else>
+        <section class="content-grid dashboard-main-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <div><h2>可见档案的场景分布</h2><p>{{ sampleDescription }}</p></div>
+            </div>
+            <div v-if="scenarioSummary.length" class="scene-list">
+              <div v-for="scenario in scenarioSummary" :key="scenario.name" class="scene-row">
+                <span>{{ scenario.name }}</span>
+                <div class="progress-track"><i :style="{ width: `${scenario.percent}%` }" /></div>
+                <strong>{{ scenario.count }} 条</strong>
+              </div>
+            </div>
+            <div v-else class="resource-error">
+              <h2>暂无场景标签</h2>
+              <p>现有产品、服务和需求尚未填写可统计的场景。</p>
+            </div>
+          </article>
+
+          <aside class="panel">
+            <div class="panel-header"><div><h2>数据口径</h2><p>避免把可见数据误解为全平台即时统计</p></div></div>
+            <div class="scene-list">
+              <div class="activity-item"><span class="activity-icon">1</span><div><strong>权限范围</strong><p>当前身份：{{ currentRoleLabel }}。接口会继续校验企业、协会和跨协会授权。</p></div></div>
+              <div class="activity-item"><span class="activity-icon">2</span><div><strong>更新时间</strong><p>页面加载及手动重试时读取服务端，不宣称推送式即时更新。</p></div></div>
+              <div class="activity-item"><span class="activity-icon">3</span><div><strong>智能能力</strong><p>本页只汇总业务数据；未调用模型的内容不会标记为智能分析。</p></div></div>
+            </div>
           </aside>
-        </div>
-      </article>
+        </section>
 
-      <aside class="pilot-summary panel">
-        <div class="pilot-summary-head"><div><h3>试点运行概览</h3></div><span class="live-badge"><i /> 实时</span></div>
-        <article class="pilot-stat"><span class="pilot-stat-icon"><Building2 aria-hidden="true" /></span><div><span>已接入单位</span><strong>{{ selectedArea.units }}</strong><small>辖区管线相关单位</small></div></article>
-        <article class="pilot-stat"><span class="pilot-stat-icon"><Grid3X3 aria-hidden="true" /></span><div><span>试点网格</span><strong>{{ selectedArea.grids }}</strong><small>{{ selectedArea.streets.join(' · ') }}</small></div></article>
-        <article class="pilot-stat"><span class="pilot-stat-icon"><BadgeCheck aria-hidden="true" /></span><div><span>服务认领率</span><strong>{{ selectedArea.claimed }}%</strong><div class="pilot-progress"><i :style="{ width: `${selectedArea.claimed}%` }" /></div></div></article>
-        <article class="pilot-stat alert-stat"><span class="pilot-stat-icon"><ShieldAlert aria-hidden="true" /></span><div><span>待核验漏点</span><strong>{{ selectedArea.alerts }}</strong><small>需辖区对接人协同确认</small></div></article>
-      </aside>
-    </section>
+        <section class="ecosystem-section-heading">
+          <div><h2>最新可见供需档案</h2><p>以下内容来自真实产品、服务和需求目录</p></div>
+          <RouterLink class="secondary-button ecosystem-link-button" to="/matching">查看匹配记录</RouterLink>
+        </section>
+        <section class="tier-grid">
+          <article class="tier-card panel">
+            <div class="tier-top"><span>供</span><em>{{ snapshot.offerings.total }} 条</em></div>
+            <small>PRODUCTS &amp; SERVICES</small><h3>产品与服务</h3>
+            <ul v-if="snapshot.offerings.items.length">
+              <li v-for="item in snapshot.offerings.items.slice(0, 4)" :key="item.id">
+                <span>✓</span>{{ item.name }} · {{ enterpriseLabel(item.enterpriseName) }} · {{ statusLabel(item.status) }}
+              </li>
+            </ul>
+            <p v-else>当前权限范围内暂无产品或服务档案。</p>
+            <RouterLink class="secondary-button" to="/members">查看相关企业</RouterLink>
+          </article>
+          <article class="tier-card panel">
+            <div class="tier-top"><span>需</span><em>{{ snapshot.demands.total }} 条</em></div>
+            <small>COOPERATION DEMANDS</small><h3>合作需求</h3>
+            <ul v-if="snapshot.demands.items.length">
+              <li v-for="item in snapshot.demands.items.slice(0, 4)" :key="item.id">
+                <span>✓</span>{{ item.title }} · {{ enterpriseLabel(item.enterpriseName) }} · {{ statusLabel(item.status) }}
+              </li>
+            </ul>
+            <p v-else>当前权限范围内暂无合作需求档案。</p>
+            <RouterLink class="primary-button" to="/matching">进入匹配工作台</RouterLink>
+          </article>
+        </section>
+      </template>
 
-    <section class="ecosystem-section-heading"><div><h2>会员权益分级</h2><p>通过数据边界和增值能力体现协会服务价值</p></div><button class="secondary-button">查看权限矩阵</button></section>
-    <section class="tier-grid">
-      <article v-for="(tier, index) in tiers" :key="tier.name" class="tier-card panel" :class="{ featured: index === 0 }">
-        <div class="tier-top"><span>0{{ index + 1 }}</span><em>{{ tier.accent }}</em></div><small>{{ tier.level }}</small><h3>{{ tier.name }}</h3>
-        <ul><li v-for="feature in tier.features" :key="feature"><Check aria-hidden="true" />{{ feature }}</li></ul><button :class="index === 0 ? 'primary-button' : 'secondary-button'">查看权益详情</button>
-      </article>
-    </section>
+      <section class="ecosystem-section-heading">
+        <div><h2>当前账号可用入口</h2><p>依据现有路由角色配置展示；最终数据权限由服务端决定</p></div>
+        <button class="secondary-button" type="button" @click="openPermissions">查看权限说明</button>
+      </section>
+      <section class="tier-grid">
+        <article v-for="workspace in availableWorkspaces" :key="workspace.to" class="tier-card panel">
+          <div class="tier-top"><span>→</span><em>{{ currentRoleLabel }}</em></div>
+          <small>AVAILABLE WORKSPACE</small><h3>{{ workspace.label }}</h3>
+          <p>{{ workspace.description }}</p>
+          <RouterLink class="secondary-button" :to="workspace.to">打开{{ workspace.label }}</RouterLink>
+        </article>
+      </section>
+    </template>
 
+    <Teleport to="body">
+      <div v-if="permissionOpen" class="dialog-backdrop" @click.self="permissionOpen = false" @keydown.esc="permissionOpen = false">
+        <section ref="permissionDialog" class="member-create-dialog permission-dialog" role="dialog" aria-modal="true" aria-labelledby="permission-title" tabindex="-1">
+          <header class="dialog-header">
+            <div><h2 id="permission-title">页面入口权限说明</h2><p>前端入口与服务端数据权限是两道独立校验</p></div>
+            <button class="dialog-close" type="button" aria-label="关闭权限说明" @click="permissionOpen = false">×</button>
+          </header>
+          <div class="dialog-body permission-dialog-body">
+            <p>此表直接读取前端路由角色配置，仅代表能否进入页面。服务端仍会逐请求校验角色、企业归属、协会关系和授权期限。</p>
+            <div class="data-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>身份</th><th v-for="workspace in workspaceRoutes" :key="workspace.to">{{ workspace.label }}</th></tr></thead>
+                <tbody>
+                  <tr v-for="role in ROLES" :key="role">
+                    <td><strong>{{ roleLabels[role] }}</strong><small v-if="role === currentRole">（当前）</small></td>
+                    <td v-for="workspace in workspaceRoutes" :key="workspace.to">{{ canAccess(role, workspace.to) ? '可进入' : '不可进入' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="form-actions"><button class="primary-button" type="button" @click="permissionOpen = false">知道了</button></div>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+.permission-dialog { width: min(900px, calc(100vw - 64px)); }
+.permission-dialog-body { padding: 24px; }
+.permission-dialog-body > p { margin-bottom: 20px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.permission-dialog-body .form-actions { position: static; margin: 20px -24px -24px; justify-content: flex-end; }
+@media (max-width: 560px) {
+  .permission-dialog { width: 100%; }
+  .permission-dialog-body { padding: 18px 16px; }
+  .permission-dialog-body .form-actions { margin: 18px -16px -18px; }
+}
+</style>

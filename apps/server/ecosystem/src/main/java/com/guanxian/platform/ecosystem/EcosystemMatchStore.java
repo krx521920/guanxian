@@ -12,6 +12,8 @@ interface EcosystemMatchStore {
 
     List<PersistedMatchView> list(UUID demandId, ActorScope actor);
 
+    List<PersistedMatchView> list(ActorScope actor);
+
     Optional<PersistedMatchView> find(UUID id, ActorScope actor);
 
     Optional<PersistedMatchView> transition(

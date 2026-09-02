@@ -16,8 +16,9 @@ interface NotificationStore {
     Optional<SubscriptionView> changeSubscriptionStatus(
             UUID id, UUID userId, long expectedVersion, String status);
     boolean deleteSubscription(UUID id, UUID userId, long expectedVersion);
-    List<NotificationMessageView> messages(UUID userId, boolean unreadOnly, int offset, int limit);
-    long countMessages(UUID userId, boolean unreadOnly);
+    List<NotificationMessageView> messages(
+            UUID userId, boolean unreadOnly, String status, long offset, int limit);
+    long countMessages(UUID userId, boolean unreadOnly, String status);
     Optional<NotificationMessageView> message(UUID id, UUID userId);
     Optional<NotificationMessageView> markRead(UUID id, UUID userId);
     boolean policyBelongsToAssociation(UUID policyId, UUID associationId);
