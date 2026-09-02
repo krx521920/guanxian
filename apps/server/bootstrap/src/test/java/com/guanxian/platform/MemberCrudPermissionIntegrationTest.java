@@ -74,7 +74,7 @@ class MemberCrudPermissionIntegrationTest {
                 .andExpect(jsonPath("$.data[0].products[0]").value("探测服务"))
                 .andExpect(jsonPath("$.data[0].city").value("北京市朝阳区"))
                 .andExpect(jsonPath("$.data[0].contact").value("测试联系人"))
-                .andExpect(jsonPath("$.data[0].completeness").value(89))
+                .andExpect(jsonPath("$.data[0].completeness").value(73))
                 .andExpect(jsonPath("$.data[0].status").value("待审核"))
                 .andExpect(jsonPath("$.data[0].updatedAt").exists());
 

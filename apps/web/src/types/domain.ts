@@ -4,6 +4,7 @@ export const ROLES = [
   'ASSOCIATION_OPERATOR',
   'ENTERPRISE_ADMIN',
   'ENTERPRISE_MEMBER',
+  'OBSERVER',
 ] as const
 
 export type UserRole = (typeof ROLES)[number]
@@ -78,9 +79,12 @@ export interface MemberProfile {
   address: string | null
   contactName: string | null
   contactPhone: string | null
+  contactEmail?: string | null
   introduction: string | null
   capabilities: string[]
   products: string[]
+  services?: string[]
+  applicationScenarios?: string[]
   cooperationNeeds: string[]
   visibility: MemberVisibility
   status: MemberStatus
@@ -99,9 +103,12 @@ export interface MemberUpsertPayload {
   address: string | null
   contactName: string | null
   contactPhone: string | null
+  contactEmail?: string | null
   introduction: string | null
   capabilities: string[]
   products: string[]
+  services?: string[]
+  applicationScenarios?: string[]
   cooperationNeeds: string[]
   visibility: MemberVisibility
   status: MemberStatus
@@ -125,6 +132,10 @@ export interface MemberImportRow {
 export interface MemberImportPreview {
   batchId: string
   filename: string
+  templateVersion: string
+  sourceSha256: string
+  submittedUnit: string
+  submittedEnterpriseId: string | null
   status: 'PREVIEWED' | 'COMMITTED' | 'CANCELLED'
   totalRows: number
   validRows: number
@@ -180,6 +191,70 @@ export interface PolicyUpsertPayload {
   visibility: string
 }
 
+export interface AccessBinding {
+  id: string
+  externalSubject: string | null
+  username: string
+  displayName: string
+  email: string | null
+  associationId: string | null
+  associationName: string | null
+  enterpriseId: string | null
+  enterpriseName: string | null
+  status: string
+  version: number
+  bound: boolean
+  updatedAt: string
+}
+
+export interface AccessBindingPayload {
+  externalSubject: string
+  username: string
+  displayName: string
+  email: string | null
+  associationId: string | null
+  enterpriseId: string | null
+}
+
+export interface AuditRecord {
+  id: number
+  actorSubject: string
+  actorUsername: string
+  associationId: string | null
+  enterpriseId: string | null
+  action: string
+  resourceType: string
+  resourceId: string
+  resourceVersion: number | null
+  outcome: string
+  details: Record<string, unknown>
+  requestId: string
+  occurredAt: string
+}
+
+export interface AuditPage {
+  items: AuditRecord[]
+  total: number
+  page: number
+  size: number
+  snapshotId: number
+}
+
+export interface PolicyHistory {
+  version: number
+  action: string
+  actorSubject: string
+  snapshot: Record<string, unknown>
+  occurredAt: string
+}
+
+export interface PolicyNotificationResult {
+  policyId: string
+  associationId: string
+  recipientCount: number
+  duplicate: boolean
+}
+
 export interface PolicyImpactAnalysis {
   id: string
   policyDocumentId: string
@@ -191,9 +266,21 @@ export interface PolicyImpactAnalysis {
   summary: string
   evidenceChunkIds: string[]
   status: string
+  modelExecutionId: string | null
+  reviewedBySubject: string | null
+  reviewedAt: string | null
   version: number
+  createdAt: string
   updatedAt: string
   analysisMethod: string
+}
+
+export interface PolicyImpactHistory {
+  version: number
+  action: string
+  actorSubject: string
+  snapshot: Record<string, unknown>
+  occurredAt: string
 }
 
 export interface PolicyImpactPage {
@@ -216,6 +303,7 @@ export interface KnowledgeIngestionResult {
 
 export interface KnowledgeCitation {
   order: number
+  documentId: string
   documentName: string
   version: number
   chunkId: string
@@ -255,19 +343,19 @@ export interface Collaboration {
   id: string
   title: string
   participants: string[]
-  owner: string
+  owner: string | null
   stage: string
-  priority: '高' | '中' | '低'
-  nextAction: string
-  dueDate: string
+  priority: string
+  nextAction: string | null
+  dueDate: string | null
   progress: number
   matchId?: string | null
   associationId?: string
   enterpriseId?: string | null
-  version?: number
-  disabled?: boolean
-  deleted?: boolean
-  updatedAt?: string
+  version: number
+  disabled: boolean
+  deleted: boolean
+  updatedAt: string
 }
 
 export interface CollaborationUpsertPayload {
@@ -301,8 +389,58 @@ export interface Offering {
   status: string
   version: number
   disabled: boolean
+  deleted: boolean
+  deletedAt: string | null
   updatedAt: string
+  allowedActions: CatalogAction[]
 }
+
+export type KnowledgeDocumentStatus = 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED' | 'DISABLED' | 'ARCHIVED'
+
+export interface KnowledgeDocument {
+  id: string
+  associationId: string
+  title: string
+  documentType: string
+  sourceType: string
+  sourceUrl: string | null
+  sourceFileId: string | null
+  sourceFilename: string | null
+  visibility: 'PUBLIC' | 'ASSOCIATION' | 'PRIVATE'
+  status: KnowledgeDocumentStatus
+  currentVersion: number
+  chunkCount: number
+  embeddingStatus: string
+  lifecycleVersion: number
+  createdBySubject: string
+  createdAt: string
+  updatedAt: string
+  reviewedBySubject: string | null
+  reviewedAt: string | null
+  reviewComment: string | null
+  deletedAt: string | null
+  deletedBySubject: string | null
+  deleted: boolean
+}
+
+export interface KnowledgeDocumentPage {
+  items: KnowledgeDocument[]
+  total: number
+  page: number
+  size: number
+}
+
+export interface KnowledgeReembeddingResult {
+  documentId: string
+  documentVersion: number
+  chunkCount: number
+  provider: string
+  model: string
+  dimensions: number
+  lifecycleVersion: number
+}
+
+export type CatalogAction = 'UPDATE' | 'SUBMIT' | 'REVIEW' | 'DISABLE' | 'ENABLE' | 'DELETE' | 'RESTORE' | 'CLOSE'
 
 export interface OfferingUpsertPayload {
   name: string
@@ -329,7 +467,10 @@ export interface Demand {
   closeReason: string | null
   version: number
   disabled: boolean
+  deleted: boolean
+  deletedAt: string | null
   updatedAt: string
+  allowedActions: CatalogAction[]
 }
 
 export interface DemandUpsertPayload {
@@ -344,6 +485,8 @@ export interface DemandUpsertPayload {
 }
 
 export interface PersistedMatch extends EcosystemMatch {
+  /** May be redacted for a cross-association reader when the sharing policy omits `state`. */
+  state: MatchState | null
   demandId: string
   demandEnterpriseId: string
   candidateEnterpriseId: string
@@ -354,6 +497,17 @@ export interface PersistedMatch extends EcosystemMatch {
   version: number
   allowedActions: MatchAction[]
 }
+
+export type MatchState =
+  | 'PENDING_CONFIRMATION'
+  | 'RECOMMENDED'
+  | 'PARTIALLY_CONFIRMED'
+  | 'CONFIRMED'
+  | 'INVITED'
+  | 'NEGOTIATING'
+  | 'OUTCOME_PENDING'
+  | 'ARCHIVED'
+  | 'CLOSED'
 
 export type MatchAction =
   | 'RECOMMEND'
@@ -435,6 +589,15 @@ export interface CollaborationActivity {
   type: string
   detail: string
   actorSubject: string
+  occurredAt: string
+}
+
+export interface CollaborationHistory {
+  id: number
+  version: number
+  action: string
+  actorSubject: string
+  snapshot: Record<string, unknown>
   occurredAt: string
 }
 
@@ -577,6 +740,8 @@ export interface AssociationRecommendation {
 
 export interface NotificationMessage {
   id: string
+  userId: string
+  associationId: string | null
   notificationType: string
   title: string
   body: string

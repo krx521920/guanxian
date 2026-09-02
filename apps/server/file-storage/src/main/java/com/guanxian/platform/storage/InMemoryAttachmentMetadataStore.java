@@ -29,7 +29,7 @@ class InMemoryAttachmentMetadataStore implements AttachmentMetadataStore {
         Instant now = Instant.now();
         AttachmentView view = new AttachmentView(
                 draft.id(), draft.associationId(), draft.enterpriseId(), draft.bucketName(), draft.objectKey(),
-                draft.originalFilename(), draft.mediaType(), draft.sizeBytes(), draft.sha256(), "PENDING",
+                draft.originalFilename(), draft.mediaType(), draft.sizeBytes(), draft.sha256(), draft.scanStatus(),
                 draft.visibility(), "ACTIVE", 0, draft.uploadedBySubject(), now, now, null);
         if (entries.putIfAbsent(view.id(), view) != null) {
             throw new IllegalStateException("duplicate attachment id");

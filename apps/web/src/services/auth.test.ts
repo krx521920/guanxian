@@ -45,6 +45,7 @@ describe('useAuth', () => {
     ['ASSOCIATION_OPERATOR', '/association'],
     ['ENTERPRISE_ADMIN', '/enterprise'],
     ['ENTERPRISE_MEMBER', '/enterprise'],
+    ['OBSERVER', '/members'],
   ])('logs %s in and returns its authorized workspace', async (role, expectedRoute) => {
     const { auth, session } = await loadAuth()
 
@@ -63,6 +64,7 @@ describe('useAuth', () => {
       ASSOCIATION_OPERATOR: { id: 'u-003', name: '徐明', role: 'ASSOCIATION_OPERATOR', organization: '北京地下管线协会', title: '会员服务专员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106' },
       ENTERPRISE_ADMIN: { id: 'u-004', name: '王志远', role: 'ENTERPRISE_ADMIN', organization: '京城管网科技有限公司', title: '企业管理员', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
       ENTERPRISE_MEMBER: { id: 'u-005', name: '李楠', role: 'ENTERPRISE_MEMBER', organization: '京城管网科技有限公司', title: '市场经理', permissions: [], associationId: '00000000-0000-0000-0000-000000000106', enterpriseId: '00000000-0000-0000-0000-000000000201' },
+      OBSERVER: { id: 'u-006', name: '只读观察员', role: 'OBSERVER', organization: '北京地下管线协会', title: '只读观察员', permissions: ['MEMBER_READ', 'POLICY_READ', 'NOTIFICATION_READ'], associationId: '00000000-0000-0000-0000-000000000106' },
     })
   })
 

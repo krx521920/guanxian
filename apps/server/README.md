@@ -27,7 +27,7 @@ mvn clean verify
 mvn -pl bootstrap -am spring-boot:run
 ```
 
-应用启动时由 Flyway 按顺序执行 V1–V18，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除、知识向量持久化、身份生命周期约束、政策协会归属约束及分协会通知订阅唯一键。V16 为政策影响分析补充协会列、同协会复合外键和写入触发器，禁止把一个协会的政策关联到另一协会企业；V17 为跨协会授权资源、同意状态、唯一有效授权、推荐资源归属与审批生命周期、关系完整生命周期、共享策略生命周期及各资源类型可见字段白名单增加数据库约束和参与方索引；V18 强制需求企业与候选企业不同，并固化协会推荐、双方确认、邀请应答、顺序洽谈、双方反馈和成果归档的阶段关系、参与方/协会归属、版本与时间字段。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移并保留已有企业记录。旧的 `docker-entrypoint-initdb.d` 初始化入口已删除，后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
+应用启动时由 Flyway 按顺序执行 V1–V22，覆盖基础结构、会员档案、OIDC 数据域、审计、批量导入、业务生命周期、跨协会授权、附件/通知、匹配状态机、会员软删除、知识向量持久化、身份生命周期约束、政策协会归属约束及分协会通知订阅唯一键。V16–V20 固化政策影响、跨协会协作、匹配闭环、通知和附件状态不变量；V21 增加会员正式模板版本、来源文件 SHA-256、提交单位及企业、产品/服务/场景字段，并为知识文档增加审核、软删除、生命周期版本与历史；V22 持久化分协会 RAG 评测指标、逐例结果、执行人、费用和发布结论。已有非空数据库若没有 `flyway_schema_history`，会先以版本 0 建立基线，再执行后续迁移并保留已有企业记录。后续结构变化必须新增迁移版本，禁止直接修改已发布迁移。
 
 V16–V18 会在 DDL 生效前检查历史数据。除 V16/V17 的协会与跨协会授权约束外，V18 会拒绝同企业供需、绕过推荐或双方确认的父状态、错绑参与方/协会、状态与应答字段矛盾或提前携带应答文本的邀请、普通洽谈跳级或终态后追加、非参与企业反馈、成功反馈携带关闭原因、失败反馈缺少原因、单方成功即归档及非法结果类型/可见范围；接受邀请后首条 `TERMINATED` 是允许的明确终止路径。邀请请求字段和终态、匹配推荐/确认事实、成果归档主体/时间均不可通过增加版本号改写；拒绝、取消或终止原因必须与父匹配关闭原因一致。`MATCH` 跨协会字段白名单在 V18 中仅新增 `outcomes`，其他未声明字段继续拒绝。歧义数据会以可操作的 `DETAIL`/`HINT` 失败并整体回滚；不得用 `flyway repair`、修改迁移历史或无审核批量更新来绕过。V17 不会在迁移时静默改写单个已过期但仍标记 `ACTIVE` 的旧授权；V18 也不会替存量匹配伪造推荐、确认、邀请或成果事实。能从旧字段唯一确定的反馈 `updated_at` 仅取原 `submitted_at`，其余业务事实必须由负责人核验后修正。
 
@@ -62,6 +62,12 @@ curl http://localhost:8080/api/v1/health
 | GET | `/api/v1/members/import-template` | `MEMBER_IMPORT` |
 | POST | `/api/v1/members/imports/preview` | `MEMBER_IMPORT`，XLSX 预检 |
 | GET/POST | `/api/v1/members/imports/{batchId}` / `.../commit` | 查看预检 / 提交合法行 |
+| GET | `/api/v1/members/{id}/provenance` | 数据域内查看来源文件、提交单位、时间、行号及审核信息 |
+| GET | `/api/v1/knowledge/documents` | 当前协会上下文内分页查看知识文档，可选择包含软删除记录 |
+| POST | `/api/v1/knowledge/documents/{id}/submit` / `.../review` | 知识送审/审核，必须携带 `If-Match` |
+| POST/DELETE | `/api/v1/knowledge/documents/{id}/disable` / `.../archive` / `.../restore` / 文档本身 | 停用、归档、恢复和软删除，必须携带 `If-Match` |
+| POST | `/api/v1/knowledge/documents/{id}/reparse` / `.../reembed` | 重新解析来源附件/重新生成 Embedding，必须携带 `If-Match` |
+| GET/POST | `/api/v1/knowledge/readiness` / `/api/v1/knowledge/evaluations` | 查看对外名称闸门 / 用真实协会资料执行评测 |
 | GET | `/api/v1/audit-logs` | `AUDIT_READ`，按协会数据域过滤 |
 | GET/POST | `/api/v1/access-bindings` | JWT 模式系统管理员查询/绑定 OIDC 身份；修改既有账号必须携带 `If-Match` |
 | PUT | `/api/v1/access-bindings/{id}/disable` / `.../restore` | 显式停用/恢复账号绑定，必须携带 `If-Match` |
@@ -121,7 +127,17 @@ JWT 模式以令牌 `sub` 精确绑定 `user_account.external_subject`。账号�
 
 ### 106 家会员资料采集
 
-调查模板为 XLSX，单文件最大 5 MiB、最多 500 条有效数据行，拒绝公式单元格和被修改的表头。上传先生成持久化预检批次，逐行返回校验与重复错误；提交只导入标记为 `VALID` 的行，所有新企业进入待审核。批次提交使用事务和行锁/CAS 防止重复提交，导入后仍需协会管理员审核，不会自动认证。
+正式调查模板版本冻结为 `GX-MEMBER-SURVEY-2026-01`。工作簿将提交单位、模板版本、企业简介、产品、服务、合作需求、应用场景和联系人信息分列；单文件最大 5 MiB、最多 500 条有效数据行，拒绝公式单元格、版本不匹配和被修改的表头。上传先生成持久化预检批次，逐行返回格式错误、文件内重复信用代码和库内重复冲突；提交只导入标记为 `VALID` 的行，所有新企业进入待审核。
+
+批次保存原始文件名、SHA-256、模板版本、提交单位、提交企业、提交主体和时间；成功行保留工作表行号，可由企业档案的 provenance 接口追溯。批次提交使用事务和行锁/CAS 防止重复提交。生产操作顺序必须是“企业回表 → 预生产预检/去重 → 协会逐家审核 → 正式库”，导入不会自动认证，也不能绕过协会审核。
+
+### 知识治理与 RAG 发布闸门
+
+知识文档只允许在已选定协会上下文中管理和检索。新建文档固定为 `DRAFT`，经 `PENDING_REVIEW` 审核通过后才成为 `PUBLISHED` 并进入检索；支持停用、归档、软删除、恢复、从已校验附件重新解析及重新生成 Embedding。生命周期操作使用强 ETag，历史动作写入 `knowledge_document_history`。系统管理员的特权访问也不会跨越所选协会。
+
+附件只有完成内容验证且生产 ClamAV 扫描成功后才能进入知识库；`PENDING`、`REQUIRES_REUPLOAD` 或扫描失败内容一律失败关闭。模型密钥通过生产编排的只读 secret/configtree 文件注入，不写入环境样例或镜像。外部 Embedding 与生成模型共用数据出境开关、单次费用阈值和 `model_execution` 执行审计。
+
+每个协会必须用已审核发布的真实资料建立评测集，至少 10 例且同时包含有证据题和拒答题。当前发布阈值为证据召回率不低于 0.85、引用精确率不低于 0.95、拒答正确率不低于 0.95；最新一次评测未达标或尚无评测时，readiness 只允许 `ASSOCIATION_COLLABORATION_PLATFORM`。Python `/api/v1/qa/policy` 固定返回 503，不参与降级答复；Java `ai-adapter` 是唯一正式 RAG 实现。
 
 ## 自动化测试与变异测试
 
@@ -152,7 +168,7 @@ mvn -Pmutation '-Dpit.dryRun=true' -pl bootstrap -am clean verify
 
 报告中 `KILLED` 表示现有测试发现了变异，`SURVIVED` 表示需要补充断言或测试场景，`NO_COVERAGE` 表示测试尚未执行到该代码。首次引入阶段不设置分数门槛，待基线稳定后再通过 `mutationThreshold` 和 `coverageThreshold` 逐步设为 CI 门禁。
 
-2026-08-31 当前工作区普通全量回归基线为 67 个 Surefire 测试报告、314 项测试，失败、错误和跳过均为 0。真实 PostgreSQL 16 Testcontainers 已覆盖 Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级、V17→V18 匹配闭环升级、脏数据失败回滚及关键双写并发/CAS；隔离 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境的 Playwright 5/5 条浏览器旅程也已通过。PIT 分数只能引用与当前提交对应的 `bootstrap/target/pit-reports/` 产物，历史分数不得冒充当前结果；本地联合 E2E 仍不能替代正式 IdP、生产网络、备份恢复或告警验收。
+2026-09-02 当前变更的普通全量回归生成 69 份 Surefire 报告，共定义 346 项测试，实际执行并通过 284 项，失败 0、错误 0。本次本机 Docker daemon 不可用，62 项 Testcontainers 用例被跳过；跳过不等于通过，因此 Flyway V1–V22、PostgreSQL/MinIO/Redis/OIDC/ClamAV 真实依赖和当前版本浏览器 E2E 必须在 Docker 可用的 CI 或预生产环境重新执行。早期 PostgreSQL 16 Testcontainers 与 Playwright 5/5 联合环境结果只是历史基线，不得冒充当前变更的验收证据。正式 IdP、生产网络、备份恢复、真实告警和真实语料评测完成前，不得声明生产闭环或对外使用“AI 平台”名称。
 
 ## Docker
 
@@ -166,6 +182,6 @@ docker run --rm -p 8080:8080 guanxian-server:dev
 
 1. 将系统管理员账号绑定、停用、恢复、解绑和代管上下文接入管理页面，并落实高权限操作双人复核。
 2. 使用正式 IdP（不是隔离 Keycloak）完成生产域浏览器 OIDC/PKCE 登录与各身份权限验收，关闭全部演示身份。
-3. 在生产数据隔离副本完成 V12→V18 升级、V16–V18 脏数据处置、备份恢复和回滚兼容演练。
-4. 为会员附件补齐病毒扫描、数据质量评分和导入批次撤销策略。
-5. 配置合规的真实模型与 Embedding 供应商，使用协会真实语料完成出处、效果、费用和数据出境验收；通过前继续使用“管理协作平台”名称。
+3. 在生产数据隔离副本完成 V12→V22 升级、V16–V22 存量数据处置、备份恢复和回滚兼容演练。
+4. 在预生产接通真实 PostgreSQL、MinIO、Redis、OIDC 与私网 ClamAV，完成当前版本浏览器 E2E；继续完善数据质量治理和导入批次撤销策略。
+5. 收齐并逐家审核 106 家正式调查表，配置合规的真实模型与 Embedding 供应商，使用协会真实语料完成召回、引用、拒答、费用和数据出境验收；通过前继续使用“管理协作平台”名称。

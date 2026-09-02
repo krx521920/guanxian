@@ -22,6 +22,12 @@ import type {
 } from '../types/domain'
 import { apiActionMessage, displayBusinessStatus, formatDateTime } from './business-form'
 import {
+  applyMatchPage,
+  MATCH_STATE_FILTERS,
+  reconcileSavedMatch,
+  type MatchStateFilter,
+} from './matching-view'
+import {
   availableNegotiationStages,
   canOpenMatchCollaboration,
   canRespondToInvitation,
@@ -31,18 +37,18 @@ import {
   isInvitationResponder,
   isValidInvitationResponse,
   loadMatchWorkflowSections,
-  refreshedMatchOrNull,
 } from './match-workflow'
 
 const route = useRoute()
 const auth = useAuth()
 const items = ref<PersistedMatch[]>([])
+const total = ref(0)
 const demands = ref<Demand[]>([])
 const loading = ref(false)
 const busy = ref(false)
 const error = ref<PageResourceError | null>(null)
 const message = ref('')
-const state = ref('全部')
+const state = ref<MatchStateFilter>('')
 const page = ref(0)
 const size = ref(20)
 const selected = ref<PersistedMatch | null>(null)
@@ -71,9 +77,6 @@ const outcomeForm = reactive({ title: '', summary: '', contractAmount: '', resul
 const matchConsents = ref<AssociationConsent[]>([])
 const matchConsentTargets = ref<AssociationConsentTarget[]>([])
 const consentForm = reactive({ targetAssociationId: '', expiresAt: '' })
-const states = computed(() => ['全部', ...new Set(items.value.map((item) => displayBusinessStatus(item.state)))])
-const filtered = computed(() => items.value.filter((item) => state.value === '全部' || displayBusinessStatus(item.state) === state.value))
-const paged = computed(() => filtered.value.slice(page.value * size.value, (page.value + 1) * size.value))
 const recommendedCount = computed(() => items.value.filter((item) => Boolean(item.recommendedAt)).length)
 const confirmedCount = computed(() => items.value.filter((item) => item.demandConfirmedAt && item.candidateConfirmedAt).length)
 const hasGenerationRole = computed(() => ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN', 'ASSOCIATION_OPERATOR', 'ENTERPRISE_ADMIN'].includes(auth.user.value?.role || ''))
@@ -121,10 +124,6 @@ let workflowRequestSequence = 0
 let loadRequestSequence = 0
 let invitationClockTimer: number | null = null
 let viewActive = true
-
-watch(() => filtered.value.length, (total) => {
-  page.value = Math.min(page.value, Math.max(0, Math.ceil(total / size.value) - 1))
-})
 
 function toInstant(value: string): string | null {
   return value ? new Date(value).toISOString() : null
@@ -298,10 +297,45 @@ function closeDetail() {
 }
 
 async function refreshSelectedMatch(matchId: string) {
-  const loaded = await platformApi.matches()
-  items.value = loaded
-  selected.value = refreshedMatchOrNull(loaded, matchId)
+  const [current, pageResult] = await Promise.all([
+    platformApi.match(matchId),
+    readMatchPage(),
+  ])
+  const loaded = pageResult
+  items.value = loaded.items
+  total.value = loaded.total
+  page.value = loaded.page
+  size.value = loaded.size
+  selected.value = current
   prepareMatchConsent()
+}
+
+async function acceptSavedMatch(saved: PersistedMatch, success: string) {
+  const reconciled = reconcileSavedMatch(items.value, total.value, saved, state.value)
+  items.value = reconciled.items
+  total.value = reconciled.total
+  selected.value = saved
+  try {
+    const currentPage = await readMatchPage()
+    items.value = currentPage.items
+    total.value = currentPage.total
+    page.value = currentPage.page
+    size.value = currentPage.size
+    selected.value = saved
+    message.value = success
+  } catch {
+    selected.value = { ...saved, allowedActions: [] }
+    message.value = '操作已保存，但列表刷新失败；为避免基于旧版本继续操作，写入按钮已暂时关闭，请重新加载。'
+  }
+}
+
+async function readMatchPage() {
+  const requestedPage = page.value
+  const first = applyMatchPage(await platformApi.matches(requestedPage, size.value, state.value))
+  if (!first.items.length && first.total > 0 && first.page !== requestedPage) {
+    return applyMatchPage(await platformApi.matches(first.page, first.size, state.value))
+  }
+  return first
 }
 
 async function refreshAfterSaved(matchId: string): Promise<boolean> {
@@ -334,21 +368,25 @@ async function load() {
   const sequence = ++loadRequestSequence
   loading.value = true; error.value = null
   try {
-    const [matches, generationResult] = await Promise.all([
-      platformApi.matches(),
+    const [matchResult, generationResult] = await Promise.all([
+      readMatchPage(),
       loadGenerationDemands()
         .then((value): { value: Demand[]; reason: unknown | null } => ({ value, reason: null }))
         .catch((reason: unknown) => ({ value: [] as Demand[], reason })),
     ])
     if (!viewActive || sequence !== loadRequestSequence) return
-    items.value = matches; demands.value = generationResult.value
+    const matches = matchResult
+    items.value = matches.items
+    total.value = matches.total
+    page.value = matches.page
+    size.value = matches.size
+    demands.value = generationResult.value
     if (generationResult.reason) {
       message.value = apiActionMessage(
         generationResult.reason,
         '匹配记录已加载，但可生成需求暂时无法读取；生成功能已关闭。',
       )
     }
-    page.value = Math.min(page.value, Math.max(0, Math.ceil(filtered.value.length / size.value) - 1))
     await loadMatchConsentContext(sequence)
     if (!viewActive || sequence !== loadRequestSequence) return
     const fromRoute = typeof route.query.demand === 'string' ? route.query.demand : ''
@@ -359,6 +397,18 @@ async function load() {
       if (!target) message.value = '该需求当前不可用于生成匹配，可能尚未开放或不在当前身份的数据范围内。'
     } else if (selectedDemandId.value && !demands.value.some((item) => item.id === selectedDemandId.value)) {
       selectedDemandId.value = ''
+    }
+    const matchFromRoute = typeof route.query.match === 'string' ? route.query.match : ''
+    if (matchFromRoute && selected.value?.id !== matchFromRoute) {
+      try {
+        const target = await platformApi.match(matchFromRoute)
+        if (!viewActive || sequence !== loadRequestSequence) return
+        await loadWorkflow(target)
+      } catch (reason) {
+        if (viewActive && sequence === loadRequestSequence) {
+          message.value = apiActionMessage(reason, '关联匹配不存在或当前身份无权查看。')
+        }
+      }
     }
   } catch (reason) {
     if (viewActive && sequence === loadRequestSequence) error.value = safePageResourceError(reason)
@@ -382,9 +432,10 @@ async function loadGenerationDemands(): Promise<Demand[]> {
   return loaded
 }
 
-function selectState(value: string) {
+function selectState(value: MatchStateFilter) {
   state.value = value
   page.value = 0
+  void load()
 }
 
 function openGenerator() {
@@ -394,11 +445,13 @@ function openGenerator() {
 
 function changePage(value: number) {
   page.value = value
+  void load()
 }
 
 function resizePage(value: number) {
   size.value = value
   page.value = 0
+  void load()
 }
 
 async function generate(closeDialog = true) {
@@ -406,9 +459,13 @@ async function generate(closeDialog = true) {
   busy.value = true; message.value = ''
   try {
     const generated = await platformApi.generateMatches(selectedDemandId.value)
-    items.value = [...generated, ...items.value.filter((item) => item.demandId !== selectedDemandId.value)]
+    page.value = 0
+    state.value = ''
+    await load()
     if (closeDialog) generatorOpen.value = false
-    message.value = generated.length ? `已为该需求生成 ${generated.length} 条可追踪匹配。` : '未找到符合条件的在架产品或服务，请先完善企业能力资料。'
+    message.value = generated.length
+      ? `本轮已新增或刷新 ${generated.length} 条可追踪匹配。`
+      : '本轮未新增可刷新候选；已进入推荐或推进阶段的匹配会原样保留。'
   } catch (reason) {
     const actionMessage = apiActionMessage(reason, '匹配生成失败，请确认需求已审核发布。')
     if (reason instanceof ApiRequestError && reason.code === 'REQUEST_TIMEOUT') {
@@ -424,8 +481,9 @@ async function transition(action: 'recommend' | 'confirm') {
   busy.value = true; message.value = ''
   try {
     const saved = await platformApi.transitionMatch(selected.value, action)
-    items.value = items.value.map((item) => item.id === saved.id ? saved : item); selected.value = saved
-    message.value = action === 'recommend' ? '协会已将匹配定向推荐给企业。' : '企业已确认匹配，可进入洽谈与协作。'
+    await acceptSavedMatch(saved, action === 'recommend'
+      ? '协会已将匹配定向推荐给企业。'
+      : '企业已确认匹配，可进入洽谈与协作。')
   } catch (reason) { await handleMatchActionFailure(reason, '匹配状态更新失败。', selected.value?.id || '') }
   finally { busy.value = false }
 }
@@ -435,8 +493,8 @@ async function closeMatch() {
   busy.value = true; message.value = ''
   try {
     const saved = await platformApi.closeMatch(selected.value, closeReason.value)
-    items.value = items.value.map((item) => item.id === saved.id ? saved : item); selected.value = saved; closeReason.value = ''
-    message.value = '匹配已关闭，原因已归档用于后续效果评估。'
+    closeReason.value = ''
+    await acceptSavedMatch(saved, '匹配已关闭，原因已归档用于后续效果评估。')
   } catch (reason) { await handleMatchActionFailure(reason, '匹配关闭失败。', selected.value?.id || '') }
   finally { busy.value = false }
 }
@@ -553,6 +611,14 @@ onMounted(() => {
   invitationClockTimer = window.setInterval(() => { currentTime.value = Date.now() }, 30_000)
   void load()
 })
+watch(
+  () => [route.query.match, route.query.demand],
+  ([nextMatch, nextDemand], [previousMatch, previousDemand]) => {
+    if (nextMatch === previousMatch && nextDemand === previousDemand) return
+    if (nextMatch !== previousMatch) closeDetail()
+    void load()
+  },
+)
 onBeforeUnmount(() => {
   viewActive = false
   loadRequestSequence += 1
@@ -568,13 +634,13 @@ onBeforeUnmount(() => {
     </PageHeader>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
     <section class="match-summary">
-      <div><span>当前匹配记录</span><strong>{{ items.length }}</strong><small>来自数据库</small></div><div><span>已由协会推荐</span><strong>{{ recommendedCount }}</strong><small>{{ items.length ? `${Math.round(recommendedCount / items.length * 100)}%` : '0%' }}</small></div><div><span>已由参与企业确认</span><strong>{{ confirmedCount }}</strong><small>{{ items.length ? `${Math.round(confirmedCount / items.length * 100)}%` : '0%' }}</small></div>
+      <div><span>符合当前筛选</span><strong>{{ total }}</strong><small>数据库总数</small></div><div><span>本页已由协会推荐</span><strong>{{ recommendedCount }}</strong><small>本页 {{ items.length }} 条</small></div><div><span>本页双方均已确认</span><strong>{{ confirmedCount }}</strong><small>仅统计当前页</small></div>
       <div class="matching-logic"><span class="ai-chip">规则</span><p><b>记录可解释</b>每条匹配保留分数和具体推荐理由，并由协会与企业人工确认。</p></div>
     </section>
-    <div class="segmented match-tabs"><button v-for="itemState in states" :key="itemState" :class="{ active: state === itemState }" @click="selectState(itemState)">{{ itemState }}</button></div>
+    <div class="segmented match-tabs"><button v-for="filter in MATCH_STATE_FILTERS" :key="filter.value || 'ALL'" :class="{ active: state === filter.value }" :disabled="loading || busy" @click="selectState(filter.value)">{{ filter.label }}</button></div>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else class="match-list">
-      <article v-for="item in paged" :key="item.id" class="match-card panel">
+      <article v-for="item in items" :key="item.id" class="match-card panel">
         <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - (item.score ?? 0) * 1.13}` }"/></svg><div><strong>{{ item.score ?? '—' }}</strong><span>匹配度</span></div></div>
         <div class="match-demand"><span class="eyebrow">需求方 · {{ item.scene || '场景未授权' }}</span><h2>{{ item.demandTitle || '需求标题未授权' }}</h2><p>{{ item.demandCompany || '需求企业未授权' }}</p></div>
         <div class="match-arrow"><span>可解释推荐</span>→</div>
@@ -582,8 +648,8 @@ onBeforeUnmount(() => {
         <div class="match-actions"><StatusBadge :value="displayBusinessStatus(item.state)" /><small>{{ formatDateTime(item.updatedAt) }}</small><button class="primary-button small" @click="openDetail(item)">查看匹配详情</button></div>
         <div class="match-reasons"><b>推荐理由</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span></div>
       </article>
-      <div v-if="!filtered.length" class="panel empty-business-state"><b>暂无匹配记录</b><span v-if="canGenerate">可从“生成新一轮匹配”选择当前身份有权操作的开放需求。</span><span v-else-if="hasGenerationRole">当前身份暂无有权生成匹配的开放需求。</span><span v-else>当前身份可查看已授权的匹配记录，但不能发起生成。</span></div>
-      <PaginationBar v-else :page="page" :size="size" :total="filtered.length" :disabled="loading || busy" @change="changePage" @resize="resizePage" />
+      <div v-if="!items.length" class="panel empty-business-state"><b>{{ state ? '当前状态下暂无匹配记录' : '暂无匹配记录' }}</b><span v-if="canGenerate">可从“生成新一轮匹配”选择当前身份有权操作的开放需求。</span><span v-else-if="hasGenerationRole">当前身份暂无有权生成匹配的开放需求。</span><span v-else>当前身份可查看已授权的匹配记录，但不能发起生成。</span></div>
+      <PaginationBar v-if="total > 0" :page="page" :size="size" :total="total" :disabled="loading || busy" @change="changePage" @resize="resizePage" />
     </section>
 
     <div v-if="rulesOpen" class="modal-backdrop" @click.self="rulesOpen = false"><section class="panel modal-card compact-modal"><div class="modal-head"><div><span class="eyebrow">MATCH EXPLAINABILITY</span><h2>匹配依据</h2></div><button class="icon-button" @click="rulesOpen = false">×</button></div><div class="modal-copy"><p>系统从需求场景、所需能力、供给方产品/服务、资质与数据可见性中生成候选。</p><p>分数和推荐理由以后端每条记录为准，页面不伪造固定权重。</p><p>匹配不会自动对外推送：必须经协会推荐、企业确认后才进入洽谈。</p></div><div class="form-actions"><button class="primary-button" @click="rulesOpen = false">我知道了</button></div></section></div>

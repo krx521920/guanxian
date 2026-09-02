@@ -14,7 +14,7 @@ import java.util.UUID;
 public interface PartnerFieldAuthorization {
     Set<String> MEMBER_FIELDS = Set.of(
             "name", "category", "address", "introduction",
-            "capabilities", "products", "cooperationNeeds");
+            "capabilities", "products", "services", "applicationScenarios", "cooperationNeeds");
     Set<String> OFFERING_FIELDS = Set.of(
             "enterpriseName", "name", "description", "scenarios", "qualifications");
     Set<String> DEMAND_FIELDS = Set.of(

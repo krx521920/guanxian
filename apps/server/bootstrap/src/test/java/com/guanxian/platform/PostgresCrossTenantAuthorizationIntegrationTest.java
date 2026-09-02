@@ -198,6 +198,32 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     }
 
     @Test
+    void sharedForeignDemandIsReadableButNeverEligibleForMatchGeneration() throws Exception {
+        Fixture fixture = fixture(Instant.now().plusSeconds(3600));
+        UUID demandId = insertDemand(fixture.partnerEnterpriseId(), "PARTNERS");
+        insertPolicy(fixture, "DEMAND", Instant.now().plusSeconds(3600));
+        insertConsent(fixture, "DEMAND", demandId, Instant.now().plusSeconds(3600));
+
+        mockMvc.perform(get("/api/v1/demands/{id}", demandId).with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(demandId.toString()));
+        mockMvc.perform(get("/api/v1/matches/generation-demands")
+                        .with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0))
+                .andExpect(jsonPath("$.data.items").isEmpty());
+        mockMvc.perform(post("/api/v1/matches/demand/{id}/generate", demandId)
+                        .with(actor(fixture.subject()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("DEMAND_SCOPE_VIOLATION"));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM ecosystem_match WHERE demand_id=?",
+                Integer.class, demandId));
+    }
+
+    @Test
     void partnerMemberIsVisibleOnlyThroughPolicyConsentAndSensitiveFieldsStayRedacted() throws Exception {
         Fixture fixture = fixture(Instant.now().plusSeconds(3600));
         jdbc.update("""
@@ -434,13 +460,33 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         String response = mockMvc.perform(get("/api/v1/matches").with(actor(fixture.subject())))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        JsonNode match = findById(objectMapper.readTree(response).path("data"), matchId);
+        JsonNode match = findById(objectMapper.readTree(response).path("data").path("items"), matchId);
         assertEquals("Authorized Demand Title", match.path("demandTitle").asText());
         assertEquals("RECOMMENDED", match.path("state").asText());
         assertTrue(match.path("solution").isNull());
         assertTrue(match.path("supplierCompany").isNull());
         assertTrue(match.path("score").isNull());
         assertTrue(match.path("reasons").isArray() && match.path("reasons").isEmpty());
+
+        jdbc.update("""
+                UPDATE association_share_policy
+                   SET visible_fields='["demandTitle"]'::jsonb
+                 WHERE source_association_id=? AND target_association_id=?
+                   AND resource_type='MATCH'
+                """, fixture.partnerAssociationId(), fixture.actorAssociationId());
+        String redacted = mockMvc.perform(get("/api/v1/matches")
+                        .with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode redactedMatch = findById(
+                objectMapper.readTree(redacted).path("data").path("items"), matchId);
+        assertTrue(redactedMatch.path("state").isNull());
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("state", "RECOMMENDED")
+                        .with(actor(fixture.subject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(0))
+                .andExpect(jsonPath("$.data.items").isEmpty());
 
         jdbc.update("UPDATE enterprise_share_consent SET status='REVOKED', revoked_at=now() WHERE id=?",
                 candidateConsent);
@@ -451,10 +497,41 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
     void bilateralConfirmationAndWorkflowStagesAreEnforcedByPostgres() throws Exception {
         WorkflowFixture fixture = workflowFixture();
 
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("page", "0").param("size", "1")
+                        .param("state", "pending_confirmation")
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(1))
+                .andExpect(jsonPath("$.data.items.length()").value(1));
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("page", "1").param("size", "1")
+                        .param("state", "PENDING_CONFIRMATION")
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.items").isEmpty());
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("state", "NOT_A_STATE")
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_MATCH_QUERY"));
+        mockMvc.perform(get("/api/v1/matches")
+                        .param("size", "0")
+                        .with(actor(fixture.reviewerSubject())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_MATCH_QUERY"));
+
         String supplierPending = mockMvc.perform(get("/api/v1/matches")
                         .with(enterpriseActor(fixture.supplierSubject())))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertFalse(containsId(objectMapper.readTree(supplierPending).path("data"), fixture.matchId()));
+        assertFalse(containsId(
+                objectMapper.readTree(supplierPending).path("data").path("items"), fixture.matchId()));
+        mockMvc.perform(get("/api/v1/matches/{id}", fixture.matchId())
+                        .with(enterpriseActor(fixture.supplierSubject())))
+                .andExpect(status().isNotFound());
         mockMvc.perform(post("/api/v1/matches/{id}/confirm", fixture.matchId())
                         .with(enterpriseActor(fixture.supplierSubject()))
                         .header(HttpHeaders.IF_MATCH, "\"0\""))
@@ -485,7 +562,15 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         String supplierRecommended = mockMvc.perform(get("/api/v1/matches")
                         .with(enterpriseActor(fixture.supplierSubject())))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        assertTrue(containsId(objectMapper.readTree(supplierRecommended).path("data"), fixture.matchId()));
+        assertTrue(containsId(
+                objectMapper.readTree(supplierRecommended).path("data").path("items"), fixture.matchId()));
+        mockMvc.perform(get("/api/v1/matches/{id}", fixture.matchId())
+                        .with(enterpriseActor(fixture.supplierSubject())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(fixture.matchId().toString()))
+                .andExpect(jsonPath("$.data.allowedActions").isArray())
+                .andExpect(result -> assertEquals("\"1\"",
+                        result.getResponse().getHeader(HttpHeaders.ETAG)));
         for (String child : new String[]{"invitations", "negotiations", "feedback", "outcomes"}) {
             mockMvc.perform(get("/api/v1/matches/{id}/" + child, fixture.matchId())
                             .with(enterpriseActor(fixture.supplierSubject())))
@@ -594,7 +679,7 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         JsonNode readyMatch = findById(
-                objectMapper.readTree(readyResponse).path("data"), fixture.matchId());
+                objectMapper.readTree(readyResponse).path("data").path("items"), fixture.matchId());
         assertTrue(containsText(readyMatch.path("allowedActions"), "ARCHIVE"));
 
         mockMvc.perform(post("/api/v1/matches/{id}/outcomes", fixture.matchId())
@@ -800,7 +885,9 @@ class PostgresCrossTenantAuthorizationIntegrationTest {
         String response = mockMvc.perform(get("/api/v1/matches").with(actor(fixture.subject())))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
-        assertEquals(expected, containsId(objectMapper.readTree(response).path("data"), id));
+        JsonNode page = objectMapper.readTree(response).path("data");
+        assertEquals(expected ? 1 : 0, page.path("total").asInt());
+        assertEquals(expected, containsId(page.path("items"), id));
     }
 
     private void assertOfferingVisible(Fixture fixture, UUID id, boolean expected) throws Exception {

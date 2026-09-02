@@ -14,9 +14,13 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -54,7 +58,8 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
     @Override
     public List<PersistedMatchView> upsert(
             DemandView demand, List<MatchCandidateDraft> candidates, ActorScope actor) {
-        requireSystemUpsertScope(demand, actor);
+        requireUpsertScope(demand, actor);
+        List<UUID> changedCandidateIds = new ArrayList<>();
         for (MatchCandidateDraft candidate : candidates) {
             if (demand.enterpriseId().equals(candidate.candidateEnterpriseId())) {
                 throw new PreconditionFailedException("a demand enterprise cannot be matched with itself");
@@ -69,7 +74,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                     .addValue("solution", candidate.solution())
                     .addValue("score", candidate.score())
                     .addValue("reasons", json(candidate.reasons()));
-            jdbc.update("""
+            int changed = jdbc.update("""
                     INSERT INTO ecosystem_match (
                         demand_id, candidate_enterprise_id, score, explanation, review_status,
                         demand_company_snapshot, demand_title_snapshot, scene_snapshot,
@@ -92,8 +97,17 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                         updated_at=now()
                     WHERE ecosystem_match.state='PENDING_CONFIRMATION'
                     """, params);
+            if (changed == 1) {
+                changedCandidateIds.add(candidate.candidateEnterpriseId());
+            }
         }
-        return list(demand.id(), actor);
+        if (changedCandidateIds.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> changed = new HashSet<>(changedCandidateIds);
+        return list(demand.id(), actor).stream()
+                .filter(value -> changed.contains(value.candidateEnterpriseId()))
+                .toList();
     }
 
     @Override
@@ -107,10 +121,37 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
 
     @Override
     public List<PersistedMatchView> list(ActorScope actor) {
+        return list(actor, null, 0, Integer.MAX_VALUE);
+    }
+
+    @Override
+    public List<PersistedMatchView> list(
+            ActorScope actor, String state, long offset, int limit) {
+        MapSqlParameterSource params = scopeParams(actor)
+                .addValue("state", state, Types.VARCHAR)
+                .addValue("offset", offset)
+                .addValue("limit", limit);
         return jdbc.query(SELECT + scope(actor)
                         + " AND m.deleted_at IS NULL"
-                        + " ORDER BY m.updated_at DESC, m.score DESC, m.id",
-                scopeParams(actor), mapper);
+                        + " AND (:state IS NULL OR m.state=:state)"
+                        + " ORDER BY m.score DESC NULLS LAST, m.id"
+                        + " OFFSET :offset LIMIT :limit",
+                params, mapper);
+    }
+
+    @Override
+    public long count(ActorScope actor, String state) {
+        Long value = jdbc.queryForObject("""
+                SELECT count(*)
+                  FROM ecosystem_match m
+                  JOIN cooperation_demand d ON d.id=m.demand_id
+                  JOIN enterprise de ON de.id=d.enterprise_id
+                  JOIN enterprise ce ON ce.id=m.candidate_enterprise_id
+                """ + scope(actor)
+                        + " AND m.deleted_at IS NULL"
+                        + " AND (:state IS NULL OR m.state=:state)",
+                scopeParams(actor).addValue("state", state, Types.VARCHAR), Long.class);
+        return value == null ? 0 : value;
     }
 
     @Override
@@ -221,21 +262,33 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 actorScope = actor.enterpriseId() == null ? "TRUE" : "FALSE";
             } else if (actor.enterpriseId() != null) {
                 actorScope = "((de.association_id=:associationId"
+                        + " AND de.status='ACTIVE' AND de.deleted_at IS NULL"
                         + " AND d.enterprise_id=:enterpriseId)"
                         + " OR (m.state<>'PENDING_CONFIRMATION'"
                         + " AND ce.association_id=:associationId"
+                        + " AND ce.status='ACTIVE' AND ce.deleted_at IS NULL"
                         + " AND m.candidate_enterprise_id=:enterpriseId))";
             } else {
-                actorScope = "(de.association_id=:associationId"
+                actorScope = "((de.association_id=:associationId"
+                        + " AND de.status='ACTIVE' AND de.deleted_at IS NULL)"
                         + " OR (m.state<>'PENDING_CONFIRMATION'"
-                        + " AND ce.association_id=:associationId))";
+                        + " AND ce.association_id=:associationId"
+                        + " AND ce.status='ACTIVE' AND ce.deleted_at IS NULL))";
             }
         } else if (actor.isAssociationStaff()) {
-            actorScope = "(de.association_id=:associationId"
+            actorScope = actor.partnerAssociationIds().isEmpty()
+                    ? "(de.association_id=:associationId"
+                    + " AND de.status='ACTIVE' AND de.deleted_at IS NULL)"
+                    : "((de.association_id=:associationId"
+                    + " AND de.status='ACTIVE' AND de.deleted_at IS NULL)"
                     + " OR (m.state<>'PENDING_CONFIRMATION' AND "
                     + authorizedPartnerMatchRead() + "))";
         } else if (actor.enterpriseId() != null) {
-            actorScope = "(d.enterprise_id=:enterpriseId"
+            actorScope = actor.partnerAssociationIds().isEmpty()
+                    ? "(d.enterprise_id=:enterpriseId"
+                    + " OR (m.state<>'PENDING_CONFIRMATION'"
+                    + " AND m.candidate_enterprise_id=:enterpriseId))"
+                    : "(d.enterprise_id=:enterpriseId"
                     + " OR (m.state<>'PENDING_CONFIRMATION'"
                     + " AND (m.candidate_enterprise_id=:enterpriseId OR "
                     + authorizedPartnerMatchRead() + ")))";
@@ -259,6 +312,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
 
     private static String authorizedPartnerOwner(String enterpriseAlias, String enterpriseIdExpression) {
         return "(" + enterpriseAlias + ".association_id<>:associationId"
+                + " AND " + enterpriseAlias + ".association_id IN (:partnerAssociationIds)"
                 + " AND " + enterpriseAlias + ".status='ACTIVE'"
                 + " AND " + enterpriseAlias + ".deleted_at IS NULL"
                 + " AND d.deleted_at IS NULL"
@@ -274,7 +328,11 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 + " WHERE sp.source_association_id=" + enterpriseAlias + ".association_id"
                 + " AND sp.target_association_id=:associationId"
                 + " AND sp.resource_type='MATCH' AND sp.status='ACTIVE'"
-                + " AND sp.valid_from<=now() AND (sp.expires_at IS NULL OR sp.expires_at>now()))"
+                + " AND sp.valid_from<=now() AND (sp.expires_at IS NULL OR sp.expires_at>now())"
+                + " AND jsonb_typeof(sp.visible_fields)='array'"
+                + " AND sp.visible_fields<>'[]'::jsonb"
+                + " AND sp.visible_fields <@ CAST('[\"demandCompany\",\"demandTitle\",\"scene\","
+                + "\"supplierCompany\",\"solution\",\"score\",\"reasons\",\"state\",\"outcomes\"]' AS jsonb))"
                 + " AND EXISTS (SELECT 1 FROM enterprise_share_consent esc"
                 + " WHERE esc.enterprise_id=" + enterpriseIdExpression
                 + " AND esc.target_association_id=:associationId"
@@ -287,6 +345,7 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
         return new MapSqlParameterSource()
                 .addValue("associationId", actor.associationId())
                 .addValue("enterpriseId", actor.enterpriseId())
+                .addValue("partnerAssociationIds", actor.partnerAssociationIds())
                 .addValue("contextEnterpriseId", actor.enterpriseId());
     }
 
@@ -356,12 +415,16 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                 + " AND operational_candidate_enterprise.deleted_at IS NULL)";
     }
 
-    private void requireSystemUpsertScope(DemandView demand, ActorScope actor) {
-        if (!actor.isSystemAdmin()) {
-            return;
-        }
+    private void requireUpsertScope(DemandView demand, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
-        if (actor.enterpriseId() != null
+        if (!actor.isSystemAdmin() && !actor.isAssociationStaff()
+                && (!actor.isEnterpriseAdmin() || actor.enterpriseId() == null
+                || !actor.enterpriseId().equals(demand.enterpriseId()))) {
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "matches must be generated for the selected enterprise's demand");
+        }
+        if (actor.isSystemAdmin() && actor.enterpriseId() != null
                 && !actor.enterpriseId().equals(demand.enterpriseId())) {
             throw new ForbiddenException(
                     "ENTERPRISE_SCOPE_VIOLATION",
@@ -372,12 +435,14 @@ class PostgresEcosystemMatchStore implements EcosystemMatchStore {
                     SELECT 1
                       FROM cooperation_demand d
                       JOIN enterprise e ON e.id=d.enterprise_id
+                      JOIN association a ON a.id=e.association_id
                      WHERE d.id=:demandId
                        AND d.enterprise_id=:enterpriseId
                        AND d.deleted_at IS NULL
                        AND e.association_id=:associationId
                        AND e.status='ACTIVE'
-                       AND e.deleted_at IS NULL)
+                       AND e.deleted_at IS NULL
+                       AND a.status='ACTIVE')
                 """, new MapSqlParameterSource()
                 .addValue("demandId", demand.id())
                 .addValue("enterpriseId", demand.enterpriseId())

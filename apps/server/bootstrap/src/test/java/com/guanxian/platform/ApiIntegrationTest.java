@@ -55,6 +55,28 @@ class ApiIntegrationTest {
     }
 
     @Test
+    void auditPagingReturnsStableSnapshotAndRejectsUnboundedOffsets() throws Exception {
+        mockMvc.perform(get("/api/v1/audit-logs/page")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.total").isNumber())
+                .andExpect(jsonPath("$.data.snapshotId").isNumber());
+
+        mockMvc.perform(get("/api/v1/audit-logs/page")
+                        .param("page", "10001")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AUDIT_PAGE"));
+
+        mockMvc.perform(get("/api/v1/audit-logs/page")
+                        .param("size", "501")
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_AUDIT_PAGE_SIZE"));
+    }
+
+    @Test
     void memberCrudWorksInMemory() throws Exception {
         String body = """
                 {
@@ -121,8 +143,11 @@ class ApiIntegrationTest {
 
         mockMvc.perform(get("/api/v1/matches").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data").isEmpty());
+                .andExpect(jsonPath("$.data.items").isArray())
+                .andExpect(jsonPath("$.data.items").isEmpty())
+                .andExpect(jsonPath("$.data.total").value(0))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20));
 
         mockMvc.perform(get("/api/v1/collaborations").with(httpBasic("enterprise-admin", "enterprise123")))
                 .andExpect(status().isOk())

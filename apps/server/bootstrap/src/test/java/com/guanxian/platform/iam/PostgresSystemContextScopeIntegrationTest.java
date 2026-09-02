@@ -1,6 +1,7 @@
 package com.guanxian.platform.iam;
 
 import com.guanxian.platform.notification.NotificationService;
+import com.guanxian.platform.notification.PolicyNotificationRequest;
 import com.guanxian.platform.notification.SubscriptionRequest;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
@@ -42,6 +43,7 @@ class PostgresSystemContextScopeIntegrationTest {
     private static final UUID ENTERPRISE_A = UUID.fromString("74000000-0000-0000-0000-000000000101");
     private static final UUID ENTERPRISE_A2 = UUID.fromString("74000000-0000-0000-0000-000000000102");
     private static final UUID SYSTEM_USER = UUID.fromString("74000000-0000-0000-0000-000000000201");
+    private static final UUID TENANT_USER = UUID.fromString("74000000-0000-0000-0000-000000000202");
 
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
@@ -96,9 +98,9 @@ class PostgresSystemContextScopeIntegrationTest {
                 system(ASSOCIATION_A, ENTERPRISE_A)));
 
         var subscriptionA = notifications.createSubscription(
-                new SubscriptionRequest("POLICY", Map.of("scope", "A"), List.of("IN_APP")), associationA);
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), associationA);
         var subscriptionB = notifications.createSubscription(
-                new SubscriptionRequest("POLICY", Map.of("scope", "B"), List.of("IN_APP")), associationB);
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), associationB);
 
         assertEquals(2, notifications.subscriptions(global).size());
         assertEquals(List.of(subscriptionA.id()),
@@ -117,8 +119,51 @@ class PostgresSystemContextScopeIntegrationTest {
         assertEquals(1, notifications.messages(associationA, false, 0, 20).total());
         assertThrows(NotFoundException.class, () -> notifications.markRead(messageB, associationA));
         assertEquals("READ", notifications.markRead(messageB, associationB).status());
+        assertEquals("READ", notifications.markRead(messageB, associationB).status());
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT count(*) FROM audit_log
+                 WHERE action = 'MARK_READ' AND resource_type = 'NOTIFICATION_MESSAGE'
+                   AND resource_id = ?
+                """, Integer.class, messageB.toString()));
+        assertEquals("ARCHIVED", notifications.archive(messageB, associationB).status());
+        assertEquals("ARCHIVED", notifications.archive(messageB, associationB).status());
+        assertEquals(0, notifications.messages(associationB, false, 0, 20).total());
+        assertEquals(1, notifications.messages(
+                associationB, false, "ARCHIVED", 0, 20).total());
+        assertEquals("READ", notifications.restore(messageB, associationB).status());
+        assertEquals("READ", notifications.restore(messageB, associationB).status());
         assertTrue(notifications.messages(associationA, false, 0, 20).items().stream()
                 .anyMatch(value -> value.id().equals(messageA)));
+    }
+
+    @Test
+    void postgresDeliveryRechecksTheUsersCurrentAssociationBinding() {
+        seedScopes();
+        jdbc.update("""
+                INSERT INTO user_account (
+                    id, association_id, username, display_name, external_subject, status)
+                VALUES (?, ?, 'tenant-recipient', '租户收件人', 'tenant-recipient-subject', 'ACTIVE')
+                """, TENANT_USER, ASSOCIATION_A);
+        jdbc.update("""
+                INSERT INTO notification_subscription (
+                    user_id, association_id, subscription_type, filters, channels, status)
+                VALUES (?, ?, 'POLICY', '{}'::jsonb, '["IN_APP"]'::jsonb, 'ACTIVE')
+                """, TENANT_USER, ASSOCIATION_A);
+        UUID policyId = jdbc.queryForObject("""
+                INSERT INTO policy_document (title, association_id, status)
+                VALUES ('跨租户投递校验', ?, 'PUBLISHED') RETURNING id
+                """, UUID.class, ASSOCIATION_A);
+
+        jdbc.update("UPDATE user_account SET association_id = ? WHERE id = ?", ASSOCIATION_B, TENANT_USER);
+        var result = notifications.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_A, policyId, "不应投递", "用户已迁出协会", "stale-binding"),
+                system(ASSOCIATION_A, null));
+
+        assertEquals(0, result.recipientCount());
+        assertEquals(0, jdbc.queryForObject("""
+                SELECT count(*) FROM notification_message
+                 WHERE user_id = ? AND association_id = ? AND resource_id = ?
+                """, Integer.class, TENANT_USER, ASSOCIATION_A, policyId));
     }
 
     private void seedScopes() {
@@ -137,6 +182,7 @@ class PostgresSystemContextScopeIntegrationTest {
                 INSERT INTO user_account (id, username, display_name, external_subject, status)
                 VALUES (?, 'context-system', '上下文系统管理员', 'context-system-subject', 'ACTIVE')
                 """, SYSTEM_USER);
+        jdbc.update("INSERT INTO user_role (user_id, role_code) VALUES (?, 'SYSTEM_ADMIN')", SYSTEM_USER);
     }
 
     private UUID insertMessage(UUID associationId, String title) {

@@ -7,6 +7,7 @@ import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +25,7 @@ import java.util.UUID;
 
 @Service
 public class AttachmentService {
+    static final String CONTENT_VALIDATED = "VALIDATED";
     private static final Map<String, Set<String>> MEDIA_EXTENSIONS = Map.of(
             "application/pdf", Set.of("pdf"),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Set.of("docx"),
@@ -38,6 +40,7 @@ public class AttachmentService {
     private final AttachmentRateLimiter rateLimiter;
     private final StorageProperties properties;
     private final AttachmentEnterpriseScope enterpriseScope;
+    private final AttachmentContentScanner contentScanner;
 
     public AttachmentService(
             AttachmentMetadataStore metadata,
@@ -45,11 +48,23 @@ public class AttachmentService {
             AttachmentRateLimiter rateLimiter,
             StorageProperties properties,
             AttachmentEnterpriseScope enterpriseScope) {
+        this(metadata, objects, rateLimiter, properties, enterpriseScope, new ContentValidationOnlyScanner());
+    }
+
+    @Autowired
+    public AttachmentService(
+            AttachmentMetadataStore metadata,
+            ObjectStorage objects,
+            AttachmentRateLimiter rateLimiter,
+            StorageProperties properties,
+            AttachmentEnterpriseScope enterpriseScope,
+            AttachmentContentScanner contentScanner) {
         this.metadata = metadata;
         this.objects = objects;
         this.rateLimiter = rateLimiter;
         this.properties = properties;
         this.enterpriseScope = enterpriseScope;
+        this.contentScanner = contentScanner;
     }
 
     public AttachmentView upload(
@@ -61,6 +76,7 @@ public class AttachmentService {
         Scope target = writableScope(actor, requestedAssociationId, requestedEnterpriseId);
         rateLimiter.check(actor, "upload");
         ValidatedFile validated = validate(file);
+        contentScanner.assertClean(validated.content());
         String visibility = normalizeVisibility(requestedVisibility, target.enterpriseId());
         UUID id = UUID.randomUUID();
         LocalDate today = LocalDate.now();
@@ -73,7 +89,7 @@ public class AttachmentService {
         AttachmentDraft draft = new AttachmentDraft(
                 id, target.associationId(), target.enterpriseId(), properties.getBucket(), objectKey,
                 validated.filename(), validated.mediaType(), validated.content().length,
-                sha256(validated.content()), visibility, actor.subject());
+                sha256(validated.content()), CONTENT_VALIDATED, visibility, actor.subject());
         objects.put(objectKey, validated.mediaType(), validated.content());
         try {
             return metadata.create(draft, actor);
@@ -112,6 +128,12 @@ public class AttachmentService {
 
     public AttachmentDownload download(UUID id, ActorScope actor) {
         AttachmentView view = get(id, actor, false);
+        if (!CONTENT_VALIDATED.equals(view.scanStatus())) {
+            throw new ApiException(
+                    "ATTACHMENT_CONTENT_UNAVAILABLE",
+                    "attachment content is unavailable until validation succeeds; legacy pending files must be uploaded again",
+                    HttpStatus.CONFLICT);
+        }
         byte[] content = objects.get(view.objectKey());
         if (content.length != view.sizeBytes() || content.length > properties.getMaxSizeBytes()) {
             throw new StorageUnavailableException("stored object failed size verification");

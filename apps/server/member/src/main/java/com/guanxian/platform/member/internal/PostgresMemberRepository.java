@@ -26,8 +26,9 @@ class PostgresMemberRepository implements MemberRepository {
     };
     private static final String SELECT_FIELDS = """
             SELECT id, association_id, name, unified_social_credit_code, category, address,
-                   contact_name, contact_phone, description, capabilities, products,
-                   cooperation_needs, visibility, status, version, created_at, updated_at,
+                   contact_name, contact_phone, contact_email, description, capabilities, products,
+                   services, application_scenarios, cooperation_needs,
+                   visibility, status, version, created_at, updated_at,
                    deleted_at, deleted_by_subject, status_before_delete
             FROM enterprise
             """;
@@ -74,11 +75,13 @@ class PostgresMemberRepository implements MemberRepository {
                     id, association_id, unified_social_credit_code, name, short_name,
                     description, enterprise_roles, service_scenarios, visibility, status,
                     version, created_at, updated_at, category, address, contact_name,
-                    contact_phone, capabilities, products, cooperation_needs)
+                    contact_phone, contact_email, capabilities, products, services,
+                    application_scenarios, cooperation_needs)
                 VALUES (:id, :associationId, :creditCode, :name, NULL,
                     :introduction, '[]'::jsonb, '[]'::jsonb, :visibility, :status,
                     :version, :createdAt, :updatedAt, :category, :address, :contactName,
-                    :contactPhone, CAST(:capabilities AS jsonb), CAST(:products AS jsonb),
+                    :contactPhone, :contactEmail, CAST(:capabilities AS jsonb), CAST(:products AS jsonb),
+                    CAST(:services AS jsonb), CAST(:applicationScenarios AS jsonb),
                     CAST(:cooperationNeeds AS jsonb))
                 """;
         try {
@@ -103,8 +106,11 @@ class PostgresMemberRepository implements MemberRepository {
                     address = :address,
                     contact_name = :contactName,
                     contact_phone = :contactPhone,
+                    contact_email = :contactEmail,
                     capabilities = CAST(:capabilities AS jsonb),
                     products = CAST(:products AS jsonb),
+                    services = CAST(:services AS jsonb),
+                    application_scenarios = CAST(:applicationScenarios AS jsonb),
                     cooperation_needs = CAST(:cooperationNeeds AS jsonb),
                     deleted_at = :deletedAt,
                     deleted_by_subject = :deletedBySubject,
@@ -134,8 +140,11 @@ class PostgresMemberRepository implements MemberRepository {
                 .addValue("address", member.address())
                 .addValue("contactName", member.contactName())
                 .addValue("contactPhone", member.contactPhone())
+                .addValue("contactEmail", member.contactEmail())
                 .addValue("capabilities", writeList(member.capabilities()))
                 .addValue("products", writeList(member.products()))
+                .addValue("services", writeList(member.services()))
+                .addValue("applicationScenarios", writeList(member.applicationScenarios()))
                 .addValue("cooperationNeeds", writeList(member.cooperationNeeds()))
                 .addValue("deletedAt", member.deletedAt() == null ? null : Timestamp.from(member.deletedAt()))
                 .addValue("deletedBySubject", member.deletedBySubject())
@@ -152,9 +161,12 @@ class PostgresMemberRepository implements MemberRepository {
                 resultSet.getString("address"),
                 resultSet.getString("contact_name"),
                 resultSet.getString("contact_phone"),
+                resultSet.getString("contact_email"),
                 resultSet.getString("description"),
                 readList(resultSet.getString("capabilities")),
                 readList(resultSet.getString("products")),
+                readList(resultSet.getString("services")),
+                readList(resultSet.getString("application_scenarios")),
                 readList(resultSet.getString("cooperation_needs")),
                 resultSet.getString("visibility"),
                 resultSet.getString("status"),

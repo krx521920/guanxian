@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -122,11 +123,16 @@ public class PolicyService {
     public PolicyView restore(UUID id, long expectedVersion, ActorScope actor) {
         PolicyView current = get(id, actor, true);
         requireReviewer(actor, current.associationId());
-        if (!current.deleted()) {
-            throw new PreconditionFailedException("policy is not deleted");
-        }
         requireVersion(current.version(), expectedVersion);
-        PolicyView restored = store.restore(id, expectedVersion, actor).orElseThrow(PolicyService::stale);
+        PolicyView restored;
+        if (current.deleted()) {
+            restored = store.restore(id, expectedVersion, actor).orElseThrow(PolicyService::stale);
+        } else if ("DISABLED".equals(current.status()) || current.disabled()) {
+            restored = store.transition(id, expectedVersion, "DRAFT", actor)
+                    .orElseThrow(PolicyService::stale);
+        } else {
+            throw new PreconditionFailedException("policy is neither deleted nor disabled");
+        }
         store.recordChange(actor, "RESTORE", restored, null);
         return restored;
     }
@@ -157,6 +163,31 @@ public class PolicyService {
         if (!VISIBILITIES.contains(visibility)) {
             throw new PreconditionFailedException("visibility must be PRIVATE, MEMBERS, PARTNERS or PUBLIC");
         }
+        validateSourceUrl(request.sourceUrl());
+    }
+
+    private static void validateSourceUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        try {
+            URI uri = URI.create(value.trim());
+            if (!("http".equalsIgnoreCase(uri.getScheme())
+                    || "https".equalsIgnoreCase(uri.getScheme()))
+                    || uri.getHost() == null
+                    || uri.getUserInfo() != null) {
+                throw invalidSourceUrl();
+            }
+        } catch (IllegalArgumentException exception) {
+            throw invalidSourceUrl();
+        }
+    }
+
+    private static ApiException invalidSourceUrl() {
+        return new ApiException(
+                "INVALID_POLICY_SOURCE_URL",
+                "sourceUrl must be an HTTP or HTTPS URL without embedded credentials",
+                HttpStatus.BAD_REQUEST);
     }
 
     private static UUID writableAssociation(UUID requested, ActorScope actor) {

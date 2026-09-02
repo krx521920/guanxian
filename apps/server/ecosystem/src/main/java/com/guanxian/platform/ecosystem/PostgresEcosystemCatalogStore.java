@@ -31,7 +31,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
     private static final String OFFERING_SELECT = """
             SELECT p.id, p.enterprise_id, e.name AS enterprise_name, p.name, p.kind, p.description,
                    p.scenarios::text AS scenarios, p.qualifications::text AS qualifications,
-                   p.visibility, p.status, p.version, p.disabled_at, p.updated_at
+                   p.visibility, p.status, p.version, p.disabled_at, p.deleted_at, p.updated_at
               FROM product_service p
               JOIN enterprise e ON e.id = p.enterprise_id
             """;
@@ -40,7 +40,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                    d.scenarios::text AS scenarios,
                    d.required_capabilities::text AS required_capabilities,
                    d.visibility, d.budget_min, d.budget_max, d.response_deadline,
-                   d.status, d.close_reason, d.version, d.disabled_at, d.updated_at
+                   d.status, d.close_reason, d.version, d.disabled_at, d.deleted_at, d.updated_at
               FROM cooperation_demand d
               JOIN enterprise e ON e.id = d.enterprise_id
             """;
@@ -339,6 +339,35 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
+    public boolean isDemandDeleted(UUID demandId) {
+        Boolean deleted = jdbc.queryForObject("""
+                SELECT NOT EXISTS (
+                    SELECT 1
+                      FROM cooperation_demand
+                     WHERE id=:id AND deleted_at IS NULL
+                )
+                """, new MapSqlParameterSource("id", demandId), Boolean.class);
+        return !Boolean.FALSE.equals(deleted);
+    }
+
+    @Override
+    public boolean isDemandOpenForResponse(UUID demandId) {
+        Boolean open = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1
+                      FROM cooperation_demand
+                     WHERE id=:id
+                       AND status='OPEN'
+                       AND disabled_at IS NULL
+                       AND deleted_at IS NULL
+                       AND visibility <> 'DIRECTED'
+                       AND (response_deadline IS NULL OR response_deadline > now())
+                )
+                """, new MapSqlParameterSource("id", demandId), Boolean.class);
+        return Boolean.TRUE.equals(open);
+    }
+
+    @Override
     public boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId) {
         if (enterpriseId == null || associationId == null) {
             return false;
@@ -611,7 +640,7 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                 .addValue("description", request.description().trim())
                 .addValue("scenarios", json(list(request.scenarios())))
                 .addValue("requiredCapabilities", json(list(request.requiredCapabilities())))
-                .addValue("visibility", visibility(request.visibility(), "DIRECTED"))
+                .addValue("visibility", visibility(request.visibility(), "MEMBERS"))
                 .addValue("budgetMin", request.budgetMin())
                 .addValue("budgetMax", request.budgetMax())
                 .addValue("responseDeadline", request.responseDeadline() == null
@@ -632,6 +661,8 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                 rs.getString("status"),
                 rs.getLong("version"),
                 rs.getTimestamp("disabled_at") != null,
+                rs.getTimestamp("deleted_at") != null,
+                instant(rs.getTimestamp("deleted_at")),
                 instant(rs.getTimestamp("updated_at")));
     }
 
@@ -652,6 +683,8 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
                 rs.getString("close_reason"),
                 rs.getLong("version"),
                 rs.getTimestamp("disabled_at") != null,
+                rs.getTimestamp("deleted_at") != null,
+                instant(rs.getTimestamp("deleted_at")),
                 instant(rs.getTimestamp("updated_at")));
     }
 

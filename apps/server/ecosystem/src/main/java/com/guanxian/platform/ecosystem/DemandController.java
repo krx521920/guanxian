@@ -113,6 +113,16 @@ public class DemandController {
                 id, VersionEtags.requireVersion(ifMatch), actor(authentication)));
     }
 
+    @PostMapping("/{id}/enable")
+    @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
+    ResponseEntity<ApiResponse<DemandView>> enable(
+            @PathVariable UUID id,
+            @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) String ifMatch,
+            Authentication authentication) {
+        return versioned(service.enableDemand(
+                id, VersionEtags.requireVersion(ifMatch), actor(authentication)));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ENTERPRISE_WRITE')")
     ResponseEntity<ApiResponse<DemandView>> delete(

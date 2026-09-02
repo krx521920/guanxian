@@ -4,16 +4,19 @@ import com.guanxian.platform.ai.AiTextService;
 import com.guanxian.platform.member.api.MemberDirectory;
 import com.guanxian.platform.member.api.EnterpriseLifecycle;
 import com.guanxian.platform.member.api.MemberProfile;
+import com.guanxian.platform.shared.error.ApiException;
 import com.guanxian.platform.shared.error.ForbiddenException;
 import com.guanxian.platform.shared.error.NotFoundException;
 import com.guanxian.platform.shared.error.PreconditionFailedException;
 import com.guanxian.platform.shared.security.ActorScope;
 import com.guanxian.platform.shared.security.PartnerFieldAuthorization;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -106,6 +109,63 @@ public class EcosystemMatchService {
         return outboundMatches(normalizeExpiredInvitations(matchStore.list(actor), actor), actor);
     }
 
+    @Transactional
+    public EcosystemPage<PersistedMatchView> persisted(
+            ActorScope actor, int requestedPage, int requestedSize, String requestedState) {
+        int page = requirePage(requestedPage);
+        int size = requirePageSize(requestedSize);
+        String state = normalizeState(requestedState);
+        if (workflowStore != null) {
+            return InMemoryEcosystemUnitOfWork.execute(
+                    matchStore, workflowStore,
+                    () -> persistedPageInternal(actor, page, size, state));
+        }
+        return persistedPageInternal(actor, page, size, state);
+    }
+
+    private EcosystemPage<PersistedMatchView> persistedPageInternal(
+            ActorScope actor, int page, int size, String state) {
+        if (actor.isSystemAdmin() || actor.partnerAssociationIds().isEmpty()) {
+            normalizeScopedExpiredInvitations(actor);
+            long offset = Math.multiplyExact((long) page, size);
+            List<PersistedMatchView> items = outboundMatches(
+                    matchStore.list(actor, state, offset, size), actor).stream()
+                    .filter(value -> state == null || state.equals(value.state()))
+                    .toList();
+            return new EcosystemPage<>(
+                    items, matchStore.count(actor, state), page, size);
+        }
+        List<PersistedMatchView> authorized = outboundMatches(
+                normalizeExpiredInvitations(matchStore.list(actor), actor), actor).stream()
+                .filter(value -> state == null || state.equals(value.state()))
+                .toList();
+        long offset = Math.multiplyExact((long) page, size);
+        List<PersistedMatchView> items;
+        if (offset >= authorized.size()) {
+            items = List.of();
+        } else {
+            int from = Math.toIntExact(offset);
+            int to = Math.min(from + size, authorized.size());
+            items = authorized.subList(from, to);
+        }
+        long total = authorized.size();
+        return new EcosystemPage<>(items, total, page, size);
+    }
+
+    @Transactional
+    public PersistedMatchView detail(UUID id, ActorScope actor) {
+        if (workflowStore != null) {
+            return InMemoryEcosystemUnitOfWork.execute(
+                    matchStore, workflowStore, () -> detailInternal(id, actor));
+        }
+        return detailInternal(id, actor);
+    }
+
+    private PersistedMatchView detailInternal(UUID id, ActorScope actor) {
+        PersistedMatchView value = normalizeExpiredInvitation(findRawAuthorized(id, actor), actor);
+        return outboundMatch(value, actor);
+    }
+
     public List<EcosystemMatch> match(MatchRequest request, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
         int limit = request.limit() == null ? 5 : request.limit();
@@ -131,6 +191,7 @@ public class EcosystemMatchService {
         if (!"OPEN".equals(demand.status())) {
             throw new PreconditionFailedException("matches can only be generated for an OPEN demand");
         }
+        requireDemandOpenForResponse(demand);
         requireDemandOwnerOrAssociation(demand, actor);
         int limit = requestedLimit == null ? 5 : Math.min(Math.max(requestedLimit, 1), 20);
         String scene = String.join(" ", demand.scenarios());
@@ -180,6 +241,7 @@ public class EcosystemMatchService {
             source = catalogService.demands(actor, null, false, sourcePage, 100);
             source.items().stream()
                     .filter(demand -> "OPEN".equals(demand.status()))
+                    .filter(EcosystemMatchService::isDemandOpenForResponse)
                     .filter(demand -> canGenerateDemand(demand, actor))
                     .forEach(eligible::add);
             sourcePage++;
@@ -217,6 +279,7 @@ public class EcosystemMatchService {
         }
         PersistedMatchView current = findRawAuthorized(id, actor);
         requireOperationalMatch(current);
+        requireDemandOpenForResponse(current.demandId());
         requireOwningAssociation(current, actor);
         MatchLifecycle.requireRecommendationAllowed(current);
         if (current.version() != expectedVersion) {
@@ -235,6 +298,7 @@ public class EcosystemMatchService {
         EcosystemScopeGuard.requireWriteContext(actor);
         PersistedMatchView current = findRawAuthorized(id, actor);
         requireOperationalMatch(current);
+        requireDemandOpenForResponse(current.demandId());
         if (actor.enterpriseId() == null
                 || (!actor.enterpriseId().equals(current.demandEnterpriseId())
                 && !actor.enterpriseId().equals(current.candidateEnterpriseId()))) {
@@ -520,6 +584,10 @@ public class EcosystemMatchService {
         if (value.demandEnterpriseId().equals(value.candidateEnterpriseId())) {
             throw new PreconditionFailedException("a demand enterprise cannot be matched with itself");
         }
+        if (catalogStore.isDemandDeleted(value.demandId())) {
+            throw new PreconditionFailedException(
+                    "the source demand is deleted; restore it before continuing the match workflow");
+        }
         if (!enterpriseLifecycle.isOperational(value.demandEnterpriseId())
                 || !enterpriseLifecycle.isOperational(value.candidateEnterpriseId())) {
             throw new PreconditionFailedException(
@@ -532,6 +600,54 @@ public class EcosystemMatchService {
         return values.stream()
                 .map(value -> normalizeExpiredInvitation(value, actor))
                 .toList();
+    }
+
+    private void requireDemandOpenForResponse(UUID demandId) {
+        if (!catalogStore.isDemandOpenForResponse(demandId)) {
+            throw new PreconditionFailedException(
+                    "the demand response window has expired or the demand is no longer open");
+        }
+    }
+
+    private static void requireDemandOpenForResponse(DemandView demand) {
+        if (!isDemandOpenForResponse(demand)) {
+            throw new PreconditionFailedException(
+                    "the demand response window has expired or the demand is no longer open");
+        }
+    }
+
+    private static boolean isDemandOpenForResponse(DemandView demand) {
+        return "OPEN".equals(demand.status())
+                && !demand.disabled()
+                && !demand.deleted()
+                && !"DIRECTED".equals(demand.visibility())
+                && (demand.responseDeadline() == null
+                || demand.responseDeadline().isAfter(Instant.now()));
+    }
+
+    private void normalizeScopedExpiredInvitations(ActorScope actor) {
+        if (workflowStore == null) {
+            return;
+        }
+        int page = 0;
+        int batchSize = 100;
+        while (true) {
+            List<PersistedMatchView> batch = matchStore.list(
+                    actor, MatchLifecycle.INVITED, (long) page * batchSize, batchSize);
+            if (batch.isEmpty()) {
+                return;
+            }
+            boolean removedFromInvitedPage = false;
+            for (PersistedMatchView value : batch) {
+                PersistedMatchView normalized = normalizeExpiredInvitation(value, actor);
+                if (!MatchLifecycle.INVITED.equals(normalized.state())) {
+                    removedFromInvitedPage = true;
+                }
+            }
+            if (!removedFromInvitedPage) {
+                page++;
+            }
+        }
     }
 
     private PersistedMatchView normalizeExpiredInvitation(
@@ -576,10 +692,15 @@ public class EcosystemMatchService {
 
     private boolean canMaintainInvitation(PersistedMatchView match, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return actor.associationId() != null
-                    && EcosystemScopeGuard.systemCanReadMatch(actor, match, catalogStore);
+            boolean participantEnterprise = actor.enterpriseId() != null
+                    && (actor.enterpriseId().equals(match.demandEnterpriseId())
+                    || actor.enterpriseId().equals(match.candidateEnterpriseId()));
+            return participantEnterprise && EcosystemScopeGuard.systemCanReadMatch(
+                    actor, match, catalogStore)
+                    || systemOwnsDemand(match, actor);
         }
-        return actor.enterpriseId() != null
+        return actor.isEnterpriseAdmin()
+                && actor.enterpriseId() != null
                 && (actor.enterpriseId().equals(match.demandEnterpriseId())
                 || actor.enterpriseId().equals(match.candidateEnterpriseId()))
                 || actor.isAssociationStaff() && actor.associationId() != null
@@ -601,6 +722,7 @@ public class EcosystemMatchService {
 
     private Set<String> allowedActions(PersistedMatchView value, ActorScope actor) {
         if (value.demandEnterpriseId().equals(value.candidateEnterpriseId())
+                || catalogStore.isDemandDeleted(value.demandId())
                 || !enterpriseLifecycle.isOperational(value.demandEnterpriseId())
                 || !enterpriseLifecycle.isOperational(value.candidateEnterpriseId())) {
             return Set.of();
@@ -678,6 +800,35 @@ public class EcosystemMatchService {
 
     private static PreconditionFailedException stale() {
         return new PreconditionFailedException("match version is stale; reload and retry with the latest ETag");
+    }
+
+    private static int requirePage(int page) {
+        if (page < 0) {
+            throw invalidQuery("page must be greater than or equal to zero");
+        }
+        return page;
+    }
+
+    private static int requirePageSize(int size) {
+        if (size < 1 || size > 100) {
+            throw invalidQuery("size must be between 1 and 100");
+        }
+        return size;
+    }
+
+    private static String normalizeState(String state) {
+        if (state == null || state.isBlank()) {
+            return null;
+        }
+        String normalized = state.trim().toUpperCase(Locale.ROOT);
+        if (!MatchLifecycle.isState(normalized)) {
+            throw invalidQuery("unsupported match state: " + state.trim());
+        }
+        return normalized;
+    }
+
+    private static ApiException invalidQuery(String message) {
+        return new ApiException("INVALID_MATCH_QUERY", message, HttpStatus.BAD_REQUEST);
     }
 
     private List<OfferingView> visibleActiveOfferings(ActorScope actor) {

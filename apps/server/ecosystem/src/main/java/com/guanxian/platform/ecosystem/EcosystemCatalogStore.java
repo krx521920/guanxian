@@ -43,6 +43,12 @@ interface EcosystemCatalogStore {
 
     Optional<DemandView> restoreDemand(UUID id, long expectedVersion, ActorScope actor);
 
+    boolean isDemandDeleted(UUID demandId);
+
+    default boolean isDemandOpenForResponse(UUID demandId) {
+        return !isDemandDeleted(demandId);
+    }
+
     boolean enterpriseBelongsToAssociation(UUID enterpriseId, UUID associationId);
 
     void recordChange(

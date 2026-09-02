@@ -244,6 +244,29 @@ describe('OIDC authentication', () => {
     })
   })
 
+  it('accepts the backend OBSERVER role as a read-only platform identity', async () => {
+    const oidc = await loadOidc({
+      user: { access_token: 'observer-token', expired: false },
+      currentUser: {
+        subject: 'observer-subject',
+        username: 'observer',
+        displayName: '只读观察员',
+        organization: '北京地下管线协会',
+        title: '只读观察员',
+        roles: ['OBSERVER'],
+        permissions: ['MEMBER_READ', 'POLICY_READ', 'NOTIFICATION_READ'],
+      },
+    })
+
+    await oidc.auth.initialize()
+
+    expect(oidc.auth.user.value).toMatchObject({
+      role: 'OBSERVER',
+      permissions: ['MEMBER_READ', 'POLICY_READ', 'NOTIFICATION_READ'],
+    })
+    expect(oidc.auth.takePostLoginRoute()).toBe('/members')
+  })
+
   it('does not restore a stored system scope after the account loses the system role', async () => {
     const oidc = await loadOidc({
       user: { access_token: 'downgraded-token', expired: false },

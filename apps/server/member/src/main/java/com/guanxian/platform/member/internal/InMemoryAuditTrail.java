@@ -33,9 +33,16 @@ class InMemoryAuditTrail implements AuditTrail {
 
     @Override
     public void recordReview(
-            ActorScope actor, UUID associationId, UUID enterpriseId, String previousStatus, String decision, String comment) {
+            ActorScope actor,
+            UUID associationId,
+            UUID enterpriseId,
+            long newVersion,
+            String previousStatus,
+            String decision,
+            String comment) {
         record(actor, "MEMBER_REVIEW", "ENTERPRISE", enterpriseId.toString(), associationId, enterpriseId,
-                Map.of("previousStatus", previousStatus, "decision", decision,
+                Map.of("newVersion", newVersion,
+                        "previousStatus", previousStatus, "decision", decision,
                         "comment", comment == null ? "" : comment));
     }
 

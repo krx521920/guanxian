@@ -33,8 +33,10 @@ public record MemberListItem(
         populated += member.introduction() == null ? 0 : 1;
         populated += member.capabilities().isEmpty() ? 0 : 1;
         populated += member.products().isEmpty() ? 0 : 1;
+        populated += member.services().isEmpty() ? 0 : 1;
+        populated += member.applicationScenarios().isEmpty() ? 0 : 1;
         populated += member.cooperationNeeds().isEmpty() ? 0 : 1;
-        int completeness = Math.min(100, Math.round(populated * 100f / 9));
+        int completeness = Math.min(100, Math.round(populated * 100f / 11));
         return new MemberListItem(
                 member.id(), member.name(), abbreviate(member.name()), member.category(), member.capabilities(),
                 member.products(), member.address(), member.contactName(), completeness,

@@ -12,6 +12,7 @@ record AttachmentDraft(
         String mediaType,
         long sizeBytes,
         String sha256,
+        String scanStatus,
         String visibility,
         String uploadedBySubject) {
 }

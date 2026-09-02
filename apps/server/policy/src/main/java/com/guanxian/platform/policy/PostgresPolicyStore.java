@@ -231,7 +231,8 @@ class PostgresPolicyStore implements PolicyStore {
             sql.append("""
                      AND (
                        (p.association_id = :associationId AND (:associationStaff OR
-                          (p.status = 'PUBLISHED' AND p.disabled_at IS NULL)))
+                          (p.status = 'PUBLISHED' AND p.disabled_at IS NULL
+                           AND p.visibility <> 'PRIVATE')))
                        OR (p.status = 'PUBLISHED' AND p.disabled_at IS NULL AND p.visibility = 'PUBLIC')
                        OR (p.status = 'PUBLISHED' AND p.disabled_at IS NULL
                            AND p.visibility = 'PARTNERS' AND p.association_id IN (:partnerIds))

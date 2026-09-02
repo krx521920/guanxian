@@ -101,20 +101,21 @@ class InMemoryNotificationStore implements NotificationStore {
 
     @Override
     public synchronized List<NotificationMessageView> messages(
-            UUID userId, UUID associationId, boolean unreadOnly, long offset, int limit) {
+            UUID userId, UUID associationId, boolean unreadOnly, String status, long offset, int limit) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
                 .filter(value -> associationId == null || associationId.equals(value.associationId()))
-                .filter(value -> !unreadOnly || value.readAt() == null)
+                .filter(value -> messageMatches(value, unreadOnly, status))
                 .sorted(Comparator.comparing(NotificationMessageView::createdAt).reversed()
                         .thenComparing(NotificationMessageView::id))
                 .skip(offset).limit(limit).toList();
     }
 
     @Override
-    public synchronized long countMessages(UUID userId, UUID associationId, boolean unreadOnly) {
+    public synchronized long countMessages(
+            UUID userId, UUID associationId, boolean unreadOnly, String status) {
         return messages.values().stream().filter(value -> userId.equals(value.userId()))
                 .filter(value -> associationId == null || associationId.equals(value.associationId()))
-                .filter(value -> !unreadOnly || value.readAt() == null).count();
+                .filter(value -> messageMatches(value, unreadOnly, status)).count();
     }
 
     @Override
@@ -131,10 +132,40 @@ class InMemoryNotificationStore implements NotificationStore {
             return Optional.empty();
         }
         NotificationMessageView current = found.get();
+        if (current.readAt() != null || !"DELIVERED".equals(current.status())) {
+            return Optional.empty();
+        }
         NotificationMessageView updated = new NotificationMessageView(
                 current.id(), current.userId(), current.associationId(), current.notificationType(),
                 current.title(), current.body(), current.resourceType(), current.resourceId(),
                 "READ", Instant.now(), current.createdAt(), current.deliveredAt());
+        messages.put(id, updated);
+        return Optional.of(updated);
+    }
+
+    @Override
+    public synchronized Optional<NotificationMessageView> archive(
+            UUID id, UUID userId, UUID associationId) {
+        Optional<NotificationMessageView> found = message(id, userId, associationId);
+        if (found.isEmpty() || !Set.of("DELIVERED", "READ").contains(found.get().status())) {
+            return Optional.empty();
+        }
+        NotificationMessageView current = found.get();
+        NotificationMessageView updated = copyWithStatus(current, "ARCHIVED", current.readAt());
+        messages.put(id, updated);
+        return Optional.of(updated);
+    }
+
+    @Override
+    public synchronized Optional<NotificationMessageView> restore(
+            UUID id, UUID userId, UUID associationId) {
+        Optional<NotificationMessageView> found = message(id, userId, associationId);
+        if (found.isEmpty() || !"ARCHIVED".equals(found.get().status())) {
+            return Optional.empty();
+        }
+        NotificationMessageView current = found.get();
+        NotificationMessageView updated = copyWithStatus(
+                current, current.readAt() == null ? "DELIVERED" : "READ", current.readAt());
         messages.put(id, updated);
         return Optional.of(updated);
     }
@@ -165,7 +196,8 @@ class InMemoryNotificationStore implements NotificationStore {
             if (associationId.equals(subscription.associationId())
                     && "POLICY".equals(subscription.subscriptionType())
                     && "ACTIVE".equals(subscription.status())
-                    && subscription.channels().contains("IN_APP")) {
+                    && subscription.channels().contains("IN_APP")
+                    && subscription.filters().isEmpty()) {
                 UUID id = UUID.randomUUID();
                 messages.put(id, new NotificationMessageView(id, subscription.userId(), associationId,
                         "POLICY", request.title(), request.body(), "POLICY_DOCUMENT", request.policyId(),
@@ -179,17 +211,24 @@ class InMemoryNotificationStore implements NotificationStore {
     @Override
     public synchronized void audit(
             ActorScope actor, UUID associationId, String action, String resourceType,
-            UUID resourceId, Map<String, Object> details) {
+            UUID resourceId, Long resourceVersion, Map<String, Object> details) {
         Map<String, Object> audit = new HashMap<>(details);
         audit.put("action", action);
         audit.put("resourceType", resourceType);
         audit.put("resourceId", resourceId);
         audit.put("actorSubject", actor.subject());
+        if (resourceVersion != null) {
+            audit.put("resourceVersion", resourceVersion);
+        }
         audits.add(Map.copyOf(audit));
     }
 
     synchronized int auditCount() {
         return audits.size();
+    }
+
+    synchronized Map<String, Object> latestAudit() {
+        return audits.isEmpty() ? Map.of() : audits.getLast();
     }
 
     synchronized int outboxCount() {
@@ -212,5 +251,23 @@ class InMemoryNotificationStore implements NotificationStore {
     }
 
     private record PolicyState(UUID associationId, String status, boolean disabled, boolean deleted) {
+    }
+
+    private static boolean messageMatches(
+            NotificationMessageView value, boolean unreadOnly, String status) {
+        if (unreadOnly) {
+            return value.readAt() == null && "DELIVERED".equals(value.status());
+        }
+        return status == null
+                ? Set.of("DELIVERED", "READ").contains(value.status())
+                : status.equals(value.status());
+    }
+
+    private static NotificationMessageView copyWithStatus(
+            NotificationMessageView current, String status, Instant readAt) {
+        return new NotificationMessageView(
+                current.id(), current.userId(), current.associationId(), current.notificationType(),
+                current.title(), current.body(), current.resourceType(), current.resourceId(),
+                status, readAt, current.createdAt(), current.deliveredAt());
     }
 }

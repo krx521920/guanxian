@@ -119,3 +119,4 @@ guanxian:
       dimensions: ${GUANXIAN_EMBEDDING_DIMENSIONS:1536}
       max-batch-size: ${GUANXIAN_EMBEDDING_MAX_BATCH_SIZE:32}
       request-timeout: ${GUANXIAN_EMBEDDING_TIMEOUT:30s}
+      cost-per-million-tokens: ${GUANXIAN_EMBEDDING_COST_PER_MILLION:0}

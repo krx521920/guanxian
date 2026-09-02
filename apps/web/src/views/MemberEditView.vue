@@ -54,8 +54,8 @@ const minimumConsentExpiry = localDateTime(new Date(Date.now() + 60_000))
 const maximumConsentExpiry = computed(() => localDateTime(selectedMemberTarget.value?.policyExpiresAt))
 
 const form = reactive({
-  name: '', unifiedSocialCreditCode: '', category: '', address: '', contactName: '', contactPhone: '',
-  introduction: '', capabilities: '', products: '', cooperationNeeds: '',
+  name: '', unifiedSocialCreditCode: '', category: '', address: '', contactName: '', contactPhone: '', contactEmail: '',
+  introduction: '', capabilities: '', products: '', services: '', applicationScenarios: '', cooperationNeeds: '',
   visibility: 'MEMBERS' as MemberVisibility, status: 'ACTIVE' as MemberStatus,
 })
 
@@ -67,9 +67,12 @@ function fillForm(value: VersionedMember) {
   form.address = member.address || ''
   form.contactName = member.contactName || ''
   form.contactPhone = member.contactPhone || ''
+  form.contactEmail = member.contactEmail || ''
   form.introduction = member.introduction || ''
   form.capabilities = member.capabilities.join('\n')
   form.products = member.products.join('\n')
+  form.services = (member.services || []).join('\n')
+  form.applicationScenarios = (member.applicationScenarios || []).join('\n')
   form.cooperationNeeds = member.cooperationNeeds.join('\n')
   form.visibility = member.visibility
   form.status = member.status
@@ -80,7 +83,9 @@ function payload(): MemberUpsertPayload {
   return {
     name: form.name.trim(), unifiedSocialCreditCode: nullable(form.unifiedSocialCreditCode), category: form.category.trim(),
     address: nullable(form.address), contactName: nullable(form.contactName), contactPhone: nullable(form.contactPhone),
+    contactEmail: nullable(form.contactEmail),
     introduction: nullable(form.introduction), capabilities: listValue(form.capabilities), products: listValue(form.products),
+    services: listValue(form.services), applicationScenarios: listValue(form.applicationScenarios),
     cooperationNeeds: listValue(form.cooperationNeeds), visibility: form.visibility, status: form.status,
   }
 }
@@ -223,9 +228,10 @@ onMounted(load)
         <label><span>可见范围</span><select v-model="form.visibility" :disabled="!canSetVisibility"><option value="MEMBERS">全体会员</option><option value="ASSOCIATION">本协会</option><option value="PARTNERS">本协会及友好协会</option><option value="PRIVATE">仅本企业与协会</option><option value="PUBLIC">公开</option></select></label>
         <label class="form-span-2"><span>联系地址</span><input v-model="form.address" maxlength="300" /></label>
         <label><span>联系人</span><input v-model="form.contactName" maxlength="50" /></label><label><span>联系电话</span><input v-model="form.contactPhone" maxlength="50" /></label>
+        <label><span>联系邮箱</span><input v-model="form.contactEmail" type="email" maxlength="200" /></label>
         <label class="form-span-2"><span>企业简介</span><textarea v-model="form.introduction" rows="5" maxlength="2000" /></label>
       </div></section>
-      <section class="form-section"><h3>能力、产品与合作需求</h3><p>每行填写一项，也可以使用中文或英文逗号分隔。</p><div class="form-grid"><label><span>核心能力</span><textarea v-model="form.capabilities" rows="7" /></label><label><span>产品与服务</span><textarea v-model="form.products" rows="7" /></label><label class="form-span-2"><span>合作需求</span><textarea v-model="form.cooperationNeeds" rows="6" /></label></div></section>
+      <section class="form-section"><h3>能力、产品、服务与合作需求</h3><p>每行填写一项，也可以使用中文或英文逗号分隔。</p><div class="form-grid"><label><span>核心能力</span><textarea v-model="form.capabilities" rows="7" /></label><label><span>产品</span><textarea v-model="form.products" rows="7" /></label><label><span>服务</span><textarea v-model="form.services" rows="7" /></label><label><span>应用场景</span><textarea v-model="form.applicationScenarios" rows="7" /></label><label class="form-span-2"><span>合作需求</span><textarea v-model="form.cooperationNeeds" rows="6" /></label></div></section>
       <section v-if="canManageMemberConsent" class="form-section">
         <h3>企业资料跨协会授权</h3>
         <p>授权仅适用于协会字段白名单中的企业名称、类别、地址、简介、能力、产品和合作需求；联系人、电话及统一社会信用代码始终不开放。</p>

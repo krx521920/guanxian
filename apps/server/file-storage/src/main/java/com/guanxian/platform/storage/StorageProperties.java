@@ -2,6 +2,8 @@ package com.guanxian.platform.storage;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
+
 @ConfigurationProperties(prefix = "guanxian.storage")
 public class StorageProperties {
     private String backend = "memory";
@@ -12,6 +14,10 @@ public class StorageProperties {
     private String redisUrl = "redis://localhost:6379";
     private long maxSizeBytes = 20L * 1024 * 1024;
     private int rateLimitPerMinute = 30;
+    private String scanMode = "content-only";
+    private String scanHost = "localhost";
+    private int scanPort = 3310;
+    private Duration scanTimeout = Duration.ofSeconds(20);
 
     public String getBackend() {
         return backend;
@@ -76,4 +82,13 @@ public class StorageProperties {
     public void setRateLimitPerMinute(int rateLimitPerMinute) {
         this.rateLimitPerMinute = rateLimitPerMinute;
     }
+
+    public String getScanMode() { return scanMode; }
+    public void setScanMode(String value) { scanMode = value == null ? "" : value.trim(); }
+    public String getScanHost() { return scanHost; }
+    public void setScanHost(String value) { scanHost = value == null ? "" : value.trim(); }
+    public int getScanPort() { return scanPort; }
+    public void setScanPort(int value) { scanPort = value; }
+    public Duration getScanTimeout() { return scanTimeout; }
+    public void setScanTimeout(Duration value) { scanTimeout = value; }
 }

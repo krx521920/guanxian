@@ -502,6 +502,10 @@ public class EcosystemWorkflowService {
         if (value.demandEnterpriseId().equals(value.candidateEnterpriseId())) {
             throw new PreconditionFailedException("a demand enterprise cannot be matched with itself");
         }
+        if (catalogStore.isDemandDeleted(value.demandId())) {
+            throw new PreconditionFailedException(
+                    "the source demand is deleted; restore it before continuing the match workflow");
+        }
         if (!enterpriseLifecycle.isOperational(value.demandEnterpriseId())
                 || !enterpriseLifecycle.isOperational(value.candidateEnterpriseId())) {
             throw new PreconditionFailedException(
@@ -535,7 +539,15 @@ public class EcosystemWorkflowService {
                 match.demandEnterpriseId(), actor.associationId());
         if (actor.isSystemAdmin()) {
             EcosystemScopeGuard.requireSystemMatchWrite(actor, match, catalogStore);
-            return;
+            boolean participantEnterprise = actor.enterpriseId() != null
+                    && (match.demandEnterpriseId().equals(actor.enterpriseId())
+                    || match.candidateEnterpriseId().equals(actor.enterpriseId()));
+            if (participantEnterprise || systemOwnsDemand(match, actor)) {
+                return;
+            }
+            throw new ForbiddenException(
+                    "MATCH_PARTICIPANT_REQUIRED",
+                    "selected system context cannot manage this match negotiation");
         }
         if (owningAssociation || isEnterpriseWriter(actor)
                 && (match.demandEnterpriseId().equals(actor.enterpriseId())
@@ -627,10 +639,15 @@ public class EcosystemWorkflowService {
 
     private boolean canMaintainInvitation(PersistedMatchView match, ActorScope actor) {
         if (actor.isSystemAdmin()) {
-            return actor.associationId() != null
-                    && EcosystemScopeGuard.systemCanReadMatch(actor, match, catalogStore);
+            boolean participantEnterprise = actor.enterpriseId() != null
+                    && (actor.enterpriseId().equals(match.demandEnterpriseId())
+                    || actor.enterpriseId().equals(match.candidateEnterpriseId()));
+            return participantEnterprise && EcosystemScopeGuard.systemCanReadMatch(
+                    actor, match, catalogStore)
+                    || systemOwnsDemand(match, actor);
         }
-        return actor.enterpriseId() != null
+        return actor.isEnterpriseAdmin()
+                && actor.enterpriseId() != null
                 && (actor.enterpriseId().equals(match.demandEnterpriseId())
                 || actor.enterpriseId().equals(match.candidateEnterpriseId()))
                 || actor.isAssociationStaff() && actor.associationId() != null

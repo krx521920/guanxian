@@ -3,6 +3,7 @@ package com.guanxian.platform.ai.rag;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
+import java.math.BigDecimal;
 
 @ConfigurationProperties("guanxian.ai.embedding")
 public class EmbeddingProperties {
@@ -13,6 +14,7 @@ public class EmbeddingProperties {
     private int dimensions = 1536;
     private int maxBatchSize = 32;
     private Duration requestTimeout = Duration.ofSeconds(30);
+    private BigDecimal costPerMillionTokens = BigDecimal.ZERO;
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -28,4 +30,8 @@ public class EmbeddingProperties {
     public void setMaxBatchSize(int maxBatchSize) { this.maxBatchSize = maxBatchSize; }
     public Duration getRequestTimeout() { return requestTimeout; }
     public void setRequestTimeout(Duration requestTimeout) { this.requestTimeout = requestTimeout; }
+    public BigDecimal getCostPerMillionTokens() { return costPerMillionTokens; }
+    public void setCostPerMillionTokens(BigDecimal value) {
+        this.costPerMillionTokens = value == null ? BigDecimal.ZERO : value;
+    }
 }

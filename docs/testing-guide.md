@@ -1,6 +1,6 @@
 # 测试与质量验收指南
 
-更新时间：2026-08-31。
+更新时间：2026-09-02。
 
 ## 1. 当前批准的验证范围
 
@@ -17,19 +17,19 @@
 
 ## 2. 可追溯基线
 
-当前仓库包含 Flyway `V1` 至 `V18` 共 18 个版本化迁移。当前 Java 普通全量回归生成 67 个 Surefire 测试报告、包含 314 项测试，已经在真实 PostgreSQL 16 Testcontainers 上完成 V18 验证。
+当前仓库包含 Flyway `V1` 至 `V22` 共 22 个版本化迁移。测试总数与通过数只能从同一提交的命令输出和报告中读取，不得使用旧数量或历史真实依赖结果代替当前验收。
 
-2026-08-31 本地验证基线：
+2026-09-02 本地验证基线：
 
-- Web：15 个 Vitest 文件、167 项测试通过，`vue-tsc -b` 与 Vite 生产构建通过。
-- Java：67 个 Surefire 测试报告、314 项测试通过，失败、错误和跳过均为 0；Flyway V1–V18 空库迁移、V15→V17 政策影响升级、V16→V17 跨协会完整性升级和 V17→V18 匹配闭环升级均已在本工作区通过。
-- AI：默认批准范围收集 46 项测试；`stress` 与 `fuzz` 标记均不进入默认执行。
-- 运维配置：`tests/operations` 28 项、`tests/config` 10 项，CI 分目录执行，共 38 项。
-- 真实依赖检查：PostgreSQL 16 Testcontainers 覆盖 Flyway V1–V18 空库迁移、V15→V17、V16→V17 与 V17→V18 干净升级、歧义数据失败事务回滚、并发邀请唯一性和陈旧反馈 CAS；隔离 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境中的 Playwright 5/5 条浏览器旅程通过，覆盖四个真实账号、角色权限、附件与通知，以及从供需建档到成果归档的完整匹配闭环。
+- Web：20 个 Vitest 文件、208 项测试全部通过，`npm run typecheck` 和 `npm run build` 通过。
+- Java：69 份 Surefire 报告共定义 346 项测试，实际执行并通过 284 项，失败 0、错误 0。本次本机 Docker daemon 不可用，其中 62 项 Testcontainers 用例被跳过，不能计入通过。新增 RAG 发布闸门的 3 项普通测试已执行通过。
+- AI：常规范围 46 项全部通过，5 项被默认配置排除；`stress` 与 `fuzz` 标记均不进入默认执行。
+- 运维配置：`tests/operations` 28 项、`tests/config` 10 项，当前本地共 38 项全部通过；E2E Compose 配置使用隔离测试环境变量渲染通过。
+- 真实依赖检查：早期基线曾在 PostgreSQL 16 Testcontainers 和隔离 PostgreSQL、MinIO、Redis、Keycloak/OIDC 联合环境中执行，并留有 Playwright 5/5 的历史记录。该记录不包含当前 V21/V22、ClamAV 和本轮全部代码变更，不能作为本轮真实依赖验收证据。
 
-本轮本机 E2E 由 Docker 运行真实 PostgreSQL、MinIO、Redis 和 Keycloak，业务后端与 Web 使用本机进程连接这些依赖。Docker Desktop 访问 Docker Hub 基础镜像元数据时因本机证书信任链报 `x509: certificate signed by unknown authority`，因此没有把应用镜像构建记为通过，也没有关闭 TLS 校验规避；完整应用容器构建必须在具备可信证书链的 CI 或构建环境复验。
+本次本机 Docker daemon 不可用，所以当前变更的 PostgreSQL Testcontainers、PostgreSQL/MinIO/Redis/Keycloak 联合环境和浏览器 E2E 均未完成当次复验。必须在 Docker 可用且证书链可信的 CI 或测试环境补跑；正式 IdP、备份恢复和真实告警仍需另行验收。
 
-测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V3、89 项、125 项或 47 项基线。
+测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V18、314 项、167 项或其他不属于当前提交的基线。
 
 ## 3. 常规验证命令
 
@@ -77,7 +77,7 @@ Pop-Location
 - `PostgresMemberMigrationIntegrationTest`：空库/存量库迁移、会员 ETag、软删除恢复和审计。
 - `PostgresCrossTenantAuthorizationIntegrationTest`：跨协会关系、共享策略、企业授权和匹配状态机。
 - `PostgresKnowledgeIsolationIntegrationTest`：知识入库、引用轨迹、向量持久化和跨协会隔离。
-- `PostgresIdentityPolicyNotificationUpgradeIntegrationTest`：V12→V15 身份、政策归属和通知订阅升级合同。
+- `PostgresIdentityPolicyNotificationUpgradeIntegrationTest`：V12→V22 身份、政策归属、通知订阅范围、消息状态及后续迁移兼容升级合同。
 - `PostgresPolicyImpactAssociationMigrationIntegrationTest`：V15→V17 政策影响同协会回填、复合外键与不一致脏数据失败回滚。
 - `PostgresCrossAssociationIntegrityMigrationIntegrationTest`：V16→V17 跨协会授权/推荐/策略约束、脏数据失败回滚、到期授权原子物化及双事务唯一授权。
 - `PostgresMatchWorkflowIntegrityMigrationIntegrationTest`：V17→V18 干净升级和完整合法路径；同企业供需、旧枚举、非法父状态、残留待应答邀请、待处理邀请提前应答、普通洽谈跳级/终态后追加、成功反馈携带关闭原因、单方成功归档的失败回滚；接受邀请后直接终止、拒绝/取消/终止原因一致性、邀请终态与匹配/成果审计事实不可改写、`MATCH.outcomes` 跨协会字段白名单、运行期非法转移/参与方阻断、反馈关闭原因互斥、并发邀请唯一性和反馈 ETag/CAS。
@@ -86,10 +86,12 @@ Pop-Location
 - `PostgresCollaborationSystemContextIntegrationTest`：协作事项系统上下文与跨租户隔离。
 - `PostgresPolicyLifecycleIntegrationTest` 与 `PostgresPolicyImpactIntegrationTest`：政策生命周期、数据域和影响分析落库。
 - `PostgresMinioRedisIntegrationTest`：真实 PostgreSQL 元数据、MinIO 对象读写/软删除恢复与 Redis 限流联合验证。
+- `PostgresAttachmentContentValidationUpgradeIntegrationTest`：V19→V20 将历史 `PENDING` 附件失败关闭为 `REQUIRES_REUPLOAD`、递增版本和更新时间，同时保持 `VALIDATED` 记录不变。
+- `KnowledgeApiIntegrationTest` 与 `RagEvaluationServiceTest`：知识文档草稿、送审、发布、跨协会范围、无评测时拒绝 AI 名称、真实证据/拒答指标达标放行及跨协会评测证据阻断。
 
 Docker 不可用时，Testcontainers 未执行不能视为通过；应由标准 Ubuntu CI Runner 完成。
 
-V16–V18 的升级测试明确验证“先检查、后约束”：无法无歧义处理的历史数据必须让迁移失败并保留原版本，运维人员根据异常的 `DETAIL` 和 `HINT` 审核修正后再执行。测试不会把迁移中的静默业务数据清洗视为可接受行为；V18 只允许把旧反馈的 `submitted_at` 确定性复制为初始 `updated_at`。
+V16–V18 的升级测试明确验证“先检查、后约束”：无法无歧义处理的历史数据必须让迁移失败并保留原版本，运维人员根据异常的 `DETAIL` 和 `HINT` 审核修正后再执行。V19/V20 分别显式规范通知和附件状态；V21/V22 追加采集出处、知识生命周期和评测记录，不替历史资料伪造出处或评测结论。所有 V1–V22 迁移必须在存量数据隔离副本复验；开发内容校验不能替代生产 ClamAV 扫描。
 
 OIDC/PKCE 手动验收：
 

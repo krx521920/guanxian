@@ -69,19 +69,23 @@ class MemberScopeAuditIntegrationTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
-        mockMvc.perform(put("/api/v1/members/{id}/review", OWN_ENTERPRISE_ID)
+        var reviewedResponse = mockMvc.perform(put("/api/v1/members/{id}/review", OWN_ENTERPRISE_ID)
                         .with(httpBasic("association-admin", "admin123"))
                         .header(HttpHeaders.IF_MATCH, reviewEtag)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"decision\":\"ACTIVE\",\"comment\":\"资料复核通过\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("ACTIVE"));
+                .andExpect(jsonPath("$.data.status").value("ACTIVE"))
+                .andReturn().getResponse();
+        int reviewedVersion = objectMapper.readTree(
+                reviewedResponse.getContentAsByteArray()).path("data").path("version").asInt();
 
         mockMvc.perform(get("/api/v1/audit-logs")
                         .queryParam("enterpriseId", OWN_ENTERPRISE_ID)
                         .with(httpBasic("association-admin", "admin123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].action").value("MEMBER_REVIEW"))
+                .andExpect(jsonPath("$.data[0].resourceVersion").value(reviewedVersion))
                 .andExpect(jsonPath("$.data[0].actorUsername").value("association-admin"))
                 .andExpect(jsonPath("$.data[0].requestId").isNotEmpty())
                 .andExpect(jsonPath("$.data[1].action").value("MEMBER_UPDATE"))

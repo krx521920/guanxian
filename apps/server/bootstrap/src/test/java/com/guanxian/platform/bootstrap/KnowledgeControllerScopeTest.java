@@ -53,17 +53,13 @@ class KnowledgeControllerScopeTest {
     }
 
     @Test
-    void unscopedSystemAdministratorCanQueryGloballyButCannotIngest() {
+    void unscopedSystemAdministratorCannotQueryOrIngestKnowledge() {
         when(actorScopeResolver.resolve(authentication)).thenReturn(systemAdmin(null, null));
 
-        controller.ask(new KnowledgeController.KnowledgeQuestionRequest(
-                null, "全局知识查询", 3), authentication);
-
-        ArgumentCaptor<PolicyRagService.RagQuestion> question =
-                ArgumentCaptor.forClass(PolicyRagService.RagQuestion.class);
-        verify(ragService).ask(question.capture());
-        assertThat(question.getValue().associationId()).isNull();
-        assertThat(question.getValue().privilegedKnowledgeAccess()).isTrue();
+        assertThatThrownBy(() -> controller.ask(new KnowledgeController.KnowledgeQuestionRequest(
+                null, "全局知识查询", 3), authentication))
+                .isInstanceOfSatisfying(ForbiddenException.class,
+                        error -> assertThat(error.code()).isEqualTo("ASSOCIATION_CONTEXT_REQUIRED"));
 
         assertThatThrownBy(() -> controller.ingest(textRequest(null), authentication))
                 .isInstanceOfSatisfying(ForbiddenException.class,
@@ -87,7 +83,7 @@ class KnowledgeControllerScopeTest {
         assertThatThrownBy(() -> controller.ask(new KnowledgeController.KnowledgeQuestionRequest(
                 ASSOCIATION_A, "用请求体建立范围", 3), authentication))
                 .isInstanceOfSatisfying(ForbiddenException.class,
-                        error -> assertThat(error.code()).isEqualTo("SYSTEM_CONTEXT_FORBIDDEN"));
+                        error -> assertThat(error.code()).isEqualTo("ASSOCIATION_CONTEXT_REQUIRED"));
     }
 
     @Test

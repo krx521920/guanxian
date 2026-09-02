@@ -129,7 +129,11 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
             return Optional.empty();
         }
         OfferingView old = stored.value();
-        OfferingView updated = copyOffering(old, old.status(), old.version() + 1, old.disabled());
+        Instant deletedAt = Instant.now();
+        OfferingView updated = new OfferingView(
+                old.id(), old.enterpriseId(), old.enterpriseName(), old.name(), old.kind(), old.description(),
+                old.scenarios(), old.qualifications(), old.visibility(), old.status(), old.version() + 1,
+                old.disabled(), true, deletedAt, deletedAt);
         offerings.put(id, new StoredOffering(updated, true));
         return Optional.of(updated);
     }
@@ -194,7 +198,7 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
         DemandView value = new DemandView(
                 id, enterpriseId, null, request.title().trim(), request.description().trim(),
                 list(request.scenarios()), list(request.requiredCapabilities()),
-                visibility(request.visibility(), "DIRECTED"), request.budgetMin(), request.budgetMax(),
+                visibility(request.visibility(), "MEMBERS"), request.budgetMin(), request.budgetMax(),
                 request.responseDeadline(), "DRAFT", null, 0, false, Instant.now());
         demands.put(id, new StoredDemand(value, false));
         bindEnterpriseAssociation(enterpriseId, actor);
@@ -246,7 +250,12 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
             return Optional.empty();
         }
         DemandView old = stored.value();
-        DemandView updated = copyDemand(old, old.status(), old.closeReason(), old.version() + 1, old.disabled());
+        Instant deletedAt = Instant.now();
+        DemandView updated = new DemandView(
+                old.id(), old.enterpriseId(), old.enterpriseName(), old.title(), old.description(),
+                old.scenarios(), old.requiredCapabilities(), old.visibility(), old.budgetMin(), old.budgetMax(),
+                old.responseDeadline(), old.status(), old.closeReason(), old.version() + 1,
+                old.disabled(), true, deletedAt, deletedAt);
         demands.put(id, new StoredDemand(updated, true));
         return Optional.of(updated);
     }
@@ -263,6 +272,26 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
         DemandView updated = copyDemand(old, "DRAFT", null, old.version() + 1, false);
         demands.put(id, new StoredDemand(updated, false));
         return Optional.of(updated);
+    }
+
+    @Override
+    public boolean isDemandDeleted(UUID demandId) {
+        StoredDemand stored = demands.get(demandId);
+        return stored == null || stored.deleted();
+    }
+
+    @Override
+    public boolean isDemandOpenForResponse(UUID demandId) {
+        StoredDemand stored = demands.get(demandId);
+        if (stored == null || stored.deleted()) {
+            return false;
+        }
+        DemandView demand = stored.value();
+        return "OPEN".equals(demand.status())
+                && !demand.disabled()
+                && !"DIRECTED".equals(demand.visibility())
+                && (demand.responseDeadline() == null
+                || demand.responseDeadline().isAfter(Instant.now()));
     }
 
     @Override

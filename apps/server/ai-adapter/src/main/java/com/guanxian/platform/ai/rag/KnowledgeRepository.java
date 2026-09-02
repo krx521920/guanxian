@@ -3,7 +3,9 @@ package com.guanxian.platform.ai.rag;
 import com.guanxian.platform.ai.rag.DocumentTextChunker.TextChunk;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface KnowledgeRepository {
@@ -14,13 +16,69 @@ public interface KnowledgeRepository {
     }
     UUID saveRetrieval(TraceDraft trace, List<CitationDraft> citations);
     UUID saveModelExecution(ModelExecutionDraft execution);
+    KnowledgeDocumentPage listDocuments(DocumentScope scope, boolean includeDeleted, int offset, int limit);
+    Optional<KnowledgeDocumentView> findDocument(UUID documentId, DocumentScope scope, boolean includeDeleted);
+    KnowledgeDocumentView updateLifecycle(LifecycleCommand command);
+    DocumentContent currentContent(UUID documentId, DocumentScope scope);
+    ReembeddingResult replaceEmbeddings(ReembeddingCommand command);
 
     record RetrievalScope(UUID associationId, String actorSubject, boolean privileged) {
         public RetrievalScope {
-            if (actorSubject == null || actorSubject.isBlank()) {
-                throw new IllegalArgumentException("actor subject is required for knowledge retrieval");
+            if (associationId == null || actorSubject == null || actorSubject.isBlank()) {
+                throw new IllegalArgumentException("association and actor subject are required for knowledge retrieval");
             }
         }
+    }
+
+    record DocumentScope(UUID associationId, String actorSubject, boolean privileged) {
+        public DocumentScope {
+            if (associationId == null || actorSubject == null || actorSubject.isBlank()) {
+                throw new IllegalArgumentException("association and actor subject are required for knowledge management");
+            }
+        }
+    }
+
+    record KnowledgeDocumentView(
+            UUID id, UUID associationId, String title, String documentType, String sourceType,
+            String sourceUrl, UUID sourceFileId, String sourceFilename, String visibility, String status,
+            int currentVersion, int chunkCount, String embeddingStatus, long lifecycleVersion,
+            String createdBySubject, Instant createdAt, Instant updatedAt,
+            String reviewedBySubject, Instant reviewedAt, String reviewComment,
+            Instant deletedAt, String deletedBySubject) {
+        public boolean deleted() { return deletedAt != null; }
+    }
+
+    record KnowledgeDocumentPage(List<KnowledgeDocumentView> items, long total, int page, int size) {
+        public KnowledgeDocumentPage {
+            items = items == null ? List.of() : List.copyOf(items);
+        }
+    }
+
+    record LifecycleCommand(
+            UUID documentId, UUID associationId, long expectedVersion, String targetStatus,
+            boolean delete, boolean restore, String reviewComment,
+            UUID actorUserId, String actorSubject, String actorUsername, String action, String requestId) {
+    }
+
+    record ChunkSource(UUID id, int chunkIndex, String content) {
+    }
+
+    record DocumentContent(KnowledgeDocumentView document, List<ChunkSource> chunks) {
+        public DocumentContent { chunks = chunks == null ? List.of() : List.copyOf(chunks); }
+    }
+
+    record ReembeddingCommand(
+            UUID documentId, UUID associationId, long expectedVersion,
+            String provider, String model, List<double[]> embeddings,
+            UUID actorUserId, String actorSubject, String actorUsername, String requestId) {
+        public ReembeddingCommand {
+            embeddings = embeddings == null ? List.of() : embeddings.stream()
+                    .map(vector -> vector == null ? null : vector.clone()).toList();
+        }
+    }
+
+    record ReembeddingResult(UUID documentId, int documentVersion, int chunkCount,
+                             String provider, String model, int dimensions, long lifecycleVersion) {
     }
 
     record IngestCommand(UUID documentId, UUID associationId, String title, String documentType,
@@ -28,14 +86,15 @@ public interface KnowledgeRepository {
                          UUID actorUserId, String actorSubject, String actorUsername,
                          String contentHash, List<TextChunk> chunks,
                          UUID sourceFileId, String parserName, String parserVersion, Integer pageCount,
-                         String embeddingProvider, String embeddingModel, List<double[]> embeddings) {
+                         String embeddingProvider, String embeddingModel, List<double[]> embeddings,
+                         Long expectedLifecycleVersion) {
         public IngestCommand(
                 UUID documentId, UUID associationId, String title, String documentType,
                 String sourceType, String sourceUrl, String visibility, String status,
                 String actorSubject, String contentHash, List<TextChunk> chunks) {
             this(documentId, associationId, title, documentType, sourceType, sourceUrl, visibility, status,
                     null, actorSubject, actorSubject, contentHash, chunks,
-                    null, null, null, null, null, null, List.of());
+                    null, null, null, null, null, null, List.of(), null);
         }
 
         public IngestCommand {
@@ -64,7 +123,7 @@ public interface KnowledgeRepository {
                 }
             }
             visibility = normalize(visibility, "ASSOCIATION");
-            status = normalize(status, "PUBLISHED");
+            status = normalize(status, "DRAFT");
         }
 
         public int embeddingDimensions() {

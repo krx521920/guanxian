@@ -33,6 +33,7 @@ const router = createRouter({
         { path: 'collaborations', component: () => import('../views/CollaborationsView.vue'), meta: { title: '协作事项', roles: protectedRouteRoles['/collaborations'] } },
         { path: 'attachments', component: () => import('../views/AttachmentCenterView.vue'), meta: { title: '资料附件', roles: protectedRouteRoles['/attachments'] } },
         { path: 'federation', component: () => import('../views/FederationView.vue'), meta: { title: '友好协会', roles: protectedRouteRoles['/federation'] } },
+        { path: 'operations', component: () => import('../views/OperationsView.vue'), meta: { title: '审计与账号', roles: protectedRouteRoles['/operations'] } },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },

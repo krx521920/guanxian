@@ -240,7 +240,9 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         if (!repository.update(reviewed, expectedVersion)) {
             throw versionMismatch();
         }
-        auditTrail.recordReview(actor, existing.associationId(), id, existing.status(), request.decision(), trimToNull(request.comment()));
+        auditTrail.recordReview(
+                actor, existing.associationId(), id, reviewed.version(),
+                existing.status(), request.decision(), trimToNull(request.comment()));
         return reviewed;
     }
 
@@ -256,7 +258,8 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         MemberProfile deleted = new MemberProfile(
                 existing.id(), existing.associationId(), existing.name(), existing.unifiedSocialCreditCode(),
                 existing.category(), existing.address(), existing.contactName(), existing.contactPhone(),
-                existing.introduction(), existing.capabilities(), existing.products(), existing.cooperationNeeds(),
+                existing.contactEmail(), existing.introduction(), existing.capabilities(), existing.products(),
+                existing.services(), existing.applicationScenarios(), existing.cooperationNeeds(),
                 existing.visibility(), "DELETED", nextVersion(existing), existing.createdAt(), now,
                 now, actor.subject(), existing.status());
         if (!repository.update(deleted, expectedVersion)) {
@@ -286,7 +289,8 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         MemberProfile restored = new MemberProfile(
                 existing.id(), existing.associationId(), existing.name(), existing.unifiedSocialCreditCode(),
                 existing.category(), existing.address(), existing.contactName(), existing.contactPhone(),
-                existing.introduction(), existing.capabilities(), existing.products(), existing.cooperationNeeds(),
+                existing.contactEmail(), existing.introduction(), existing.capabilities(), existing.products(),
+                existing.services(), existing.applicationScenarios(), existing.cooperationNeeds(),
                 existing.visibility(), restoredStatus, nextVersion(existing), existing.createdAt(), now,
                 null, null, null);
         if (!repository.update(restored, expectedVersion)) {
@@ -340,8 +344,9 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         return new MemberProfile(
                 id, associationId, request.name().trim(), normalizeCreditCode(request.unifiedSocialCreditCode()),
                 request.category().trim(), trimToNull(request.address()), trimToNull(request.contactName()),
-                trimToNull(request.contactPhone()), trimToNull(request.introduction()),
-                immutable(request.capabilities()), immutable(request.products()), immutable(request.cooperationNeeds()),
+                trimToNull(request.contactPhone()), trimToNull(request.contactEmail()), trimToNull(request.introduction()),
+                immutable(request.capabilities()), immutable(request.products()), immutable(request.services()),
+                immutable(request.applicationScenarios()), immutable(request.cooperationNeeds()),
                 visibility, status, version, createdAt, updatedAt, null, null, null);
     }
 
@@ -352,7 +357,8 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         return new MemberProfile(
                 member.id(), member.associationId(), member.name(), member.unifiedSocialCreditCode(),
                 member.category(), member.address(), member.contactName(), member.contactPhone(),
-                member.introduction(), member.capabilities(), member.products(), member.cooperationNeeds(),
+                member.contactEmail(), member.introduction(), member.capabilities(), member.products(),
+                member.services(), member.applicationScenarios(), member.cooperationNeeds(),
                 member.visibility(), status, member.version() + 1, member.createdAt(), updatedAt,
                 member.deletedAt(), member.deletedBySubject(), member.statusBeforeDelete());
     }
@@ -438,7 +444,8 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
 
     private static String searchableText(MemberProfile member) {
         return String.join(" ", member.name(), nullToEmpty(member.category()), nullToEmpty(member.introduction()),
-                String.join(" ", member.capabilities()), String.join(" ", member.products()))
+                String.join(" ", member.capabilities()), String.join(" ", member.products()),
+                String.join(" ", member.services()), String.join(" ", member.applicationScenarios()))
                 .toLowerCase(Locale.ROOT);
     }
 
@@ -476,9 +483,12 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
                 visibleFields.contains("address") ? member.address() : null,
                 null,
                 null,
+                null,
                 visibleFields.contains("introduction") ? member.introduction() : null,
                 visibleFields.contains("capabilities") ? safeList(member.capabilities()) : List.of(),
                 visibleFields.contains("products") ? safeList(member.products()) : List.of(),
+                visibleFields.contains("services") ? safeList(member.services()) : List.of(),
+                visibleFields.contains("applicationScenarios") ? safeList(member.applicationScenarios()) : List.of(),
                 visibleFields.contains("cooperationNeeds") ? safeList(member.cooperationNeeds()) : List.of(),
                 member.visibility(),
                 member.status(),
@@ -516,7 +526,13 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
 
         @Override
         public void recordReview(
-                ActorScope actor, UUID associationId, UUID enterpriseId, String previousStatus, String decision, String comment) {
+                ActorScope actor,
+                UUID associationId,
+                UUID enterpriseId,
+                long newVersion,
+                String previousStatus,
+                String decision,
+                String comment) {
         }
 
         @Override

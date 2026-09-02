@@ -52,7 +52,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                     version, uploaded_by_subject, uploaded_at, updated_at)
                 VALUES (
                     :id, :associationId, :enterpriseId, :bucketName, :objectKey, :originalFilename,
-                    :mediaType, :sizeBytes, :sha256, 'PENDING', :visibility, 'ACTIVE',
+                    :mediaType, :sizeBytes, :sha256, :scanStatus, :visibility, 'ACTIVE',
                     0, :uploadedBy, now(), now())
                 """, draftParameters(draft));
         AttachmentView created = findById(draft.id()).orElseThrow();
@@ -221,6 +221,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                 .addValue("mediaType", draft.mediaType())
                 .addValue("sizeBytes", draft.sizeBytes())
                 .addValue("sha256", draft.sha256())
+                .addValue("scanStatus", draft.scanStatus())
                 .addValue("visibility", draft.visibility())
                 .addValue("uploadedBy", draft.uploadedBySubject());
     }
@@ -262,6 +263,7 @@ class PostgresAttachmentMetadataStore implements AttachmentMetadataStore {
                     "mediaType", value.mediaType(),
                     "sizeBytes", value.sizeBytes(),
                     "version", value.version(),
+                    "validationStatus", value.scanStatus(),
                     "status", value.status()));
             jdbc.update("""
                     INSERT INTO audit_log (

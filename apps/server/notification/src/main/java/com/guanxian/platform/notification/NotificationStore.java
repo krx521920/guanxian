@@ -17,13 +17,20 @@ interface NotificationStore {
             UUID id, UUID userId, UUID associationId, long expectedVersion, String status);
     boolean deleteSubscription(UUID id, UUID userId, UUID associationId, long expectedVersion);
     List<NotificationMessageView> messages(
-            UUID userId, UUID associationId, boolean unreadOnly, long offset, int limit);
-    long countMessages(UUID userId, UUID associationId, boolean unreadOnly);
+            UUID userId, UUID associationId, boolean unreadOnly, String status, long offset, int limit);
+    long countMessages(UUID userId, UUID associationId, boolean unreadOnly, String status);
     Optional<NotificationMessageView> message(UUID id, UUID userId, UUID associationId);
     Optional<NotificationMessageView> markRead(UUID id, UUID userId, UUID associationId);
+    Optional<NotificationMessageView> archive(UUID id, UUID userId, UUID associationId);
+    Optional<NotificationMessageView> restore(UUID id, UUID userId, UUID associationId);
     boolean policyBelongsToAssociation(UUID policyId, UUID associationId);
     PolicyNotificationResult publishPolicy(
             UUID associationId, PolicyNotificationRequest request, ActorScope actor);
+    default void audit(ActorScope actor, UUID associationId, String action,
+                       String resourceType, UUID resourceId, Map<String, Object> details) {
+        audit(actor, associationId, action, resourceType, resourceId, null, details);
+    }
     void audit(ActorScope actor, UUID associationId, String action,
-               String resourceType, UUID resourceId, Map<String, Object> details);
+               String resourceType, UUID resourceId, Long resourceVersion,
+               Map<String, Object> details);
 }

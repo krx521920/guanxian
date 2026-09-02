@@ -14,6 +14,7 @@ class EmbeddingRetrievalTest {
     @Test
     void retrievesSemanticallyWhenQuestionSharesNoLiteralTerm() {
         RagProperties properties = new RagProperties();
+        properties.setExternalModelDataEgressEnabled(true);
         MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
         EmbeddingProvider embedding = constantEmbedding();
         UUID associationId = UUID.randomUUID();

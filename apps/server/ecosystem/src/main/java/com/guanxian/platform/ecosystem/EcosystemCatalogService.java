@@ -12,7 +12,10 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +24,8 @@ import java.util.UUID;
 public class EcosystemCatalogService {
     private static final Set<String> EDITABLE_OFFERING_STATES = Set.of("DRAFT", "REJECTED");
     private static final Set<String> EDITABLE_DEMAND_STATES = Set.of("DRAFT", "REJECTED");
+    private static final Set<String> DEMAND_VISIBILITIES = Set.of(
+            "PRIVATE", "MEMBERS", "PARTNERS", "PUBLIC");
     private final EcosystemCatalogStore store;
     private final EnterpriseLifecycle enterpriseLifecycle;
     private final PartnerFieldAuthorization partnerFields;
@@ -76,7 +81,7 @@ public class EcosystemCatalogService {
         requireOperational(enterpriseId);
         OfferingView created = store.createOffering(enterpriseId, request, actor);
         record(actor, "CREATE", "PRODUCT_SERVICE", created.id(), created.enterpriseId(), created.version(), created);
-        return created;
+        return withAllowedActions(created, offeringActions(created, actor));
     }
 
     @Transactional
@@ -90,7 +95,7 @@ public class EcosystemCatalogService {
         OfferingView updated = store.updateOffering(id, expectedVersion, request, actor)
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, "UPDATE", "PRODUCT_SERVICE", updated.id(), updated.enterpriseId(), updated.version(), updated);
-        return updated;
+        return withAllowedActions(updated, offeringActions(updated, actor));
     }
 
     @Transactional
@@ -127,6 +132,15 @@ public class EcosystemCatalogService {
     }
 
     @Transactional
+    public OfferingView enableOffering(UUID id, long expectedVersion, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
+        OfferingView current = offering(id, actor, false);
+        requireOwnerOrAssociation(actor, current.enterpriseId());
+        requireState(current.status(), Set.of("DISABLED"), "only a disabled offering can be enabled");
+        return transitionOffering(current, expectedVersion, "DRAFT", "ENABLE", actor);
+    }
+
+    @Transactional
     public OfferingView deleteOffering(UUID id, long expectedVersion, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
         OfferingView current = offering(id, actor, false);
@@ -136,7 +150,7 @@ public class EcosystemCatalogService {
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, "SOFT_DELETE", "PRODUCT_SERVICE", deleted.id(), deleted.enterpriseId(),
                 deleted.version(), deleted);
-        return deleted;
+        return withAllowedActions(deleted, offeringActions(deleted, actor));
     }
 
     @Transactional
@@ -149,7 +163,7 @@ public class EcosystemCatalogService {
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, "RESTORE", "PRODUCT_SERVICE", restored.id(), restored.enterpriseId(),
                 restored.version(), restored);
-        return restored;
+        return withAllowedActions(restored, offeringActions(restored, actor));
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -179,19 +193,19 @@ public class EcosystemCatalogService {
     @Transactional
     public DemandView createDemand(DemandUpsertRequest request, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
-        validateBudget(request.budgetMin(), request.budgetMax());
+        validateDemandRequest(request);
         UUID enterpriseId = requireEnterprise(actor);
         requireOperational(enterpriseId);
         DemandView created = store.createDemand(enterpriseId, request, actor);
         record(actor, "CREATE", "COOPERATION_DEMAND", created.id(), created.enterpriseId(), created.version(), created);
-        return created;
+        return withAllowedActions(created, demandActions(created, actor));
     }
 
     @Transactional
     public DemandView updateDemand(
             UUID id, long expectedVersion, DemandUpsertRequest request, ActorScope actor) {
         EcosystemScopeGuard.requireWriteContext(actor);
-        validateBudget(request.budgetMin(), request.budgetMax());
+        validateDemandRequest(request);
         DemandView current = demand(id, actor, false);
         requireOwner(actor, current.enterpriseId());
         requireState(current.status(), EDITABLE_DEMAND_STATES, "demand must be DRAFT or REJECTED to edit");
@@ -200,7 +214,7 @@ public class EcosystemCatalogService {
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, "UPDATE", "COOPERATION_DEMAND", updated.id(), updated.enterpriseId(),
                 updated.version(), updated);
-        return updated;
+        return withAllowedActions(updated, demandActions(updated, actor));
     }
 
     @Transactional
@@ -220,6 +234,9 @@ public class EcosystemCatalogService {
         DemandView current = demand(id, actor, false);
         requireReviewAssociation(actor, current.enterpriseId());
         requireState(current.status(), Set.of("PENDING_REVIEW"), "demand is not pending review");
+        if (decision.approved()) {
+            requireResponseWindow(current);
+        }
         return transitionDemand(
                 current, expectedVersion, decision.approved() ? "OPEN" : "REJECTED",
                 decision.comment(), decision.approved() ? "APPROVE" : "REJECT", actor);
@@ -240,10 +257,18 @@ public class EcosystemCatalogService {
         EcosystemScopeGuard.requireWriteContext(actor);
         DemandView current = demand(id, actor, false);
         requireOwnerOrAssociation(actor, current.enterpriseId());
-        if ("DISABLED".equals(current.status())) {
-            throw new PreconditionFailedException("demand is already disabled");
-        }
+        requireState(current.status(), Set.of("DRAFT", "PENDING_REVIEW", "REJECTED", "OPEN"),
+                "a closed or already disabled demand cannot be disabled");
         return transitionDemand(current, expectedVersion, "DISABLED", null, "DISABLE", actor);
+    }
+
+    @Transactional
+    public DemandView enableDemand(UUID id, long expectedVersion, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
+        DemandView current = demand(id, actor, false);
+        requireOwnerOrAssociation(actor, current.enterpriseId());
+        requireState(current.status(), Set.of("DISABLED"), "only a disabled demand can be enabled");
+        return transitionDemand(current, expectedVersion, "DRAFT", null, "ENABLE", actor);
     }
 
     @Transactional
@@ -256,7 +281,7 @@ public class EcosystemCatalogService {
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, "SOFT_DELETE", "COOPERATION_DEMAND", deleted.id(), deleted.enterpriseId(),
                 deleted.version(), deleted);
-        return deleted;
+        return withAllowedActions(deleted, demandActions(deleted, actor));
     }
 
     @Transactional
@@ -269,7 +294,7 @@ public class EcosystemCatalogService {
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, "RESTORE", "COOPERATION_DEMAND", restored.id(), restored.enterpriseId(),
                 restored.version(), restored);
-        return restored;
+        return withAllowedActions(restored, demandActions(restored, actor));
     }
 
     private OfferingView transitionOffering(
@@ -279,7 +304,7 @@ public class EcosystemCatalogService {
         OfferingView updated = store.transitionOffering(current.id(), expectedVersion, state, actor)
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, action, "PRODUCT_SERVICE", updated.id(), updated.enterpriseId(), updated.version(), updated);
-        return updated;
+        return withAllowedActions(updated, offeringActions(updated, actor));
     }
 
     private DemandView transitionDemand(
@@ -295,7 +320,7 @@ public class EcosystemCatalogService {
                 .orElseThrow(EcosystemCatalogService::stale);
         record(actor, action, "COOPERATION_DEMAND", updated.id(), updated.enterpriseId(),
                 updated.version(), updated);
-        return updated;
+        return withAllowedActions(updated, demandActions(updated, actor));
     }
 
     private void record(
@@ -370,7 +395,7 @@ public class EcosystemCatalogService {
 
     Optional<OfferingView> authorizedOffering(OfferingView value, ActorScope actor) {
         if (!isCrossAssociationRead(value.enterpriseId(), actor)) {
-            return Optional.of(value);
+            return Optional.of(withAllowedActions(value, offeringActions(value, actor)));
         }
         return partnerFields.authorizedFields(actor, value.enterpriseId(), value.kind(), value.id())
                 .map(fields -> new OfferingView(
@@ -379,12 +404,13 @@ public class EcosystemCatalogService {
                         visible(fields, "description") ? value.description() : null,
                         visible(fields, "scenarios") ? value.scenarios() : List.of(),
                         visible(fields, "qualifications") ? value.qualifications() : List.of(),
-                        value.visibility(), value.status(), value.version(), value.disabled(), value.updatedAt()));
+                        value.visibility(), value.status(), value.version(), value.disabled(),
+                        value.deleted(), value.deletedAt(), value.updatedAt(), Set.of()));
     }
 
     Optional<DemandView> authorizedDemand(DemandView value, ActorScope actor) {
         if (!isCrossAssociationRead(value.enterpriseId(), actor)) {
-            return Optional.of(value);
+            return Optional.of(withAllowedActions(value, demandActions(value, actor)));
         }
         return partnerFields.authorizedFields(actor, value.enterpriseId(), "DEMAND", value.id())
                 .map(fields -> new DemandView(
@@ -396,7 +422,109 @@ public class EcosystemCatalogService {
                         value.visibility(), visible(fields, "budgetMin") ? value.budgetMin() : null,
                         visible(fields, "budgetMax") ? value.budgetMax() : null,
                         visible(fields, "responseDeadline") ? value.responseDeadline() : null,
-                        value.status(), null, value.version(), value.disabled(), value.updatedAt()));
+                        value.status(), null, value.version(), value.disabled(),
+                        value.deleted(), value.deletedAt(), value.updatedAt(), Set.of()));
+    }
+
+    private Set<String> offeringActions(OfferingView value, ActorScope actor) {
+        boolean owner = canOwn(actor, value.enterpriseId());
+        boolean manager = canManage(actor, value.enterpriseId());
+        if (value.deleted()) {
+            return manager ? Set.of("RESTORE") : Set.of();
+        }
+        HashSet<String> actions = new HashSet<>();
+        if (owner && EDITABLE_OFFERING_STATES.contains(value.status())) {
+            actions.add("UPDATE");
+            actions.add("SUBMIT");
+        }
+        if (canReview(actor, value.enterpriseId()) && "PENDING_REVIEW".equals(value.status())) {
+            actions.add("REVIEW");
+        }
+        if (manager) {
+            actions.add("DELETE");
+            actions.add("DISABLED".equals(value.status()) ? "ENABLE" : "DISABLE");
+        }
+        return Set.copyOf(actions);
+    }
+
+    private Set<String> demandActions(DemandView value, ActorScope actor) {
+        boolean owner = canOwn(actor, value.enterpriseId());
+        boolean manager = canManage(actor, value.enterpriseId());
+        if (value.deleted()) {
+            return manager ? Set.of("RESTORE") : Set.of();
+        }
+        HashSet<String> actions = new HashSet<>();
+        if (owner && EDITABLE_DEMAND_STATES.contains(value.status())) {
+            actions.add("UPDATE");
+            actions.add("SUBMIT");
+        }
+        if (canReview(actor, value.enterpriseId()) && "PENDING_REVIEW".equals(value.status())) {
+            actions.add("REVIEW");
+        }
+        if (manager) {
+            actions.add("DELETE");
+            if ("DISABLED".equals(value.status())) {
+                actions.add("ENABLE");
+            } else if (!"CLOSED".equals(value.status())) {
+                actions.add("DISABLE");
+            }
+            if ("OPEN".equals(value.status())) {
+                actions.add("CLOSE");
+            }
+        }
+        return Set.copyOf(actions);
+    }
+
+    private boolean canOwn(ActorScope actor, UUID enterpriseId) {
+        if (!enterpriseLifecycle.isOperational(enterpriseId)) {
+            return false;
+        }
+        if (actor.isSystemAdmin()) {
+            return actor.associationId() != null
+                    && EcosystemScopeGuard.systemCanReadEnterprise(actor, enterpriseId, store);
+        }
+        return actor.isEnterpriseAdmin() && enterpriseId.equals(actor.enterpriseId());
+    }
+
+    private boolean canManage(ActorScope actor, UUID enterpriseId) {
+        if (!enterpriseLifecycle.isOperational(enterpriseId)) {
+            return false;
+        }
+        if (actor.isSystemAdmin()) {
+            return actor.associationId() != null
+                    && EcosystemScopeGuard.systemCanReadEnterprise(actor, enterpriseId, store);
+        }
+        if (actor.isAssociationStaff()) {
+            return actor.associationId() != null
+                    && store.enterpriseBelongsToAssociation(enterpriseId, actor.associationId());
+        }
+        return actor.isEnterpriseAdmin() && enterpriseId.equals(actor.enterpriseId());
+    }
+
+    private boolean canReview(ActorScope actor, UUID enterpriseId) {
+        if (!actor.isSystemAdmin() && !actor.isAssociationReviewer()) {
+            return false;
+        }
+        return actor.associationId() != null
+                && store.enterpriseBelongsToAssociation(enterpriseId, actor.associationId())
+                && (!actor.isSystemAdmin()
+                || EcosystemScopeGuard.systemCanReadEnterprise(actor, enterpriseId, store));
+    }
+
+    private static OfferingView withAllowedActions(OfferingView value, Set<String> actions) {
+        return new OfferingView(
+                value.id(), value.enterpriseId(), value.enterpriseName(), value.name(), value.kind(),
+                value.description(), value.scenarios(), value.qualifications(), value.visibility(),
+                value.status(), value.version(), value.disabled(), value.deleted(), value.deletedAt(),
+                value.updatedAt(), actions);
+    }
+
+    private static DemandView withAllowedActions(DemandView value, Set<String> actions) {
+        return new DemandView(
+                value.id(), value.enterpriseId(), value.enterpriseName(), value.title(), value.description(),
+                value.scenarios(), value.requiredCapabilities(), value.visibility(), value.budgetMin(),
+                value.budgetMax(), value.responseDeadline(), value.status(), value.closeReason(),
+                value.version(), value.disabled(), value.deleted(), value.deletedAt(), value.updatedAt(), actions);
     }
 
     private boolean isCrossAssociationRead(UUID enterpriseId, ActorScope actor) {
@@ -428,6 +556,29 @@ public class EcosystemCatalogService {
     private static void validateBudget(BigDecimal minimum, BigDecimal maximum) {
         if (minimum != null && maximum != null && minimum.compareTo(maximum) > 0) {
             throw new PreconditionFailedException("budgetMin must not exceed budgetMax");
+        }
+    }
+
+    private static void validateDemandRequest(DemandUpsertRequest request) {
+        validateBudget(request.budgetMin(), request.budgetMax());
+        String visibility = request.visibility() == null || request.visibility().isBlank()
+                ? "MEMBERS" : request.visibility().trim().toUpperCase(Locale.ROOT);
+        if (!DEMAND_VISIBILITIES.contains(visibility)) {
+            throw new PreconditionFailedException(
+                    "visibility must be PRIVATE, MEMBERS, PARTNERS or PUBLIC");
+        }
+        if (request.responseDeadline() != null
+                && !request.responseDeadline().isAfter(Instant.now())) {
+            throw new PreconditionFailedException("responseDeadline must be in the future");
+        }
+    }
+
+    private static void requireResponseWindow(DemandView demand) {
+        if (!DEMAND_VISIBILITIES.contains(demand.visibility())
+                || demand.responseDeadline() != null
+                && !demand.responseDeadline().isAfter(Instant.now())) {
+            throw new PreconditionFailedException(
+                    "demand response window has expired or its visibility is unsupported");
         }
     }
 }

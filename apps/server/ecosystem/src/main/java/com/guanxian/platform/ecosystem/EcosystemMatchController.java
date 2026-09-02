@@ -33,8 +33,20 @@ public class EcosystemMatchController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('MATCH_REQUEST')")
-    ApiResponse<List<PersistedMatchView>> list(Authentication authentication) {
-        return ApiResponse.ok(matchService.persisted(actor(authentication)));
+    ApiResponse<EcosystemPage<PersistedMatchView>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String state,
+            Authentication authentication) {
+        return ApiResponse.ok(matchService.persisted(
+                actor(authentication), page, size, state));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('MATCH_REQUEST')")
+    ResponseEntity<ApiResponse<PersistedMatchView>> detail(
+            @PathVariable UUID id, Authentication authentication) {
+        return versioned(matchService.detail(id, actor(authentication)));
     }
 
     @GetMapping("/generation-demands")

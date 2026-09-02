@@ -44,6 +44,10 @@ services:
       GUANXIAN_STORAGE_MAX_SIZE_BYTES: ${GUANXIAN_STORAGE_MAX_SIZE_BYTES:-20971520}
       GUANXIAN_STORAGE_RATE_LIMIT_ENABLED: "true"
       GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE: ${GUANXIAN_STORAGE_RATE_LIMIT_PER_MINUTE:-30}
+      GUANXIAN_STORAGE_SCAN_MODE: clamav
+      GUANXIAN_STORAGE_SCAN_HOST: ${GUANXIAN_STORAGE_SCAN_HOST:?required private ClamAV host}
+      GUANXIAN_STORAGE_SCAN_PORT: ${GUANXIAN_STORAGE_SCAN_PORT:-3310}
+      GUANXIAN_STORAGE_SCAN_TIMEOUT: ${GUANXIAN_STORAGE_SCAN_TIMEOUT:-20s}
       SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:-20MB}
       SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:-21MB}
       GUANXIAN_AI_PROVIDER_ENABLED: ${GUANXIAN_AI_PROVIDER_ENABLED:-false}
@@ -59,6 +63,7 @@ services:
       GUANXIAN_EMBEDDING_DIMENSIONS: ${GUANXIAN_EMBEDDING_DIMENSIONS:-1536}
       GUANXIAN_EMBEDDING_MAX_BATCH_SIZE: ${GUANXIAN_EMBEDDING_MAX_BATCH_SIZE:-32}
       GUANXIAN_EMBEDDING_TIMEOUT: ${GUANXIAN_EMBEDDING_TIMEOUT:-30s}
+      GUANXIAN_EMBEDDING_COST_PER_MILLION: ${GUANXIAN_EMBEDDING_COST_PER_MILLION:-0}
     secrets:
       - source: postgres_password
         target: spring.datasource.password
@@ -70,6 +75,8 @@ services:
         target: guanxian.storage.redis-url
       - source: embedding_api_key
         target: guanxian.ai.embedding.api-key
+      - source: ai_provider_api_key
+        target: guanxian.ai.provider.api-key
     expose: ["8080"]
     depends_on:
       postgres:
@@ -221,6 +228,8 @@ secrets:
     file: ${STORAGE_REDIS_URL_FILE:?required and must contain a rediss URL}
   embedding_api_key:
     file: ${EMBEDDING_API_KEY_FILE:?required; use an empty protected file while embeddings are disabled}
+  ai_provider_api_key:
+    file: ${AI_PROVIDER_API_KEY_FILE:?required; use an empty protected file while the external model is disabled}
   tls_certificate:
     file: ${TLS_CERTIFICATE_FILE:?required}
   tls_private_key:

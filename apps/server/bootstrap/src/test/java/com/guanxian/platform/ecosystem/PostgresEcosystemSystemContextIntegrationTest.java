@@ -131,6 +131,16 @@ class PostgresEcosystemSystemContextIntegrationTest {
 
         PersistedMatchView confirmedA = confirm(matchA, systemA, systemA1, systemA2);
         PersistedMatchView confirmedB = confirm(matchB, systemB, systemB1, systemB2);
+        assertTrue(matchStore.upsert(
+                demandA,
+                List.of(new MatchCandidateDraft(
+                        ENTERPRISE_A2, "不得覆盖", "不得覆盖已推进方案", 1, List.of("不得覆盖"))),
+                systemA).isEmpty());
+        PersistedMatchView protectedMatch = matches.detail(confirmedA.id(), systemA);
+        assertEquals(confirmedA.state(), protectedMatch.state());
+        assertEquals(confirmedA.version(), protectedMatch.version());
+        assertEquals(confirmedA.solution(), protectedMatch.solution());
+        assertEquals(confirmedA.reasons(), protectedMatch.reasons());
         Instant invitationExpiresAt = Instant.now().plus(7, ChronoUnit.DAYS)
                 .truncatedTo(ChronoUnit.MICROS);
         MatchInvitationRequest invitationARequest = invitation(ENTERPRISE_A2, invitationExpiresAt);
@@ -257,6 +267,11 @@ class PostgresEcosystemSystemContextIntegrationTest {
         PersistedMatchView negotiating = matches.persisted(candidateEnterprise).stream()
                 .filter(value -> value.id().equals(confirmed.id()))
                 .findFirst().orElseThrow();
+        assertThrows(ForbiddenException.class, () -> workflow.addNegotiation(
+                negotiating.id(), negotiating.version(),
+                new NegotiationRequest(
+                        "INITIAL_CONTACT", "候选协会不得代替企业记录洽谈", null, null),
+                candidateAssociation));
         NegotiationView record = workflow.addNegotiation(
                 negotiating.id(), negotiating.version(),
                 new NegotiationRequest(

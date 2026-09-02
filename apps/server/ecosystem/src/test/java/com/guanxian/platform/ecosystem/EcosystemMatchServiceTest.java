@@ -144,6 +144,13 @@ class EcosystemMatchServiceTest {
         assertThrows(PreconditionFailedException.class,
                 () -> service.confirm(confirmed.id(), confirmed.version(), supplier));
 
+        assertTrue(service.generate(opened.id(), 5, demandOwner).isEmpty());
+        PersistedMatchView unchanged = service.detail(confirmed.id(), demandOwner);
+        assertEquals(confirmed.state(), unchanged.state());
+        assertEquals(confirmed.version(), unchanged.version());
+        assertEquals(confirmed.solution(), unchanged.solution());
+        assertEquals(confirmed.reasons(), unchanged.reasons());
+
         PersistedMatchView closed = service.close(
                 confirmed.id(), confirmed.version(), new MatchCloseRequest("合作终止"), demandOwner);
         assertEquals("CLOSED", closed.state());
@@ -226,6 +233,43 @@ class EcosystemMatchServiceTest {
     }
 
     @Test
+    void partnerPaginationCountsOnlyAuthorizedRowsAndCannotFilterOnRedactedState() {
+        ActorScope partner = new ActorScope(
+                UUID.randomUUID(), "partner-page", "partner-page", ASSOCIATION_C,
+                null, Set.of("ASSOCIATION_ADMIN"), Set.of(ASSOCIATION_ID, ASSOCIATION_B));
+        PersistedMatchView raw = matchView(
+                CROSS_MATCH_ID, 90, MatchLifecycle.RECOMMENDED, 1,
+                Instant.parse("2026-08-30T00:30:00Z"), null, null, null,
+                Instant.parse("2026-08-30T01:00:00Z"));
+        EcosystemMatchStore matchStore = mock(EcosystemMatchStore.class);
+        EcosystemCatalogStore catalogStore = mock(EcosystemCatalogStore.class);
+        when(matchStore.list(partner)).thenReturn(List.of(raw));
+
+        EcosystemMatchService missingCandidateConsent = isolatedService(
+                mock(MemberDirectory.class), text -> List.of(), mock(EcosystemCatalogService.class),
+                matchStore, catalogStore, (scope, enterpriseId, type, resourceId) ->
+                enterpriseId.equals(CROSS_DEMAND_ENTERPRISE)
+                        ? Optional.of(Set.of("demandTitle")) : Optional.empty());
+        EcosystemPage<PersistedMatchView> denied = missingCandidateConsent.persisted(
+                partner, 0, 20, null);
+        assertEquals(0, denied.total());
+        assertTrue(denied.items().isEmpty());
+
+        EcosystemMatchService stateRedacted = isolatedService(
+                mock(MemberDirectory.class), text -> List.of(), mock(EcosystemCatalogService.class),
+                matchStore, catalogStore,
+                (scope, enterpriseId, type, resourceId) -> Optional.of(Set.of("demandTitle")));
+        EcosystemPage<PersistedMatchView> unfiltered = stateRedacted.persisted(
+                partner, 0, 20, null);
+        assertEquals(1, unfiltered.total());
+        assertNull(unfiltered.items().getFirst().state());
+        EcosystemPage<PersistedMatchView> filtered = stateRedacted.persisted(
+                partner, 0, 20, "recommended");
+        assertEquals(0, filtered.total());
+        assertTrue(filtered.items().isEmpty());
+    }
+
+    @Test
     void visibleScoreStillControlsOrderingForParticipantsAndAuthorizedThirdParties() {
         UUID lowerId = UUID.fromString("74000000-0000-0000-0000-000000000201");
         UUID higherId = UUID.fromString("74000000-0000-0000-0000-000000000202");
@@ -301,6 +345,7 @@ class EcosystemMatchServiceTest {
                 .thenReturn(true);
         when(catalogStore.enterpriseBelongsToAssociation(CROSS_SUPPLIER_ENTERPRISE, ASSOCIATION_ID))
                 .thenReturn(false);
+        when(catalogStore.isDemandOpenForResponse(demandId)).thenReturn(true);
         when(catalogService.demand(demandId, demandOwner, false)).thenReturn(demand);
         when(catalogService.offerings(demandOwner, null, false, 0, 100))
                 .thenReturn(new EcosystemPage<>(List.of(), 0, 0, 100));
@@ -333,6 +378,28 @@ class EcosystemMatchServiceTest {
                 CROSS_MATCH_ID, 2, new MatchCloseRequest("合作终止"), demandOwner);
         assertEquals(closed.state(), closure.state());
         assertTrue(authorizationCalls.isEmpty());
+    }
+
+    @Test
+    void deletedSourceDemandKeepsHistoryReadableButRemovesActionsAndBlocksWrites() {
+        ActorScope owner = enterpriseAt(ASSOCIATION_ID, CROSS_DEMAND_ENTERPRISE);
+        PersistedMatchView raw = matchView(
+                CROSS_MATCH_ID, 88, MatchLifecycle.RECOMMENDED, 3,
+                Instant.parse("2026-08-30T00:30:00Z"), null, null, null,
+                Instant.parse("2026-08-30T01:00:00Z"));
+        EcosystemMatchStore matchStore = mock(EcosystemMatchStore.class);
+        EcosystemCatalogStore catalogStore = mock(EcosystemCatalogStore.class);
+        when(matchStore.list(owner)).thenReturn(List.of(raw));
+        when(matchStore.find(raw.id(), owner)).thenReturn(Optional.of(raw));
+        when(catalogStore.isDemandDeleted(raw.demandId())).thenReturn(true);
+        EcosystemMatchService service = isolatedService(
+                mock(MemberDirectory.class), text -> List.of(), mock(EcosystemCatalogService.class),
+                matchStore, catalogStore, PartnerFieldAuthorization.allowAll());
+
+        PersistedMatchView historical = service.persisted(owner).getFirst();
+        assertTrue(historical.allowedActions().isEmpty());
+        assertThrows(PreconditionFailedException.class,
+                () -> service.confirm(raw.id(), raw.version(), owner));
     }
 
     @Test

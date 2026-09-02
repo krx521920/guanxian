@@ -1,12 +1,13 @@
 :root {
   font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  color: #1b2638;
-  background: #f4f6f9;
+  color: var(--ink);
+  background: var(--page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --primary: #126b68;
   --primary-dark: #0c504e;
   --primary-soft: #e5f2f0;
+  --page: #f4f6f9;
   --ink: #172235;
   --muted: #687588;
   --line: #e3e8ef;
@@ -14,11 +15,22 @@
   --warning: #b97714;
   --danger: #c65353;
   --shadow: 0 8px 28px rgba(20, 35, 55, .06);
+  --surface-soft: #edf1f4;
 }
+
+html[data-primary="blue"] { --primary: #3f6480; --primary-dark: #2d485a; --primary-soft: #e9eff3; }
+html[data-primary="violet"] { --primary: #5d607c; --primary-dark: #45485d; --primary-soft: #eeeff3; }
+html[data-primary="orange"] { --primary: #94613c; --primary-dark: #6d472d; --primary-soft: #f4ece6; }
+html[data-primary="rose"] { --primary: #884a59; --primary-dark: #643742; --primary-soft: #f3e9ec; }
+html[data-appearance="dark"] { color-scheme: dark; --primary: #5fa89e; --primary-dark: #3f857c; --primary-soft: #193a38; --page: #0f1620; --ink: #e8edf4; --muted: #9aa7b8; --line: #2c3746; --panel: #18212e; --surface-soft: #202a37; --shadow: 0 10px 30px rgba(0, 0, 0, .22); }
+html[data-appearance="dark"][data-primary="blue"] { --primary: #7199b5; --primary-dark: #527993; --primary-soft: #1c303d; }
+html[data-appearance="dark"][data-primary="violet"] { --primary: #888ba8; --primary-dark: #696d8c; --primary-soft: #282a3b; }
+html[data-appearance="dark"][data-primary="orange"] { --primary: #bd8964; --primary-dark: #986846; --primary-soft: #3a2b22; }
+html[data-appearance="dark"][data-primary="rose"] { --primary: #b97888; --primary-dark: #965867; --primary-soft: #3b252d; }
 
 * { box-sizing: border-box; }
 html, body, #app { min-height: 100%; margin: 0; }
-body { min-width: 320px; }
+body { min-width: 320px; color: var(--ink); background: var(--page); }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
 a { color: inherit; text-decoration: none; }
@@ -65,14 +77,24 @@ h1, h2, h3, p { margin-top: 0; }
 .notification-panel-header span { color: var(--muted); font-size: 10px; }
 .notification-panel-header button, .notification-state button { padding: 5px 8px; border: 0; border-radius: 5px; color: var(--primary); background: var(--primary-soft); font-size: 10px; }
 .notification-panel-header button:disabled { opacity: .5; cursor: wait; }
+.notification-tabs { padding: 7px 10px; border-bottom: 1px solid #edf0f4; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.notification-tabs button { padding: 7px 6px; border: 0; border-radius: 6px; color: var(--muted); background: transparent; font-size: 10px; }
+.notification-tabs button.active { color: var(--primary); background: var(--primary-soft); font-weight: 700; }
 .notification-state { min-height: 150px; padding: 30px 25px; color: var(--muted); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; font-size: 11px; line-height: 1.6; }
 .notification-state b { color: #445064; font-size: 13px; }
 .notification-state.error { color: var(--danger); }
 .notification-list { max-height: 410px; overflow-y: auto; }
-.notification-item { position: relative; width: 100%; padding: 14px 16px; border: 0; border-bottom: 1px solid #edf0f4; color: inherit; background: #fff; display: flex; gap: 11px; text-align: left; }
+.notification-item { position: relative; width: 100%; padding: 0; border: 0; border-bottom: 1px solid #edf0f4; color: inherit; background: #fff; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; text-align: left; }
 .notification-item:hover { background: #f7fafb; }
 .notification-item.unread { background: #f2f8f7; }
 .notification-item.unread::before { content: ''; position: absolute; top: 19px; left: 7px; width: 5px; height: 5px; border-radius: 50%; background: #d46262; }
+.notification-open { min-width: 0; padding: 14px 8px 14px 16px; border: 0; color: inherit; background: transparent; display: flex; gap: 11px; text-align: left; }
+.notification-open:disabled { opacity: .58; cursor: wait; }
+.notification-archive-action { align-self: center; margin-right: 10px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); background: var(--panel); font-size: 9px; }
+.notification-archive-action:hover { color: var(--primary); border-color: var(--primary); }
+.notification-pagination { min-height: 42px; padding: 8px 10px; border-top: 1px solid #edf0f4; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
+.notification-pagination button { padding: 5px 7px; border: 1px solid var(--line); border-radius: 5px; color: var(--primary); background: var(--panel); font-size: 9px; }
+.notification-pagination button:disabled { opacity: .45; cursor: not-allowed; }
 .notification-type { flex: 0 0 auto; margin-top: 1px; padding: 3px 5px; border-radius: 4px; color: var(--primary); background: var(--primary-soft); font-size: 8px; font-weight: 700; }
 .notification-copy { min-width: 0; display: grid; gap: 5px; }
 .notification-copy strong { color: #344156; font-size: 11px; line-height: 1.45; }
@@ -408,6 +430,28 @@ button:disabled, .primary-button:disabled, .secondary-button:disabled { opacity:
   color: var(--muted, #64748b);
   font-size: 13px;
 }
+
+html[data-appearance="dark"] .topbar { background: rgba(24, 33, 46, .94); }
+html[data-appearance="dark"] .profile-menu,
+html[data-appearance="dark"] .profile-menu select,
+html[data-appearance="dark"] .profile-menu button,
+html[data-appearance="dark"] .notification-panel,
+html[data-appearance="dark"] .notification-item,
+html[data-appearance="dark"] .modal-head,
+html[data-appearance="dark"] .metric-card,
+html[data-appearance="dark"] .secondary-button,
+html[data-appearance="dark"] .row-action,
+html[data-appearance="dark"] input,
+html[data-appearance="dark"] select,
+html[data-appearance="dark"] textarea { color: var(--ink); background: var(--panel); border-color: var(--line); }
+html[data-appearance="dark"] .notification-item:hover,
+html[data-appearance="dark"] .notification-item.unread,
+html[data-appearance="dark"] .detail-grid > div,
+html[data-appearance="dark"] .review-panel,
+html[data-appearance="dark"] .workflow-loading,
+html[data-appearance="dark"] .workflow-empty,
+html[data-appearance="dark"] .workflow-form { background: var(--surface-soft); }
+html[data-appearance="dark"] .completeness-ring > div { background: var(--panel); }
 
 .pagination-bar label {
   display: inline-flex;

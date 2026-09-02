@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Collaboration, Demand, MatchFeedback, MatchInvitation, PersistedMatch } from '../types/domain'
+import type { Collaboration, Demand, MatchFeedback, MatchInvitation, Offering, PersistedMatch } from '../types/domain'
 
 const browserWindow = {
   setTimeout: globalThis.setTimeout.bind(globalThis),
@@ -28,9 +28,10 @@ describe('persisted workflow API contract', () => {
   })
 
   it('loads persisted match records from the real collection endpoint', async () => {
-    const { platformApi, fetchMock } = await apiWith([])
-    await expect(platformApi.matches()).resolves.toEqual([])
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/matches')
+    const page = { items: [], total: 0, page: 0, size: 20 }
+    const { platformApi, fetchMock } = await apiWith(page)
+    await expect(platformApi.matches()).resolves.toEqual(page)
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/matches?page=0&size=20')
   })
 
   it('generates and stores matches only after an explicit POST', async () => {
@@ -77,6 +78,32 @@ describe('persisted workflow API contract', () => {
     expect(url).toBe('/api/v1/demands/demand-1/close')
     expect(new Headers(init.headers).get('If-Match')).toBe('"4"')
     expect(JSON.parse(String(init.body))).toEqual({ reason: '需求已完成' })
+  })
+
+  it('soft deletes, restores, and re-enables catalog records with strong versions', async () => {
+    const offering = { id: 'offering /一', version: 4 } as Offering
+    const demand = { id: 'demand /一', version: 6 } as Demand
+    const { platformApi, fetchMock } = await apiWith({})
+
+    await platformApi.deleteOffering(offering)
+    await platformApi.restoreOffering(offering)
+    await platformApi.enableOffering(offering)
+    await platformApi.deleteDemand(demand)
+    await platformApi.restoreDemand(demand)
+    await platformApi.enableDemand(demand)
+
+    expect(fetchMock.mock.calls.map(([url, init]) => ({
+      url,
+      method: (init as RequestInit).method,
+      ifMatch: new Headers((init as RequestInit).headers).get('If-Match'),
+    }))).toEqual([
+      { url: '/api/v1/offerings/offering%20%2F%E4%B8%80', method: 'DELETE', ifMatch: '"4"' },
+      { url: '/api/v1/offerings/offering%20%2F%E4%B8%80/restore', method: 'POST', ifMatch: '"4"' },
+      { url: '/api/v1/offerings/offering%20%2F%E4%B8%80/enable', method: 'POST', ifMatch: '"4"' },
+      { url: '/api/v1/demands/demand%20%2F%E4%B8%80', method: 'DELETE', ifMatch: '"6"' },
+      { url: '/api/v1/demands/demand%20%2F%E4%B8%80/restore', method: 'POST', ifMatch: '"6"' },
+      { url: '/api/v1/demands/demand%20%2F%E4%B8%80/enable', method: 'POST', ifMatch: '"6"' },
+    ])
   })
 
   it('creates an invitation for the persisted candidate enterprise', async () => {

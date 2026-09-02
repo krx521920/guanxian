@@ -33,7 +33,17 @@ class AuditTrailScopeTest {
         record(trail, ASSOCIATION_A, ENTERPRISE_A, "A1");
         record(trail, ASSOCIATION_A, ENTERPRISE_A2, "A2");
         record(trail, ASSOCIATION_B, ENTERPRISE_B, "B");
-        assertScopes(trail);
+        assertScopes(trail, () -> record(trail, ASSOCIATION_A, ENTERPRISE_A, "A3"));
+
+        trail.recordReview(
+                writer(ASSOCIATION_A, ENTERPRISE_A), ASSOCIATION_A, ENTERPRISE_A,
+                7, "PENDING_REVIEW", "ACTIVE", "资料通过");
+        AuditRecord review = trail.findVisible(
+                        system(ASSOCIATION_A, ENTERPRISE_A), ENTERPRISE_A, 20).stream()
+                .filter(record -> "MEMBER_REVIEW".equals(record.action()))
+                .findFirst().orElseThrow();
+        assertEquals(Long.valueOf(7), review.resourceVersion());
+        assertEquals(7L, ((Number) review.details().get("newVersion")).longValue());
     }
 
     @Test
@@ -67,15 +77,41 @@ class AuditTrailScopeTest {
                     request_id VARCHAR(128),
                     occurred_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)
                 """);
+        jdbc.execute("""
+                CREATE TABLE member_review (
+                    enterprise_id UUID,
+                    reviewer_user_id UUID,
+                    reviewer_subject VARCHAR(200),
+                    previous_status VARCHAR(32),
+                    decision VARCHAR(32),
+                    comment VARCHAR(2000))
+                """);
         insertAudit(jdbc, ASSOCIATION_A, ENTERPRISE_A, "A1");
         insertAudit(jdbc, ASSOCIATION_A, ENTERPRISE_A2, "A2");
         insertAudit(jdbc, ASSOCIATION_B, ENTERPRISE_B, "B");
-        assertScopes(new PostgresAuditTrail(
-                new NamedParameterJdbcTemplate(dataSource), new ObjectMapper()));
+        AuditTrail trail = new PostgresAuditTrail(
+                new NamedParameterJdbcTemplate(dataSource), new ObjectMapper());
+        assertScopes(trail, () -> insertAudit(jdbc, ASSOCIATION_A, ENTERPRISE_A, "A3"));
+
+        trail.recordReview(
+                writer(ASSOCIATION_A, ENTERPRISE_A), ASSOCIATION_A, ENTERPRISE_A,
+                8, "PENDING_REVIEW", "ACTIVE", "资料通过");
+        assertEquals(Long.valueOf(8), jdbc.queryForObject("""
+                SELECT resource_version FROM audit_log
+                 WHERE action='MEMBER_REVIEW' AND enterprise_id=?
+                """, Long.class, ENTERPRISE_A));
     }
 
-    private static void assertScopes(AuditTrail trail) {
+    private static void assertScopes(AuditTrail trail, Runnable appendAudit) {
         assertEquals(3, trail.findVisible(system(null, null), null, 20).size());
+        AuditPage firstPage = trail.pageVisible(system(null, null), null, 0, 2);
+        AuditPage secondPage = trail.pageVisible(system(null, null), null, 1, 2);
+        assertEquals(3, firstPage.total());
+        assertEquals(2, firstPage.items().size());
+        assertEquals(1, secondPage.items().size());
+        assertEquals(1, secondPage.page());
+        assertEquals(2, secondPage.size());
+        assertEquals(2, trail.pageVisible(system(ASSOCIATION_A, null), null, 0, 20).total());
         assertEquals(Set.of("A1", "A2"),
                 resourceIds(trail.findVisible(system(ASSOCIATION_A, null), null, 20)));
         assertEquals(Set.of("A1"),
@@ -86,6 +122,13 @@ class AuditTrailScopeTest {
                         system(ASSOCIATION_A, null), ENTERPRISE_B, 20)));
         assertThrows(ForbiddenException.class, () -> trail.findVisible(
                 system(ASSOCIATION_A, ENTERPRISE_A), ENTERPRISE_A2, 20));
+
+        appendAudit.run();
+        AuditPage stableSecondPage = trail.pageVisible(
+                system(null, null), null, 1, 2, firstPage.snapshotId());
+        assertEquals(3, stableSecondPage.total());
+        assertEquals(Set.of("A1"), resourceIds(stableSecondPage.items()));
+        assertEquals(4, trail.pageVisible(system(null, null), null, 0, 2).total());
     }
 
     private static void insertAudit(
@@ -123,5 +166,11 @@ class AuditTrailScopeTest {
         return new ActorScope(
                 UUID.randomUUID(), "system", "system",
                 associationId, enterpriseId, Set.of("SYSTEM_ADMIN"), Set.of());
+    }
+
+    private static ActorScope writer(UUID associationId, UUID enterpriseId) {
+        return new ActorScope(
+                UUID.randomUUID(), "reviewer", "reviewer",
+                associationId, enterpriseId, Set.of("ASSOCIATION_ADMIN"), Set.of());
     }
 }

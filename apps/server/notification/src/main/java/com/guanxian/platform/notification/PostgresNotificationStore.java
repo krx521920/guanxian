@@ -113,39 +113,69 @@ class PostgresNotificationStore implements NotificationStore {
 
     @Override
     public List<NotificationMessageView> messages(
-            UUID userId, UUID associationId, boolean unreadOnly, long offset, int limit) {
+            UUID userId, UUID associationId, boolean unreadOnly, String status, long offset, int limit) {
         MapSqlParameterSource params = new MapSqlParameterSource("userId", userId)
                 .addValue("associationId", associationId)
+                .addValue("status", status)
                 .addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(MESSAGE_SELECT + " WHERE user_id = :userId"
                         + readAssociationClause(associationId)
-                        + (unreadOnly ? " AND read_at IS NULL" : "")
+                        + messageFilter(unreadOnly, status)
                         + " ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset",
                 params, messageMapper);
     }
 
     @Override
-    public long countMessages(UUID userId, UUID associationId, boolean unreadOnly) {
+    public long countMessages(UUID userId, UUID associationId, boolean unreadOnly, String status) {
         Long count = jdbc.queryForObject("SELECT count(*) FROM notification_message WHERE user_id = :userId"
                         + readAssociationClause(associationId)
-                        + (unreadOnly ? " AND read_at IS NULL" : ""),
-                new MapSqlParameterSource("userId", userId).addValue("associationId", associationId), Long.class);
+                        + messageFilter(unreadOnly, status),
+                new MapSqlParameterSource("userId", userId).addValue("associationId", associationId)
+                        .addValue("status", status), Long.class);
         return count == null ? 0 : count;
     }
 
     @Override
     public Optional<NotificationMessageView> message(UUID id, UUID userId, UUID associationId) {
         return jdbc.query(MESSAGE_SELECT
-                        + " WHERE id = :id AND user_id = :userId AND association_id = :associationId",
+                        + " WHERE id = :id AND user_id = :userId" + readAssociationClause(associationId),
                 ids(id, userId, associationId), messageMapper).stream().findFirst();
     }
 
     @Override
     public Optional<NotificationMessageView> markRead(UUID id, UUID userId, UUID associationId) {
-        return jdbc.query("""
+        return jdbc.query(("""
                 UPDATE notification_message
-                   SET read_at = COALESCE(read_at, now()), status = 'READ'
-                 WHERE id = :id AND user_id = :userId AND association_id = :associationId
+                   SET read_at = now(), status = 'READ'
+                 WHERE id = :id AND user_id = :userId
+                """) + readAssociationClause(associationId) + """
+                   AND read_at IS NULL AND status = 'DELIVERED'
+                RETURNING id, user_id, association_id, notification_type, title, body, resource_type,
+                          resource_id, status, read_at, created_at, delivered_at
+                """, ids(id, userId, associationId), messageMapper).stream().findFirst();
+    }
+
+    @Override
+    public Optional<NotificationMessageView> archive(UUID id, UUID userId, UUID associationId) {
+        return jdbc.query(("""
+                UPDATE notification_message
+                   SET status = 'ARCHIVED'
+                 WHERE id = :id AND user_id = :userId
+                """) + readAssociationClause(associationId) + """
+                   AND status IN ('DELIVERED', 'READ')
+                RETURNING id, user_id, association_id, notification_type, title, body, resource_type,
+                          resource_id, status, read_at, created_at, delivered_at
+                """, ids(id, userId, associationId), messageMapper).stream().findFirst();
+    }
+
+    @Override
+    public Optional<NotificationMessageView> restore(UUID id, UUID userId, UUID associationId) {
+        return jdbc.query(("""
+                UPDATE notification_message
+                   SET status = CASE WHEN read_at IS NULL THEN 'DELIVERED' ELSE 'READ' END
+                 WHERE id = :id AND user_id = :userId
+                """) + readAssociationClause(associationId) + """
+                   AND status = 'ARCHIVED'
                 RETURNING id, user_id, association_id, notification_type, title, body, resource_type,
                           resource_id, status, read_at, created_at, delivered_at
                 """, ids(id, userId, associationId), messageMapper).stream().findFirst();
@@ -171,8 +201,12 @@ class PostgresNotificationStore implements NotificationStore {
                 SELECT count(DISTINCT s.user_id)
                   FROM notification_subscription s
                   JOIN user_account u ON u.id = s.user_id AND u.status = 'ACTIVE'
+                   AND (u.association_id = s.association_id OR EXISTS (
+                       SELECT 1 FROM user_role role
+                        WHERE role.user_id = u.id AND role.role_code = 'SYSTEM_ADMIN'))
                  WHERE s.association_id = :associationId AND s.subscription_type = 'POLICY'
-                   AND s.status = 'ACTIVE' AND s.channels @> '["IN_APP"]'::jsonb
+                   AND s.status = 'ACTIVE' AND s.channels = '["IN_APP"]'::jsonb
+                   AND s.filters = '{}'::jsonb
                 """, new MapSqlParameterSource("associationId", associationId), Integer.class)).orElse(0);
         String payload = json(Map.of("associationId", associationId.toString(),
                 "policyId", request.policyId().toString(), "recipientCount", recipients,
@@ -204,8 +238,12 @@ class PostgresNotificationStore implements NotificationStore {
                        :idempotencyKey || ':' || s.user_id::text, now()
                   FROM notification_subscription s
                   JOIN user_account u ON u.id = s.user_id AND u.status = 'ACTIVE'
+                   AND (u.association_id = s.association_id OR EXISTS (
+                       SELECT 1 FROM user_role role
+                        WHERE role.user_id = u.id AND role.role_code = 'SYSTEM_ADMIN'))
                  WHERE s.association_id = :associationId AND s.subscription_type = 'POLICY'
-                   AND s.status = 'ACTIVE' AND s.channels @> '["IN_APP"]'::jsonb
+                   AND s.status = 'ACTIVE' AND s.channels = '["IN_APP"]'::jsonb
+                   AND s.filters = '{}'::jsonb
                 ON CONFLICT (idempotency_key) DO NOTHING
                 """, new MapSqlParameterSource("associationId", associationId)
                 .addValue("title", request.title()).addValue("body", request.body())
@@ -217,20 +255,21 @@ class PostgresNotificationStore implements NotificationStore {
     @Override
     public void audit(
             ActorScope actor, UUID associationId, String action, String resourceType,
-            UUID resourceId, Map<String, Object> details) {
+            UUID resourceId, Long resourceVersion, Map<String, Object> details) {
         jdbc.update("""
                 INSERT INTO audit_log (
                     actor_user_id, actor_subject, actor_username, association_id, enterprise_id,
                     action, resource_type, resource_id, resource_version, outcome, details, request_id)
                 VALUES ((SELECT id FROM user_account WHERE id = :actorUserId),
                         :actorSubject, COALESCE(:actorUsername, :actorSubject), :associationId, :enterpriseId,
-                        :action, :resourceType, :resourceId, NULL, 'SUCCESS',
+                        :action, :resourceType, :resourceId, :resourceVersion, 'SUCCESS',
                         CAST(:details AS jsonb), COALESCE(:requestId, 'internal'))
                 """, new MapSqlParameterSource("actorUserId", actor.userId())
                 .addValue("actorSubject", actor.subject()).addValue("actorUsername", actor.username())
                 .addValue("associationId", associationId).addValue("enterpriseId", actor.enterpriseId())
                 .addValue("action", action).addValue("resourceType", resourceType)
-                .addValue("resourceId", resourceId.toString()).addValue("details", json(details))
+                .addValue("resourceId", resourceId.toString()).addValue("resourceVersion", resourceVersion)
+                .addValue("details", json(details))
                 .addValue("requestId", MDC.get("requestId")));
     }
 
@@ -248,6 +287,13 @@ class PostgresNotificationStore implements NotificationStore {
 
     private static String readAssociationClause(UUID associationId) {
         return associationId == null ? "" : " AND association_id = :associationId";
+    }
+
+    private static String messageFilter(boolean unreadOnly, String status) {
+        if (unreadOnly) {
+            return " AND read_at IS NULL AND status = 'DELIVERED'";
+        }
+        return status == null ? " AND status IN ('DELIVERED', 'READ')" : " AND status = :status";
     }
 
     private SubscriptionView mapSubscription(ResultSet rs, int row) throws SQLException {

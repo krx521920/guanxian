@@ -64,6 +64,16 @@ class PostgresIdentityPolicyNotificationUpgradeIntegrationTest {
                   (user_id, association_id, subscription_type, status)
                 VALUES (?, NULL, 'POLICY', 'ACTIVE'), (?, NULL, 'POLICY', 'ACTIVE')
                 """, TENANT_USER, GLOBAL_USER);
+        jdbc.update("""
+                UPDATE notification_subscription
+                   SET filters = '{"level":"CITY"}'::jsonb
+                 WHERE user_id = ? AND subscription_type = 'POLICY'
+                """, TENANT_USER);
+        jdbc.update("""
+                INSERT INTO notification_message
+                  (user_id, notification_type, title, body, status, idempotency_key)
+                VALUES (?, 'POLICY', '存量未知状态', '升级时应隔离', 'LEGACY_UNKNOWN', 'legacy-status')
+                """, GLOBAL_USER);
 
         flyway(null).migrate();
 
@@ -81,6 +91,10 @@ class PostgresIdentityPolicyNotificationUpgradeIntegrationTest {
         assertEquals("INACTIVE", jdbc.queryForObject("""
                 SELECT status FROM notification_subscription
                  WHERE user_id=? AND subscription_type='POLICY'
+                """, String.class, TENANT_USER));
+        assertEquals("INACTIVE", jdbc.queryForObject("""
+                SELECT status FROM notification_subscription
+                 WHERE user_id=? AND subscription_type='POLICY'
                 """, String.class, GLOBAL_USER));
         jdbc.update("""
                 INSERT INTO notification_subscription
@@ -91,6 +105,19 @@ class PostgresIdentityPolicyNotificationUpgradeIntegrationTest {
                 SELECT count(*) FROM notification_subscription
                  WHERE user_id=? AND subscription_type='POLICY'
                 """, Integer.class, TENANT_USER));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO notification_subscription
+                  (user_id, association_id, subscription_type, filters, channels, status)
+                VALUES (?, ?, 'POLICY', '{"level":"CITY"}'::jsonb, '["IN_APP"]'::jsonb, 'ACTIVE')
+                """, GLOBAL_USER, ASSOCIATION_A));
+        assertEquals("FAILED", jdbc.queryForObject("""
+                SELECT status FROM notification_message WHERE idempotency_key='legacy-status'
+                """, String.class));
+        assertThrows(DataIntegrityViolationException.class, () -> jdbc.update("""
+                INSERT INTO notification_message
+                  (user_id, notification_type, title, body, status, idempotency_key)
+                VALUES (?, 'POLICY', '非法状态', '约束应阻止', 'UNKNOWN', 'invalid-status')
+                """, GLOBAL_USER));
 
         assertEquals(1, jdbc.queryForObject(
                 "SELECT count(*) FROM policy_document WHERE id=? AND association_id IS NULL",

@@ -4,6 +4,7 @@ import com.guanxian.platform.member.api.MemberProfile;
 import com.guanxian.platform.member.web.MemberImportCommitResult;
 import com.guanxian.platform.member.web.MemberImportPreview;
 import com.guanxian.platform.member.web.MemberImportRowView;
+import com.guanxian.platform.member.web.MemberDataProvenanceView;
 import com.guanxian.platform.member.web.MemberUpsertRequest;
 import com.guanxian.platform.shared.error.ConflictException;
 import com.guanxian.platform.shared.error.ForbiddenException;
@@ -15,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,7 +61,8 @@ public class MemberImportService {
     public MemberImportPreview preview(
             String originalFilename, byte[] bytes, UUID requestedAssociationId, ActorScope actor) {
         UUID associationId = targetAssociation(requestedAssociationId, actor);
-        List<MemberWorkbookService.ParsedRow> parsedRows = workbookService.parse(bytes);
+        MemberWorkbookService.ParsedWorkbook workbook = workbookService.parse(bytes);
+        List<MemberWorkbookService.ParsedRow> parsedRows = workbook.rows();
         List<MemberProfile> existing = memberRepository.findAll();
         Set<String> workbookNames = new HashSet<>();
         Set<String> workbookCredits = new HashSet<>();
@@ -91,12 +96,16 @@ public class MemberImportService {
                     distinctErrors.isEmpty() ? "VALID" : "INVALID", null));
         }
         MemberImportBatch batch = new MemberImportBatch(
-                UUID.randomUUID(), associationId, safeFilename(originalFilename), "PREVIEWED",
+                UUID.randomUUID(), associationId, safeFilename(originalFilename), workbook.templateVersion(),
+                sha256(bytes), workbook.submittedUnit(), actor.enterpriseId(), "PREVIEWED",
                 actor.subject(), Instant.now(), null, rows);
         batchRepository.save(batch);
         auditTrail.record(actor, "MEMBER_IMPORT_PREVIEW", "MEMBER_IMPORT_BATCH", batch.id().toString(),
                 associationId, null, Map.of(
                         "filename", batch.originalFilename(),
+                        "templateVersion", batch.templateVersion(),
+                        "sourceSha256", batch.sourceSha256(),
+                        "submittedUnit", batch.submittedUnit(),
                         "totalRows", rows.size(),
                         "validRows", batch.validRows(),
                         "invalidRows", batch.invalidRows()));
@@ -186,7 +195,8 @@ public class MemberImportService {
 
     private static MemberImportPreview view(MemberImportBatch batch) {
         return new MemberImportPreview(
-                batch.id(), batch.originalFilename(), batch.status(), batch.rows().size(),
+                batch.id(), batch.originalFilename(), batch.templateVersion(), batch.sourceSha256(),
+                batch.submittedUnit(), batch.submittedEnterpriseId(), batch.status(), batch.rows().size(),
                 batch.validRows(), batch.invalidRows(), batch.createdAt(), batch.rows().stream()
                 .map(row -> new MemberImportRowView(
                         row.rowNumber(), row.data(), row.errors(), row.status(), row.enterpriseId()))
@@ -208,6 +218,20 @@ public class MemberImportService {
         String normalized = filename.replace('\\', '/');
         String leaf = normalized.substring(normalized.lastIndexOf('/') + 1).trim();
         return leaf.isEmpty() ? "member-survey.xlsx" : leaf.substring(0, Math.min(leaf.length(), 255));
+    }
+
+    public MemberDataProvenanceView provenance(UUID enterpriseId, ActorScope actor) {
+        memberService.get(enterpriseId, actor, true);
+        return batchRepository.findProvenance(enterpriseId)
+                .orElseThrow(() -> new NotFoundException("memberDataProvenance", enterpriseId));
+    }
+
+    private static String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     private static ForbiddenException scopeDenied() {

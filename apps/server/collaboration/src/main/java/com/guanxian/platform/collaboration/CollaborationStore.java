@@ -7,14 +7,26 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface CollaborationStore {
-    List<CollaborationView> list(
-            ActorScope actor, String query, boolean includeDeleted, long offset, int limit);
+    default List<CollaborationView> list(
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+        return list(actor, query, null, includeDeleted, offset, limit);
+    }
 
-    long count(ActorScope actor, String query, boolean includeDeleted);
+    List<CollaborationView> list(
+            ActorScope actor, String query, String stage,
+            boolean includeDeleted, long offset, int limit);
+
+    default long count(ActorScope actor, String query, boolean includeDeleted) {
+        return count(actor, query, null, includeDeleted);
+    }
+
+    long count(ActorScope actor, String query, String stage, boolean includeDeleted);
 
     Optional<CollaborationView> find(UUID id, ActorScope actor, boolean includeDeleted);
 
     boolean canLinkMatch(UUID matchId, UUID associationId, UUID enterpriseId);
+
+    boolean canAccessLinkedMatch(UUID matchId, UUID associationId, UUID enterpriseId);
 
     CollaborationView create(
             UUID associationId,

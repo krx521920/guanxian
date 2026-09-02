@@ -40,7 +40,7 @@ class NotificationServiceTest {
         ActorScope userB = actor(USER_B, ASSOCIATION_A, "ENTERPRISE_MEMBER");
 
         SubscriptionView created = service.createSubscription(
-                new SubscriptionRequest("policy", Map.of("level", "市级"), null), userA);
+                new SubscriptionRequest("policy", Map.of(), null), userA);
         assertEquals(List.of("IN_APP"), created.channels());
         assertEquals(1, service.subscriptions(userA).size());
         assertTrue(service.subscriptions(userB).isEmpty());
@@ -56,6 +56,7 @@ class NotificationServiceTest {
         service.deleteSubscription(created.id(), 2, userA);
         assertTrue(service.subscriptions(userA).isEmpty());
         assertEquals(4, store.auditCount());
+        assertEquals(2L, store.latestAudit().get("resourceVersion"));
     }
 
     @Test
@@ -122,9 +123,9 @@ class NotificationServiceTest {
         ActorScope systemB = systemActor(ASSOCIATION_B);
 
         SubscriptionView subscriptionA = service.createSubscription(
-                new SubscriptionRequest("POLICY", Map.of("scope", "A"), List.of("IN_APP")), systemA);
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), systemA);
         SubscriptionView subscriptionB = service.createSubscription(
-                new SubscriptionRequest("POLICY", Map.of("scope", "B"), List.of("IN_APP")), systemB);
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), systemB);
 
         assertEquals(2, service.subscriptions(global).size());
         assertEquals(List.of(subscriptionA.id()),
@@ -173,6 +174,66 @@ class NotificationServiceTest {
         }
         assertEquals(0, store.outboxCount());
         assertEquals(0, store.auditCount());
+    }
+
+    @Test
+    void onlyUnfilteredInAppPolicySubscriptionsCanBeCreatedOrRestored() {
+        ActorScope user = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+
+        assertThrows(PreconditionFailedException.class, () -> service.createSubscription(
+                new SubscriptionRequest("STANDARD", Map.of(), List.of("IN_APP")), user));
+        assertThrows(PreconditionFailedException.class, () -> service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of("level", "市级"), List.of("IN_APP")), user));
+        assertThrows(PreconditionFailedException.class, () -> service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("EMAIL")), user));
+    }
+
+    @Test
+    void readArchiveAndRestoreAreIdempotentAndAuditOnlyFirstTransitions() {
+        ActorScope user = actor(USER_A, ASSOCIATION_A, "ENTERPRISE_MEMBER");
+        ActorScope admin = actor(ADMIN, ASSOCIATION_A, "ASSOCIATION_ADMIN");
+        service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), user);
+        UUID policyId = UUID.randomUUID();
+        store.registerPolicy(policyId, ASSOCIATION_A, "PUBLISHED", false, false);
+        service.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_A, policyId, "政策", "正文", "lifecycle"), admin);
+        UUID messageId = service.messages(user, true, 0, 20).items().getFirst().id();
+        int baselineAudits = store.auditCount();
+
+        NotificationMessageView read = service.markRead(messageId, user);
+        assertEquals(read, service.markRead(messageId, user));
+        assertEquals(baselineAudits + 1, store.auditCount());
+
+        NotificationMessageView archived = service.archive(messageId, user);
+        assertEquals("ARCHIVED", archived.status());
+        assertEquals(archived, service.archive(messageId, user));
+        assertEquals(0, service.messages(user, false, 0, 20).total());
+        assertEquals(1, service.messages(user, false, "ARCHIVED", 0, 20).total());
+        assertEquals(baselineAudits + 2, store.auditCount());
+
+        NotificationMessageView restored = service.restore(messageId, user);
+        assertEquals("READ", restored.status());
+        assertEquals(restored, service.restore(messageId, user));
+        assertEquals(1, service.messages(user, false, 0, 20).total());
+        assertEquals(baselineAudits + 3, store.auditCount());
+    }
+
+    @Test
+    void globalSystemAdministratorCanPublishAndMaintainOwnMessagesByExplicitAssociation() {
+        ActorScope global = systemActor(null);
+        ActorScope selected = systemActor(ASSOCIATION_A);
+        service.createSubscription(
+                new SubscriptionRequest("POLICY", Map.of(), List.of("IN_APP")), selected);
+        UUID policyId = UUID.randomUUID();
+        store.registerPolicy(policyId, ASSOCIATION_A, "PUBLISHED", false, false);
+
+        service.publishPolicy(new PolicyNotificationRequest(
+                ASSOCIATION_A, policyId, "A 政策", "正文", "global-publish"), global);
+        NotificationMessageView message = service.messages(global, true, 0, 20).items().getFirst();
+        assertEquals("READ", service.markRead(message.id(), global).status());
+        assertEquals("ARCHIVED", service.archive(message.id(), global).status());
+        assertEquals("READ", service.restore(message.id(), global).status());
     }
 
     private static ActorScope actor(UUID userId, UUID associationId, String role) {

@@ -7,6 +7,10 @@ import java.util.UUID;
 public record MemberImportPreview(
         UUID batchId,
         String filename,
+        String templateVersion,
+        String sourceSha256,
+        String submittedUnit,
+        UUID submittedEnterpriseId,
         String status,
         int totalRows,
         int validRows,

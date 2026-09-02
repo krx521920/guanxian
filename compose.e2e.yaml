@@ -49,10 +49,10 @@ services:
     command:
       - |
         attempt=0
-        until psql -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -Atc "select 1 from information_schema.columns where table_name='audit_log' and column_name='resource_version'" | grep -q 1; do
+        until psql -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -Atc "select 1 from pg_constraint where conname='notification_message_status_ck'" | grep -q 1; do
           attempt=$$((attempt + 1))
           if [ "$$attempt" -ge 60 ]; then
-            echo 'Timed out waiting for the V18 database schema.' >&2
+            echo 'Timed out waiting for the V19 database schema.' >&2
             exit 1
           fi
           sleep 2

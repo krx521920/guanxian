@@ -381,6 +381,21 @@ describe('request', () => {
     expect(clearTimeoutMock).toHaveBeenCalledWith(42)
   })
 
+  it('accepts a bounded per-request timeout and rejects unsafe override values', async () => {
+    const setTimeoutMock = vi.fn(() => 77)
+    const clearTimeoutMock = vi.fn()
+    vi.stubGlobal('window', { setTimeout: setTimeoutMock, clearTimeout: clearTimeoutMock })
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => Promise.resolve(Response.json({ code: 'OK', data: { ok: true } }))))
+    const { request } = await loadRequest()
+
+    await request('/attachments', {}, undefined, 'json', 60000)
+    expect(setTimeoutMock).toHaveBeenLastCalledWith(expect.any(Function), 60000)
+
+    await request('/members', {}, undefined, 'json', 50)
+    expect(setTimeoutMock).toHaveBeenLastCalledWith(expect.any(Function), 15000)
+    expect(clearTimeoutMock).toHaveBeenCalledTimes(2)
+  })
+
   it('preserves caller cancellation', async () => {
     const externalController = new AbortController()
     const cancellation = new DOMException('用户取消', 'AbortError')

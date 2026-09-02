@@ -55,6 +55,9 @@ class MemberImportIntegrationTest {
                         .with(httpBasic("association-operator", "operator123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("PREVIEWED"))
+                .andExpect(jsonPath("$.data.templateVersion").value("GX-MEMBER-SURVEY-2026-01"))
+                .andExpect(jsonPath("$.data.submittedUnit").value("测试提交单位"))
+                .andExpect(jsonPath("$.data.sourceSha256").isNotEmpty())
                 .andExpect(jsonPath("$.data.totalRows").value(2))
                 .andExpect(jsonPath("$.data.validRows").value(1))
                 .andExpect(jsonPath("$.data.invalidRows").value(1))
@@ -80,6 +83,13 @@ class MemberImportIntegrationTest {
                 .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
                 .andExpect(jsonPath("$.data.name").value("导入企业-" + suffix))
                 .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"));
+
+        mockMvc.perform(get("/api/v1/members/{id}/provenance", enterpriseId)
+                        .with(httpBasic("association-admin", "admin123")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.sourceFilename").value("会员调查-" + suffix + ".xlsx"))
+                .andExpect(jsonPath("$.data.submittedUnit").value("测试提交单位"))
+                .andExpect(jsonPath("$.data.templateVersion").value("GX-MEMBER-SURVEY-2026-01"));
 
         mockMvc.perform(post("/api/v1/members/imports/{batchId}/commit", batchId)
                         .with(httpBasic("association-operator", "operator123")))
@@ -198,15 +208,20 @@ class MemberImportIntegrationTest {
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(template));
              ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             var sheet = workbook.getSheet("会员资料");
+            workbook.getSheet("提交信息").getRow(1).getCell(1).setCellValue("测试提交单位");
             var valid = sheet.createRow(1);
             valid.createCell(0).setCellValue("导入企业-" + suffix);
             valid.createCell(1).setCellValue("IMPORT" + suffix);
             valid.createCell(2).setCellValue("技术服务单位");
             valid.createCell(4).setCellValue("导入联系人");
-            valid.createCell(7).setCellValue("管线监测；数字孪生");
-            valid.createCell(8).setCellValue("监测平台");
-            valid.createCell(9).setCellValue("寻找场景合作方");
-            valid.createCell(10).setCellValue("MEMBERS");
+            valid.createCell(6).setCellValue("contact@example.test");
+            valid.createCell(7).setCellValue("会员企业简介");
+            valid.createCell(8).setCellValue("管线监测；数字孪生");
+            valid.createCell(9).setCellValue("监测平台");
+            valid.createCell(10).setCellValue("监测服务");
+            valid.createCell(11).setCellValue("燃气管线；供水管线");
+            valid.createCell(12).setCellValue("寻找场景合作方");
+            valid.createCell(13).setCellValue("MEMBERS");
 
             var invalid = sheet.createRow(2);
             invalid.createCell(0).setCellValue("缺少分类-" + suffix);

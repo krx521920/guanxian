@@ -61,6 +61,21 @@ class PolicyServiceTest {
     }
 
     @Test
+    void privatePoliciesRemainVisibleOnlyToAssociationStaff() {
+        ActorScope admin = associationAdmin(ASSOCIATION_A);
+        PolicyView policy = service.create(request("内部工作制度", "PRIVATE"), admin);
+        PolicyView submitted = service.submit(UUID.fromString(policy.id()), policy.version(), admin);
+        service.review(UUID.fromString(policy.id()), submitted.version(),
+                new PolicyReviewRequest(true, null), admin);
+
+        ActorScope enterpriseMember = actor(
+                ASSOCIATION_A, Set.of("ENTERPRISE_ADMIN"), Set.of());
+
+        assertThat(service.findAll("内部工作制度", admin)).hasSize(1);
+        assertThat(service.findAll("内部工作制度", enterpriseMember)).isEmpty();
+    }
+
+    @Test
     void rejectsEnterprisePolicyWritesAndStaleVersions() {
         assertThatThrownBy(() -> service.create(request("越权", "MEMBERS"),
                 actor(ASSOCIATION_A, Set.of("ENTERPRISE_ADMIN"), Set.of())))
@@ -84,6 +99,20 @@ class PolicyServiceTest {
         PolicyView restored = service.restore(UUID.fromString(created.id()), 1, admin);
         assertThat(restored.deleted()).isFalse();
         assertThat(restored.status()).isEqualTo("DRAFT");
+        assertThat(restored.version()).isEqualTo(2);
+    }
+
+    @Test
+    void disabledPolicyCanBeRestoredOnlyAsDraft() {
+        ActorScope admin = associationAdmin(ASSOCIATION_A);
+        PolicyView created = service.create(request("可重新启用政策", "MEMBERS"), admin);
+        PolicyView disabled = service.disable(UUID.fromString(created.id()), created.version(), admin);
+
+        PolicyView restored = service.restore(
+                UUID.fromString(created.id()), disabled.version(), admin);
+
+        assertThat(restored.status()).isEqualTo("DRAFT");
+        assertThat(restored.disabled()).isFalse();
         assertThat(restored.version()).isEqualTo(2);
     }
 
@@ -124,6 +153,19 @@ class PolicyServiceTest {
                 request(ASSOCIATION_B, "伪造归属政策", "PRIVATE"), associationAContext))
                 .isInstanceOfSatisfying(ForbiddenException.class,
                         exception -> assertThat(exception.code()).isEqualTo("POLICY_SCOPE_VIOLATION"));
+    }
+
+    @Test
+    void rejectsPolicySourceLinksThatCannotBeOpenedSafely() {
+        PolicyUpsertRequest unsafe = new PolicyUpsertRequest(
+                null, "来源链接校验", "北京地下管线协会", "京管协〔2026〕2号",
+                "行业协会", "信息管理", LocalDate.of(2026, 8, 20),
+                LocalDate.of(2026, 8, 21), "javascript:alert(1)", "摘要",
+                List.of("地下管线"), "MEMBERS");
+
+        assertThatThrownBy(() -> service.create(unsafe, associationAdmin(ASSOCIATION_A)))
+                .isInstanceOfSatisfying(ApiException.class,
+                        exception -> assertThat(exception.code()).isEqualTo("INVALID_POLICY_SOURCE_URL"));
     }
 
     private static PolicyUpsertRequest request(String title, String visibility) {

@@ -13,9 +13,12 @@ public record MemberProfile(
         String address,
         String contactName,
         String contactPhone,
+        String contactEmail,
         String introduction,
         List<String> capabilities,
         List<String> products,
+        List<String> services,
+        List<String> applicationScenarios,
         List<String> cooperationNeeds,
         String visibility,
         String status,
@@ -25,6 +28,32 @@ public record MemberProfile(
         Instant deletedAt,
         String deletedBySubject,
         String statusBeforeDelete) {
+
+    public MemberProfile(
+            UUID id,
+            UUID associationId,
+            String name,
+            String unifiedSocialCreditCode,
+            String category,
+            String address,
+            String contactName,
+            String contactPhone,
+            String introduction,
+            List<String> capabilities,
+            List<String> products,
+            List<String> cooperationNeeds,
+            String visibility,
+            String status,
+            long version,
+            Instant createdAt,
+            Instant updatedAt,
+            Instant deletedAt,
+            String deletedBySubject,
+            String statusBeforeDelete) {
+        this(id, associationId, name, unifiedSocialCreditCode, category, address, contactName, contactPhone,
+                null, introduction, capabilities, products, List.of(), List.of(), cooperationNeeds,
+                visibility, status, version, createdAt, updatedAt, deletedAt, deletedBySubject, statusBeforeDelete);
+    }
 
     public MemberProfile {
         if (associationId == null) {

@@ -193,7 +193,8 @@ class InMemoryPolicyStore implements PolicyStore {
         if (!"PUBLISHED".equals(policy.status()) || policy.disabled()) {
             return false;
         }
-        if (ownAssociation || "PUBLIC".equals(policy.visibility())) {
+        if (ownAssociation && !"PRIVATE".equals(policy.visibility())
+                || "PUBLIC".equals(policy.visibility())) {
             return true;
         }
         return actor.partnerAssociationIds().contains(policy.associationId())

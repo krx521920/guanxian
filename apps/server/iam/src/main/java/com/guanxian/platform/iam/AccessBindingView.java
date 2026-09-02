@@ -8,6 +8,7 @@ record AccessBindingView(
         String externalSubject,
         String username,
         String displayName,
+        String email,
         UUID associationId,
         String associationName,
         UUID enterpriseId,

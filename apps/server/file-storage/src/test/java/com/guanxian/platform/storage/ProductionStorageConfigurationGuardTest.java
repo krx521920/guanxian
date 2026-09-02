@@ -33,6 +33,7 @@ class ProductionStorageConfigurationGuardTest {
     void durableProductionConfigurationAndDevelopmentMemoryAreAccepted() {
         StorageProperties durable = new StorageProperties();
         durable.setBackend("minio");
+        durable.setScanMode("clamav");
         assertThatCode(() -> new ProductionStorageConfigurationGuard(
                 durable, productionEnvironment(), true)).doesNotThrowAnyException();
 
@@ -41,6 +42,17 @@ class ProductionStorageConfigurationGuardTest {
         assertThatCode(() -> new ProductionStorageConfigurationGuard(
                 development, new MockEnvironment().withProperty("spring.profiles.active", "dev"), false))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void productionRequiresMalwareScanning() {
+        StorageProperties properties = new StorageProperties();
+        properties.setBackend("minio");
+
+        assertThatThrownBy(() -> new ProductionStorageConfigurationGuard(
+                properties, productionEnvironment(), true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("scan-mode=clamav");
     }
 
     private static MockEnvironment productionEnvironment() {

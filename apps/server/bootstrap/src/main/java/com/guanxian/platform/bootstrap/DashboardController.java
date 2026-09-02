@@ -59,10 +59,10 @@ public class DashboardController {
         ActorScope actor = actorScopeResolver.resolve(authentication);
         List<MemberProfile> members = memberDirectory.findAll(null, actor);
         List<PolicyView> policies = policyService.findAll(null, actor);
-        List<CollaborationView> collaborations = collaborationService.findAll(actor);
-        List<OfferingView> offerings = catalogService.offerings(actor, null, false, 0, 100).items();
-        List<DemandView> demands = catalogService.demands(actor, null, false, 0, 100).items();
-        List<PersistedMatchView> matches = matchService.persisted(actor);
+        List<CollaborationView> collaborations = allCollaborations(actor);
+        List<OfferingView> offerings = allOfferings(actor);
+        List<DemandView> demands = allDemands(actor);
+        List<PersistedMatchView> matches = allMatches(actor);
         long pending = collaborations.stream()
                 .filter(item -> !"COMPLETED".equals(item.stage()) && !"DISABLED".equals(item.stage()))
                 .count();
@@ -71,7 +71,7 @@ public class DashboardController {
                 List.of(
                         new Metric("会员企业", String.valueOf(members.size()), "数据库实时统计", "info"),
                         new Metric("企业资料完整度", completeness(members) + "%", "按当前可见字段计算", "success"),
-                        new Metric("有效匹配", String.valueOf(matches.size()), "基于已建档需求", "warning"),
+                        new Metric("可见匹配记录", String.valueOf(matches.size()), "按当前身份范围统计", "warning"),
                         new Metric("待办协作事项", String.valueOf(pending), "未完成且未停用", "danger")),
                 activities(policies, collaborations, matches),
                 sceneDistribution(offerings, demands),
@@ -91,10 +91,10 @@ public class DashboardController {
         List<PolicyView> policies = policyService.findAll(null, actor).stream()
                 .filter(policy -> policy.publishDate() != null)
                 .toList();
-        List<CollaborationView> collaborations = collaborationService.findAll(actor);
-        List<OfferingView> offerings = catalogService.offerings(actor, null, false, 0, 100).items();
-        List<DemandView> demands = catalogService.demands(actor, null, false, 0, 100).items();
-        List<PersistedMatchView> persistedMatches = matchService.persisted(actor);
+        List<CollaborationView> collaborations = allCollaborations(actor);
+        List<OfferingView> offerings = allOfferings(actor);
+        List<DemandView> demands = allDemands(actor);
+        List<PersistedMatchView> persistedMatches = allMatches(actor);
         long activeCollaborations = collaborations.stream()
                 .filter(item -> !"COMPLETED".equals(item.stage()) && !"DISABLED".equals(item.stage()))
                 .count();
@@ -106,7 +106,7 @@ public class DashboardController {
                 completeness(members),
                 List.of(
                         new Metric("在架产品/服务", String.valueOf(offerings.size()), "数据库实时统计", "info"),
-                        new Metric("匹配商机", String.valueOf(persistedMatches.size()), "已持久化匹配", "success"),
+                        new Metric("可见匹配记录", String.valueOf(persistedMatches.size()), "按当前身份范围统计", "success"),
                         new Metric("协作进行中", String.valueOf(activeCollaborations), "未完成且未停用", "warning"),
                         new Metric("政策影响提醒", String.valueOf(policyAlerts), "当前可见已发布政策", "danger")),
                 policies.stream().limit(3).toList(),
@@ -167,6 +167,58 @@ public class DashboardController {
         }
         return (int) Math.round(members.stream().mapToInt(DashboardController::profileCompleteness)
                 .average().orElse(0));
+    }
+
+    private List<OfferingView> allOfferings(ActorScope actor) {
+        List<OfferingView> values = new ArrayList<>();
+        int page = 0;
+        long total;
+        do {
+            var result = catalogService.offerings(actor, null, false, page, 100);
+            values.addAll(result.items());
+            total = result.total();
+            page++;
+        } while ((long) page * 100 < total);
+        return List.copyOf(values);
+    }
+
+    private List<DemandView> allDemands(ActorScope actor) {
+        List<DemandView> values = new ArrayList<>();
+        int page = 0;
+        long total;
+        do {
+            var result = catalogService.demands(actor, null, false, page, 100);
+            values.addAll(result.items());
+            total = result.total();
+            page++;
+        } while ((long) page * 100 < total);
+        return List.copyOf(values);
+    }
+
+    private List<CollaborationView> allCollaborations(ActorScope actor) {
+        List<CollaborationView> values = new ArrayList<>();
+        int page = 0;
+        long total;
+        do {
+            var result = collaborationService.page(actor, null, false, page, 100);
+            values.addAll(result.items());
+            total = result.total();
+            page++;
+        } while ((long) page * 100 < total);
+        return List.copyOf(values);
+    }
+
+    private List<PersistedMatchView> allMatches(ActorScope actor) {
+        List<PersistedMatchView> values = new ArrayList<>();
+        int page = 0;
+        long total;
+        do {
+            var result = matchService.persisted(actor, page, 100, null);
+            values.addAll(result.items());
+            total = result.total();
+            page++;
+        } while ((long) page * 100 < total);
+        return List.copyOf(values);
     }
 
     private static int profileCompleteness(MemberProfile member) {

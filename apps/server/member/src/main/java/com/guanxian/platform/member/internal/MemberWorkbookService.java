@@ -35,11 +35,14 @@ import java.util.Map;
 @Service
 class MemberWorkbookService {
     static final String DATA_SHEET = "会员资料";
+    static final String SUBMISSION_SHEET = "提交信息";
+    static final String TEMPLATE_VERSION = "GX-MEMBER-SURVEY-2026-01";
     static final int MAX_ROWS = 500;
     static final long MAX_FILE_BYTES = 5L * 1024 * 1024;
     private static final List<String> HEADERS = List.of(
             "企业名称*", "统一社会信用代码", "企业分类*", "联系地址", "联系人", "联系电话",
-            "企业简介", "核心能力（用；分隔）", "产品与服务（用；分隔）", "合作需求（用；分隔）", "可见范围");
+            "联系邮箱", "企业简介", "核心能力（用；分隔）", "产品（用；分隔）", "服务（用；分隔）",
+            "应用场景（用；分隔）", "合作需求（用；分隔）", "可见范围");
 
     static {
         ZipSecureFile.setMinInflateRatio(0.01d);
@@ -68,20 +71,31 @@ class MemberWorkbookService {
             var constraint = validationHelper.createExplicitListConstraint(
                     new String[]{"MEMBERS", "ASSOCIATION", "PARTNERS", "PRIVATE", "PUBLIC"});
             var validation = validationHelper.createValidation(
-                    constraint, new CellRangeAddressList(1, MAX_ROWS, 10, 10));
+                    constraint, new CellRangeAddressList(1, MAX_ROWS, 13, 13));
             validation.setShowErrorBox(true);
             validation.setErrorStyle(0);
             validation.createErrorBox("可见范围无效", "请从下拉列表选择可见范围");
             sheet.addValidationData(validation);
 
+            Sheet submission = workbook.createSheet(SUBMISSION_SHEET);
+            submission.createRow(0).createCell(0).setCellValue("模板版本");
+            submission.getRow(0).createCell(1).setCellValue(TEMPLATE_VERSION);
+            submission.createRow(1).createCell(0).setCellValue("提交单位*");
+            submission.getRow(1).createCell(1).setCellValue("");
+            submission.createRow(2).createCell(0).setCellValue("说明");
+            submission.getRow(2).createCell(1).setCellValue("提交单位必须填写企业全称；模板版本不得修改。");
+            submission.setColumnWidth(0, 18 * 256);
+            submission.setColumnWidth(1, 60 * 256);
+
             Sheet instructions = workbook.createSheet("填写说明");
             String[] lines = {
                     "1. 企业名称、企业分类为必填项。",
                     "2. 每行仅填写一家企业，最多 500 家。",
-                    "3. 核心能力、产品与服务、合作需求使用中文或英文分号分隔。",
+                    "3. 核心能力、产品、服务、应用场景、合作需求使用中文或英文分号分隔。",
                     "4. 可见范围默认 MEMBERS；PRIVATE 仅本企业和协会工作人员可见。",
                     "5. 导入后统一进入“待审核”，不会自动认证。",
-                    "6. 请勿修改“会员资料”工作表名称和表头，不允许使用公式单元格。"
+                    "6. 请先在“提交信息”填写提交单位，不得修改模板版本。",
+                    "7. 请勿修改“会员资料”工作表名称和表头，不允许使用公式单元格。"
             };
             for (int index = 0; index < lines.length; index++) {
                 instructions.createRow(index).createCell(0).setCellValue(lines[index]);
@@ -94,7 +108,7 @@ class MemberWorkbookService {
         }
     }
 
-    List<ParsedRow> parse(byte[] bytes) {
+    ParsedWorkbook parse(byte[] bytes) {
         if (bytes == null || bytes.length == 0 || bytes.length > MAX_FILE_BYTES) {
             throw invalidFile("文件为空或超过 5 MiB 限制");
         }
@@ -109,6 +123,19 @@ class MemberWorkbookService {
             }
             if (sheet.getLastRowNum() > MAX_ROWS) {
                 throw invalidFile("数据区域超过模板的 500 行限制");
+            }
+            XSSFSheet submission = workbook.getSheet(SUBMISSION_SHEET);
+            if (submission == null) {
+                throw invalidFile("缺少“提交信息”工作表");
+            }
+            DataFormatter metadataFormatter = new DataFormatter(Locale.CHINA, true);
+            String templateVersion = metadataValue(submission, 0, metadataFormatter);
+            String submittedUnit = metadataValue(submission, 1, metadataFormatter);
+            if (!TEMPLATE_VERSION.equals(templateVersion)) {
+                throw invalidFile("模板版本不匹配，请重新下载正式调查模板");
+            }
+            if (submittedUnit.isBlank() || submittedUnit.length() > 200) {
+                throw invalidFile("“提交信息”中的提交单位必须填写且不能超过 200 个字符");
             }
             Map<String, Integer> columns = columns(sheet.getRow(0));
             DataFormatter formatter = new DataFormatter(Locale.CHINA, true);
@@ -128,26 +155,42 @@ class MemberWorkbookService {
                 String address = value(row, columns.get("联系地址"), "联系地址", formatter, errors);
                 String contactName = value(row, columns.get("联系人"), "联系人", formatter, errors);
                 String contactPhone = value(row, columns.get("联系电话"), "联系电话", formatter, errors);
+                String contactEmail = value(row, columns.get("联系邮箱"), "联系邮箱", formatter, errors);
                 String introduction = value(row, columns.get("企业简介"), "企业简介", formatter, errors);
                 String capabilities = value(row, columns.get("核心能力（用；分隔）"), "核心能力", formatter, errors);
-                String products = value(row, columns.get("产品与服务（用；分隔）"), "产品与服务", formatter, errors);
+                String products = value(row, columns.get("产品（用；分隔）"), "产品", formatter, errors);
+                String services = value(row, columns.get("服务（用；分隔）"), "服务", formatter, errors);
+                String scenarios = value(row, columns.get("应用场景（用；分隔）"), "应用场景", formatter, errors);
                 String needs = value(row, columns.get("合作需求（用；分隔）"), "合作需求", formatter, errors);
                 String visibility = value(row, columns.get("可见范围"), "可见范围", formatter, errors);
                 MemberUpsertRequest request = new MemberUpsertRequest(
                         name, nullIfBlank(creditCode), category, nullIfBlank(address), nullIfBlank(contactName),
-                        nullIfBlank(contactPhone), nullIfBlank(introduction), split(capabilities), split(products),
-                        split(needs), nullIfBlank(visibility), null, null);
+                        nullIfBlank(contactPhone), nullIfBlank(contactEmail), nullIfBlank(introduction),
+                        split(capabilities), split(products), split(services), split(scenarios), split(needs),
+                        nullIfBlank(visibility), null, null);
                 rows.add(new ParsedRow(index + 1, request, errors));
             }
             if (rows.isEmpty()) {
                 throw invalidFile("工作表中没有可导入的数据行");
             }
-            return rows;
+            return new ParsedWorkbook(templateVersion, submittedUnit.trim(), rows);
         } catch (ApiException exception) {
             throw exception;
         } catch (Exception exception) {
             throw invalidFile("文件不是有效的 XLSX 调查表");
         }
+    }
+
+    private static String metadataValue(XSSFSheet sheet, int rowIndex, DataFormatter formatter) {
+        Row row = sheet.getRow(rowIndex);
+        if (row == null || row.getCell(1, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL) == null) {
+            return "";
+        }
+        Cell cell = row.getCell(1);
+        if (cell.getCellType() == CellType.FORMULA) {
+            throw invalidFile("提交信息不允许使用公式");
+        }
+        return formatter.formatCellValue(cell).trim();
     }
 
     private static Map<String, Integer> columns(Row header) {
@@ -224,5 +267,11 @@ class MemberWorkbookService {
     }
 
     record ParsedRow(int rowNumber, MemberUpsertRequest data, List<String> errors) {
+    }
+
+    record ParsedWorkbook(String templateVersion, String submittedUnit, List<ParsedRow> rows) {
+        ParsedWorkbook {
+            rows = List.copyOf(rows);
+        }
     }
 }

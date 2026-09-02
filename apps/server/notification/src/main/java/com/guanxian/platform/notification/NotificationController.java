@@ -98,10 +98,11 @@ public class NotificationController {
     @PreAuthorize("hasAuthority('NOTIFICATION_READ')")
     ApiResponse<NotificationMessagePage> messages(
             @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication) {
-        return ApiResponse.ok(service.messages(actor(authentication), unreadOnly, page, size));
+        return ApiResponse.ok(service.messages(actor(authentication), unreadOnly, status, page, size));
     }
 
     @PutMapping("/messages/{id}/read")
@@ -109,6 +110,20 @@ public class NotificationController {
     ApiResponse<NotificationMessageView> markRead(
             @PathVariable UUID id, Authentication authentication) {
         return ApiResponse.ok(service.markRead(id, actor(authentication)));
+    }
+
+    @PutMapping("/messages/{id}/archive")
+    @PreAuthorize("hasAuthority('NOTIFICATION_READ')")
+    ApiResponse<NotificationMessageView> archive(
+            @PathVariable UUID id, Authentication authentication) {
+        return ApiResponse.ok(service.archive(id, actor(authentication)));
+    }
+
+    @PutMapping("/messages/{id}/restore")
+    @PreAuthorize("hasAuthority('NOTIFICATION_READ')")
+    ApiResponse<NotificationMessageView> restore(
+            @PathVariable UUID id, Authentication authentication) {
+        return ApiResponse.ok(service.restore(id, actor(authentication)));
     }
 
     @PostMapping("/policies")

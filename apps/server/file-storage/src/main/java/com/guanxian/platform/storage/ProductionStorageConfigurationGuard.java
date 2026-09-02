@@ -26,5 +26,9 @@ final class ProductionStorageConfigurationGuard {
             throw new IllegalStateException(
                     "production attachment writes require Redis rate limiting");
         }
+        if (!"clamav".equalsIgnoreCase(properties.getScanMode())) {
+            throw new IllegalStateException(
+                    "production attachment writes require guanxian.storage.scan-mode=clamav");
+        }
     }
 }

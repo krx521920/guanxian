@@ -24,6 +24,12 @@ function boundedTimeout(raw: string | undefined, fallback: number): number {
 
 const defaultTimeoutMs = boundedTimeout(import.meta.env.VITE_API_TIMEOUT_MS, 15000)
 
+function normalizedRequestTimeout(timeoutMs: number): number {
+  return Number.isFinite(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 300000
+    ? Math.trunc(timeoutMs)
+    : defaultTimeoutMs
+}
+
 export class ApiRequestError extends Error {
   constructor(
     message: string,
@@ -148,7 +154,7 @@ export async function request<T>(
     if (controller.signal.aborted) return
     abortSource = 'timeout'
     controller.abort()
-  }, timeoutMs)
+  }, normalizedRequestTimeout(timeoutMs))
 
   try {
     if (abortSource === 'external') throw externalAbortError()

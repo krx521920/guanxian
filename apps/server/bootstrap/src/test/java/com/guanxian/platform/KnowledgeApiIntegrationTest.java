@@ -1,10 +1,12 @@
 package com.guanxian.platform;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.greaterThan;
@@ -18,10 +20,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class KnowledgeApiIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Test
     void ingestsPolicyAndAnswersWithSourceCitationWithoutExternalModel() throws Exception {
-        mockMvc.perform(post("/api/v1/knowledge/documents/text")
+        String created = mockMvc.perform(post("/api/v1/knowledge/documents/text")
                         .with(httpBasic("association-admin", "admin123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -36,7 +40,9 @@ class KnowledgeApiIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("OK"));
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andReturn().getResponse().getContentAsString();
+        publish(objectMapper.readTree(created).path("data").path("documentId").asText());
 
         mockMvc.perform(post("/api/v1/knowledge/questions")
                         .with(httpBasic("enterprise-member", "member123"))
@@ -57,7 +63,7 @@ class KnowledgeApiIntegrationTest {
 
     @Test
     void privateDocumentIsHiddenFromOrdinarySameAssociationMember() throws Exception {
-        mockMvc.perform(post("/api/v1/knowledge/documents/text")
+        String created = mockMvc.perform(post("/api/v1/knowledge/documents/text")
                         .with(httpBasic("association-admin", "admin123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -68,7 +74,9 @@ class KnowledgeApiIntegrationTest {
                                   "content": "紫铜编号试验管段要求每四小时进行一次压力复核。"
                                 }
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        publish(objectMapper.readTree(created).path("data").path("documentId").asText());
 
         mockMvc.perform(post("/api/v1/knowledge/questions")
                         .with(httpBasic("enterprise-member", "member123"))
@@ -149,6 +157,21 @@ class KnowledgeApiIntegrationTest {
                                 """.formatted(otherAssociation)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SYSTEM_CONTEXT_FORBIDDEN"));
+    }
+
+    private void publish(String documentId) throws Exception {
+        mockMvc.perform(post("/api/v1/knowledge/documents/{id}/submit", documentId)
+                        .with(httpBasic("association-admin", "admin123"))
+                        .header(HttpHeaders.IF_MATCH, "\"0\""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"));
+        mockMvc.perform(post("/api/v1/knowledge/documents/{id}/review", documentId)
+                        .with(httpBasic("association-admin", "admin123"))
+                        .header(HttpHeaders.IF_MATCH, "\"1\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"approved\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"));
     }
 
 }

@@ -78,6 +78,49 @@ class PostgresEcosystemStoreScopeSqlTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
+    void matchSqlNeverExpandsBeyondTheActorPartnerSet() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        PostgresEcosystemMatchStore store = new PostgresEcosystemMatchStore(jdbc, new ObjectMapper());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+        store.list(actor("ASSOCIATION_ADMIN", null), null, 0, 20);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+        assertFalse(sql.getValue().contains("association_relationship"));
+
+        clearInvocations(jdbc);
+        store.list(actor("ASSOCIATION_ADMIN", null, Set.of(UUID.randomUUID())), null, 0, 20);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+        assertTrue(sql.getValue().contains("association_relationship"));
+        assertTrue(sql.getValue().contains("association_id IN (:partnerAssociationIds)"));
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void matchListAndCountUseTheSameActiveParticipantScope() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        PostgresEcosystemMatchStore store = new PostgresEcosystemMatchStore(jdbc, new ObjectMapper());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ActorScope associationAdmin = actor("ASSOCIATION_ADMIN", null);
+
+        store.list(associationAdmin, null, 0, 20);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+        assertActiveDemandOwnerScope(sql.getValue());
+
+        clearInvocations(jdbc);
+        store.count(associationAdmin, null);
+        verify(jdbc).queryForObject(
+                sql.capture(), any(SqlParameterSource.class), eq(Long.class));
+        assertActiveDemandOwnerScope(sql.getValue());
+
+        clearInvocations(jdbc);
+        store.list(actor("SYSTEM_ADMIN", null), null, 0, 20);
+        verify(jdbc).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+        assertActiveDemandOwnerScope(sql.getValue());
+        assertTrue(sql.getValue().contains("ce.status='ACTIVE' AND ce.deleted_at IS NULL"));
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
     void partnerCatalogListAndCountShareFailClosedAuthorizationPredicates() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         PostgresEcosystemCatalogStore store = new PostgresEcosystemCatalogStore(jdbc, new ObjectMapper());
@@ -127,6 +170,22 @@ class PostgresEcosystemStoreScopeSqlTest {
     }
 
     @Test
+    void responseWindowSqlRejectsExpiredAndUnsupportedDirectedDemands() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        PostgresEcosystemCatalogStore store = new PostgresEcosystemCatalogStore(jdbc, new ObjectMapper());
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+        store.isDemandOpenForResponse(UUID.randomUUID());
+
+        verify(jdbc).queryForObject(
+                sql.capture(), any(SqlParameterSource.class), eq(Boolean.class));
+        assertTrue(sql.getValue().contains("status='OPEN'"));
+        assertTrue(sql.getValue().contains("visibility <> 'DIRECTED'"));
+        assertTrue(sql.getValue().contains("response_deadline > now()"));
+        assertTrue(sql.getValue().contains("deleted_at IS NULL"));
+    }
+
+    @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     void workflowHistoryKeepsLifecycleFilterOnlyForEnterpriseParticipants() {
         NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
@@ -165,5 +224,10 @@ class PostgresEcosystemStoreScopeSqlTest {
         assertTrue(sql.contains("sp.visible_fields <@ CAST('[\"enterpriseName\""));
         assertTrue(sql.contains("\"" + allowedField + "\"]' AS jsonb)"));
         assertTrue(sql.contains("jsonb_typeof(invalid_sp.visible_fields)='array'"));
+    }
+
+    private static void assertActiveDemandOwnerScope(String sql) {
+        assertTrue(sql.contains("de.association_id=:associationId"));
+        assertTrue(sql.contains("de.status='ACTIVE' AND de.deleted_at IS NULL"));
     }
 }

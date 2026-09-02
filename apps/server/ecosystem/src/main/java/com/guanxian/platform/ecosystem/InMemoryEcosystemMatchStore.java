@@ -57,7 +57,8 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     @Override
     public synchronized List<PersistedMatchView> upsert(
             DemandView demand, List<MatchCandidateDraft> candidates, ActorScope actor) {
-        requireSystemUpsertScope(demand, actor);
+        requireUpsertScope(demand, actor);
+        java.util.Set<UUID> changedCandidateIds = new java.util.LinkedHashSet<>();
         for (MatchCandidateDraft candidate : candidates) {
             requireDistinctEnterprises(demand.enterpriseId(), candidate.candidateEnterpriseId());
             UUID id = UUID.nameUUIDFromBytes(
@@ -87,15 +88,18 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                     existing == null ? 0 : existing.version() + 1,
                     Instant.now(), Set.of());
             matches.put(id, value);
+            changedCandidateIds.add(candidate.candidateEnterpriseId());
             if (actor.associationId() != null) {
                 matchAssociations.putIfAbsent(id, actor.associationId());
             }
         }
-        return list(demand.id(), actor);
+        return list(demand.id(), actor).stream()
+                .filter(value -> changedCandidateIds.contains(value.candidateEnterpriseId()))
+                .toList();
     }
 
     @Override
-    public List<PersistedMatchView> list(UUID demandId, ActorScope actor) {
+    public synchronized List<PersistedMatchView> list(UUID demandId, ActorScope actor) {
         return matches.values().stream()
                 .filter(value -> value.demandId().equals(demandId))
                 .filter(value -> canRead(value, actor))
@@ -106,7 +110,7 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     }
 
     @Override
-    public List<PersistedMatchView> list(ActorScope actor) {
+    public synchronized List<PersistedMatchView> list(ActorScope actor) {
         return matches.values().stream()
                 .filter(value -> canRead(value, actor))
                 .sorted(Comparator.comparing(PersistedMatchView::updatedAt).reversed()
@@ -116,7 +120,30 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
     }
 
     @Override
-    public Optional<PersistedMatchView> find(UUID id, ActorScope actor) {
+    public synchronized List<PersistedMatchView> list(
+            ActorScope actor, String state, long offset, int limit) {
+        return matches.values().stream()
+                .filter(value -> canRead(value, actor))
+                .filter(value -> state == null || state.equals(value.state()))
+                .sorted(Comparator.comparing(
+                                PersistedMatchView::score,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(PersistedMatchView::id))
+                .skip(offset)
+                .limit(limit)
+                .toList();
+    }
+
+    @Override
+    public synchronized long count(ActorScope actor, String state) {
+        return matches.values().stream()
+                .filter(value -> canRead(value, actor))
+                .filter(value -> state == null || state.equals(value.state()))
+                .count();
+    }
+
+    @Override
+    public synchronized Optional<PersistedMatchView> find(UUID id, ActorScope actor) {
         PersistedMatchView value = matches.get(id);
         return value != null && canRead(value, actor) ? Optional.of(value) : Optional.empty();
     }
@@ -214,14 +241,14 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                         || value.candidateEnterpriseId().equals(actor.enterpriseId())
                         && !MatchLifecycle.PENDING_CONFIRMATION.equals(value.state()));
             }
-            return actor.associationId().equals(matchAssociations.get(value.id()))
+            return ownsActiveDemandAssociation(value, actor)
                     || catalogStore != null && catalogStore.enterpriseBelongsToAssociation(
                     value.candidateEnterpriseId(), actor.associationId())
                     && !MatchLifecycle.PENDING_CONFIRMATION.equals(value.state());
         }
         if (actor.isAssociationStaff()) {
             return actor.associationId() != null
-                    && (actor.associationId().equals(matchAssociations.get(value.id()))
+                    && (ownsActiveDemandAssociation(value, actor)
                     || !MatchLifecycle.PENDING_CONFIRMATION.equals(value.state())
                     && canReadAsPartner(value, actor));
         }
@@ -231,6 +258,14 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
                 && !MatchLifecycle.PENDING_CONFIRMATION.equals(value.state())
                 || !MatchLifecycle.PENDING_CONFIRMATION.equals(value.state())
                 && canReadAsPartner(value, actor));
+    }
+
+    private boolean ownsActiveDemandAssociation(PersistedMatchView value, ActorScope actor) {
+        return actor.associationId() != null
+                && actor.associationId().equals(matchAssociations.get(value.id()))
+                && enterpriseLifecycle.isOperational(value.demandEnterpriseId())
+                && (catalogStore == null || catalogStore.enterpriseBelongsToAssociation(
+                value.demandEnterpriseId(), actor.associationId()));
     }
 
     private boolean canReadAsPartner(PersistedMatchView value, ActorScope actor) {
@@ -267,11 +302,26 @@ class InMemoryEcosystemMatchStore implements EcosystemMatchStore {
         }
     }
 
-    private void requireSystemUpsertScope(DemandView demand, ActorScope actor) {
+    private void requireUpsertScope(DemandView demand, ActorScope actor) {
+        EcosystemScopeGuard.requireWriteContext(actor);
+        if (!actor.isSystemAdmin() && !actor.isAssociationStaff()) {
+            if (actor.isEnterpriseAdmin() && actor.enterpriseId() != null
+                    && actor.enterpriseId().equals(demand.enterpriseId())) {
+                return;
+            }
+            throw new ForbiddenException(
+                    "ENTERPRISE_SCOPE_VIOLATION",
+                    "matches must be generated for the selected enterprise's demand");
+        }
         if (!actor.isSystemAdmin()) {
+            if (catalogStore != null && !catalogStore.enterpriseBelongsToAssociation(
+                    demand.enterpriseId(), actor.associationId())) {
+                throw new ForbiddenException(
+                        "ASSOCIATION_SCOPE_VIOLATION",
+                        "demand is outside the selected association context");
+            }
             return;
         }
-        EcosystemScopeGuard.requireWriteContext(actor);
         if (actor.enterpriseId() != null
                 && !actor.enterpriseId().equals(demand.enterpriseId())) {
             throw new ForbiddenException(

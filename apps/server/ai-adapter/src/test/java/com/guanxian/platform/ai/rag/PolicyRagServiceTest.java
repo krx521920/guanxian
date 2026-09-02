@@ -60,7 +60,7 @@ class PolicyRagServiceTest {
     }
 
     @Test
-    void privilegedGlobalScopeReadsAllAssociationsWhileSelectedAssociationRemainsNarrow() {
+    void privilegedScopeStillRemainsInsideSelectedAssociation() {
         RagProperties properties = new RagProperties();
         MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
         KnowledgeIngestionService ingestion = new KnowledgeIngestionService(repository, properties);
@@ -73,17 +73,14 @@ class PolicyRagServiceTest {
                 null, associationB, "乙协会巡检规则", "POLICY", "MANUAL", null,
                 "PRIVATE", "PUBLISHED", "author-b", "天穹校验标记要求乙协会每日巡检。"));
 
-        var global = repository.retrieve(
-                new KnowledgeRepository.RetrievalScope(null, "system-admin", true),
-                "天穹校验标记巡检", 10);
         var associationOnly = repository.retrieve(
                 new KnowledgeRepository.RetrievalScope(associationA, "system-admin", true),
                 "天穹校验标记巡检", 10);
 
-        assertEquals(Set.of("甲协会巡检规则", "乙协会巡检规则"), global.stream()
-                .map(KnowledgeRepository.RetrievedChunk::documentTitle).collect(java.util.stream.Collectors.toSet()));
         assertEquals(List.of("甲协会巡检规则"), associationOnly.stream()
                 .map(KnowledgeRepository.RetrievedChunk::documentTitle).distinct().toList());
+        assertThrows(IllegalArgumentException.class, () -> new KnowledgeRepository.RetrievalScope(
+                null, "system-admin", true));
     }
 
     @Test
@@ -186,8 +183,9 @@ class PolicyRagServiceTest {
         properties.setMaxEstimatedCost(new BigDecimal("0.01"));
         properties.setExternalModelDataEgressEnabled(true);
         MemoryKnowledgeRepository repository = new MemoryKnowledgeRepository();
+        UUID associationId = UUID.randomUUID();
         new KnowledgeIngestionService(repository, properties).ingest(new KnowledgeTextDocument(
-                null, null, "公开政策", "POLICY", "URL", "https://example.gov.cn/policy/2",
+                null, associationId, "公开政策", "POLICY", "URL", "https://example.gov.cn/policy/2",
                 "PUBLIC", "PUBLISHED", "tester", "供水地下管线运行单位应定期排查泄漏风险。"
         ));
         AtomicBoolean called = new AtomicBoolean();
@@ -200,7 +198,7 @@ class PolicyRagServiceTest {
 
         PolicyRagService service = new PolicyRagService(repository, expensive, properties);
         assertThrows(PolicyRagService.RagLimitException.class,
-                () -> service.ask(new RagQuestion(null, "user-3", "供水地下管线泄漏风险要求", 2, null)));
+                () -> service.ask(new RagQuestion(associationId, "user-3", "供水地下管线泄漏风险要求", 2, null)));
         assertFalse(called.get());
     }
 

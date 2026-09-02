@@ -24,6 +24,9 @@ final class MatchLifecycle {
     static final String TERMINATED = "TERMINATED";
 
     private static final Set<String> CONFIRMABLE = Set.of(RECOMMENDED, PARTIALLY_CONFIRMED);
+    private static final Set<String> STATES = Set.of(
+            PENDING_CONFIRMATION, RECOMMENDED, PARTIALLY_CONFIRMED,
+            CONFIRMED, INVITED, NEGOTIATING, OUTCOME_PENDING, ARCHIVED, CLOSED);
     private static final Set<String> CLOSABLE = Set.of(
             PENDING_CONFIRMATION, RECOMMENDED, PARTIALLY_CONFIRMED,
             CONFIRMED, INVITED, NEGOTIATING, OUTCOME_PENDING);
@@ -73,6 +76,10 @@ final class MatchLifecycle {
 
     static void requireClosable(PersistedMatchView match) {
         requireState(match.state(), CLOSABLE, "close");
+    }
+
+    static boolean isState(String state) {
+        return STATES.contains(state);
     }
 
     static void requireNextNegotiationStage(String previousStage, String requestedStage) {

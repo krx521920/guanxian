@@ -1,5 +1,7 @@
 package com.guanxian.platform.member.internal;
 
+import com.guanxian.platform.member.web.MemberDataProvenanceView;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
@@ -42,8 +44,22 @@ class InMemoryMemberImportBatchRepository implements MemberImportBatchRepository
                     row.rowNumber(), row.data(), row.errors(), "IMPORTED", enterpriseId);
         }).toList();
         batches.put(id, new MemberImportBatch(
-                batch.id(), batch.associationId(), batch.originalFilename(), "COMMITTED",
+                batch.id(), batch.associationId(), batch.originalFilename(), batch.templateVersion(),
+                batch.sourceSha256(), batch.submittedUnit(), batch.submittedEnterpriseId(), "COMMITTED",
                 batch.createdBySubject(), batch.createdAt(), Instant.now(), rows));
         return true;
+    }
+
+    @Override
+    public Optional<MemberDataProvenanceView> findProvenance(UUID enterpriseId) {
+        return batches.values().stream()
+                .flatMap(batch -> batch.rows().stream()
+                        .filter(row -> enterpriseId.equals(row.enterpriseId()))
+                        .map(row -> new MemberDataProvenanceView(
+                                enterpriseId, batch.id(), row.rowNumber(), batch.originalFilename(),
+                                batch.sourceSha256(), batch.templateVersion(), batch.submittedUnit(),
+                                batch.submittedEnterpriseId(), batch.createdBySubject(), batch.createdAt(),
+                                null, null)))
+                .findFirst();
     }
 }

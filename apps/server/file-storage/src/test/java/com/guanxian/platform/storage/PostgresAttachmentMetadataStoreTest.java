@@ -25,7 +25,7 @@ class PostgresAttachmentMetadataStoreTest {
                 jdbc, new ObjectMapper(), (associationId, enterpriseId, actor) -> false);
         AttachmentDraft draft = new AttachmentDraft(
                 UUID.randomUUID(), ASSOCIATION_A, ENTERPRISE_B, "bucket", "object/key",
-                "cross.txt", "text/plain", 5, "0".repeat(64), "PRIVATE", "association-admin");
+                "cross.txt", "text/plain", 5, "0".repeat(64), "VALIDATED", "PRIVATE", "association-admin");
         ActorScope actor = new ActorScope(
                 UUID.randomUUID(), "association-admin", "association-admin",
                 ASSOCIATION_A, null, Set.of("ASSOCIATION_ADMIN"), Set.of());

@@ -71,6 +71,14 @@ class MemberImportController {
         return ApiResponse.ok(importService.get(batchId, actorScopeResolver.resolve(authentication)));
     }
 
+    @GetMapping("/{enterpriseId}/provenance")
+    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    ApiResponse<MemberDataProvenanceView> provenance(
+            @PathVariable UUID enterpriseId, Authentication authentication) {
+        return ApiResponse.ok(importService.provenance(
+                enterpriseId, actorScopeResolver.resolve(authentication)));
+    }
+
     @PostMapping("/imports/{batchId}/commit")
     @PreAuthorize("hasAuthority('MEMBER_IMPORT')")
     ApiResponse<MemberImportCommitResult> commit(

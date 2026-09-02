@@ -29,6 +29,7 @@ import java.util.UUID;
 class AccessBindingService {
     private static final String VIEW_SELECT = """
             SELECT account.id, account.external_subject, account.username, account.display_name,
+                   account.email,
                    account.association_id, association.name AS association_name,
                    account.enterprise_id, enterprise.name AS enterprise_name, account.status,
                    account.version, account.updated_at
@@ -348,7 +349,8 @@ class AccessBindingService {
         String subject = rs.getString("external_subject");
         return new AccessBindingView(
                 rs.getObject("id", UUID.class), subject, rs.getString("username"),
-                rs.getString("display_name"), rs.getObject("association_id", UUID.class),
+                rs.getString("display_name"), rs.getString("email"),
+                rs.getObject("association_id", UUID.class),
                 rs.getString("association_name"), rs.getObject("enterprise_id", UUID.class),
                 rs.getString("enterprise_name"), rs.getString("status"), rs.getLong("version"),
                 subject != null && !subject.isBlank(), rs.getTimestamp("updated_at").toInstant());

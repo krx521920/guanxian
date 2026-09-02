@@ -17,6 +17,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -61,9 +63,13 @@ class EcosystemCatalogServiceTest {
                         "上线后直接修改", "PRODUCT", null, List.of(), List.of(), "MEMBERS"), owner));
 
         OfferingView deleted = service.deleteOffering(created.id(), 2, owner);
+        assertTrue(deleted.deleted());
+        assertNotNull(deleted.deletedAt());
         OfferingView restored = service.restoreOffering(created.id(), deleted.version(), owner);
         assertEquals("DRAFT", restored.status());
         assertEquals(4, restored.version());
+        assertFalse(restored.deleted());
+        assertNull(restored.deletedAt());
     }
 
     @Test
@@ -86,6 +92,75 @@ class EcosystemCatalogServiceTest {
         assertEquals("CLOSED", closed.status());
         assertEquals("已完成供应商遴选", closed.closeReason());
         assertEquals(3, closed.version());
+        assertThrows(PreconditionFailedException.class,
+                () -> service.disableDemand(closed.id(), closed.version(), owner));
+    }
+
+    @Test
+    void rejectsUnsupportedDirectedVisibilityAndExpiredResponseWindows() {
+        ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
+        DemandUpsertRequest directed = new DemandUpsertRequest(
+                "不可达定向需求", "缺少明确接收方", List.of(), List.of(), "DIRECTED",
+                null, null, Instant.now().plusSeconds(3600));
+        DemandUpsertRequest expired = new DemandUpsertRequest(
+                "过期需求", "已经超过响应截止", List.of(), List.of(), "MEMBERS",
+                null, null, Instant.now().minusSeconds(1));
+
+        assertThrows(PreconditionFailedException.class,
+                () -> service.createDemand(directed, owner));
+        assertThrows(PreconditionFailedException.class,
+                () -> service.createDemand(expired, owner));
+    }
+
+    @Test
+    void disabledCatalogRecordsReopenAsDraftAndRequireReviewAgain() {
+        ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
+        OfferingView offering = service.createOffering(new OfferingUpsertRequest(
+                "待重启产品", "PRODUCT", null, List.of(), List.of(), "MEMBERS"), owner);
+        OfferingView disabledOffering = service.disableOffering(offering.id(), offering.version(), owner);
+        OfferingView enabledOffering = service.enableOffering(
+                disabledOffering.id(), disabledOffering.version(), owner);
+
+        assertEquals("DRAFT", enabledOffering.status());
+        assertFalse(enabledOffering.disabled());
+        assertEquals(Set.of("UPDATE", "SUBMIT", "DISABLE", "DELETE"), enabledOffering.allowedActions());
+        assertThrows(PreconditionFailedException.class, () -> service.enableOffering(
+                enabledOffering.id(), enabledOffering.version(), owner));
+
+        DemandView demand = service.createDemand(new DemandUpsertRequest(
+                "待重启需求", "需重新审核", List.of(), List.of(), "MEMBERS",
+                null, null, Instant.now().plusSeconds(3600)), owner);
+        DemandView disabledDemand = service.disableDemand(demand.id(), demand.version(), owner);
+        DemandView enabledDemand = service.enableDemand(disabledDemand.id(), disabledDemand.version(), owner);
+
+        assertEquals("DRAFT", enabledDemand.status());
+        assertFalse(enabledDemand.disabled());
+        assertEquals(Set.of("UPDATE", "SUBMIT", "DISABLE", "DELETE"), enabledDemand.allowedActions());
+        assertThrows(PreconditionFailedException.class, () -> service.enableDemand(
+                enabledDemand.id(), enabledDemand.version(), owner));
+
+        ActorScope globalSystem = new ActorScope(
+                UUID.randomUUID(), "global-system", "global-system", null, null,
+                Set.of("SYSTEM_ADMIN"), Set.of());
+        assertTrue(service.offering(enabledOffering.id(), globalSystem, false).allowedActions().isEmpty());
+        assertTrue(service.demand(enabledDemand.id(), globalSystem, false).allowedActions().isEmpty());
+    }
+
+    @Test
+    void demandDeletionStateIsAvailableToDependentWorkflows() {
+        InMemoryEcosystemCatalogStore store = new InMemoryEcosystemCatalogStore();
+        EcosystemCatalogService catalog = new EcosystemCatalogService(store);
+        ActorScope owner = enterpriseAdmin(ENTERPRISE_A);
+        DemandView demand = catalog.createDemand(new DemandUpsertRequest(
+                "生命周期探测", "供撮合状态机核验", List.of(), List.of(), "MEMBERS",
+                null, null, Instant.now().plusSeconds(3600)), owner);
+
+        assertFalse(store.isDemandDeleted(demand.id()));
+        DemandView deleted = catalog.deleteDemand(demand.id(), demand.version(), owner);
+        assertTrue(store.isDemandDeleted(demand.id()));
+        catalog.restoreDemand(demand.id(), deleted.version(), owner);
+        assertFalse(store.isDemandDeleted(demand.id()));
+        assertTrue(store.isDemandDeleted(UUID.randomUUID()));
     }
 
     @Test
@@ -138,6 +213,8 @@ class EcosystemCatalogServiceTest {
         demand = service.reviewDemand(
                 demand.id(), demand.version(), new ReviewDecisionRequest(true, null), reviewer);
         DemandView deletedDemand = service.deleteDemand(demand.id(), demand.version(), owner);
+        assertTrue(deletedDemand.deleted());
+        assertNotNull(deletedDemand.deletedAt());
 
         assertThrows(NotFoundException.class,
                 () -> service.offering(deletedOffering.id(), otherEnterpriseAdmin, true));
@@ -199,6 +276,7 @@ class EcosystemCatalogServiceTest {
         assertNull(value.description());
         assertTrue(value.scenarios().isEmpty());
         assertTrue(value.qualifications().isEmpty());
+        assertTrue(value.allowedActions().isEmpty());
 
         EcosystemCatalogService denying = new EcosystemCatalogService(
                 store, ignored -> true, (actor, enterpriseId, resourceType, resourceId) -> Optional.empty());

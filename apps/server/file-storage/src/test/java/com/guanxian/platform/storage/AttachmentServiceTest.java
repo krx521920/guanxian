@@ -48,6 +48,7 @@ class AttachmentServiceTest {
                 new MockMultipartFile("file", "policy.pdf", "application/pdf", bytes));
 
         assertThat(created.status()).isEqualTo("ACTIVE");
+        assertThat(created.scanStatus()).isEqualTo("VALIDATED");
         assertThat(created.version()).isZero();
         assertThat(service.download(created.id(), enterpriseAdmin(ENTERPRISE_A)).content())
                 .containsExactly(bytes);
@@ -107,7 +108,7 @@ class AttachmentServiceTest {
 
         AttachmentDraft crossAssociationDraft = new AttachmentDraft(
                 UUID.randomUUID(), ASSOCIATION, ENTERPRISE_C, "test", "cross/object",
-                "cross.txt", "text/plain", 5, "0".repeat(64), "PRIVATE", "association-admin");
+                "cross.txt", "text/plain", 5, "0".repeat(64), "VALIDATED", "PRIVATE", "association-admin");
         assertThatThrownBy(() -> metadata.create(crossAssociationDraft, associationAdmin()))
                 .isInstanceOfSatisfying(ForbiddenException.class,
                         error -> assertThat(error.code()).isEqualTo("ATTACHMENT_SCOPE_VIOLATION"));
@@ -135,6 +136,19 @@ class AttachmentServiceTest {
         assertThatThrownBy(() -> service.restore(created.id(), 0, enterpriseAdmin(ENTERPRISE_A)))
                 .isInstanceOf(ApiException.class)
                 .hasMessageContaining("changed");
+    }
+
+    @Test
+    void pendingOrLegacyAttachmentContentCannotBeDownloaded() {
+        AttachmentDraft pending = new AttachmentDraft(
+                UUID.randomUUID(), ASSOCIATION, ENTERPRISE_A, "test", "pending/object",
+                "pending.txt", "text/plain", 4, "0".repeat(64), "REQUIRES_REUPLOAD",
+                "PRIVATE", "association-admin");
+        AttachmentView created = metadata.create(pending, associationAdmin());
+
+        assertThatThrownBy(() -> service.download(created.id(), associationAdmin()))
+                .isInstanceOfSatisfying(ApiException.class,
+                        error -> assertThat(error.code()).isEqualTo("ATTACHMENT_CONTENT_UNAVAILABLE"));
     }
 
     @Test

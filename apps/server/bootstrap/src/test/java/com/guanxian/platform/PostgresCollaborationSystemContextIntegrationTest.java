@@ -87,10 +87,13 @@ class PostgresCollaborationSystemContextIntegrationTest {
                 INSERT INTO ecosystem_match(
                     demand_id,candidate_enterprise_id,score,explanation,review_status,
                     demand_company_snapshot,demand_title_snapshot,supplier_company_snapshot,
-                    solution,reasons,state,version)
-                VALUES (?,?,90,'{}'::jsonb,'PENDING','协作上下文测试企业A',
+                    solution,reasons,state,recommended_by_subject,recommended_at,
+                    demand_confirmed_by_subject,demand_confirmed_at,
+                    candidate_confirmed_by_subject,candidate_confirmed_at,version)
+                VALUES (?,?,90,'{}'::jsonb,'APPROVED','协作上下文测试企业A',
                         '系统范围回归-关联需求','协作上下文测试企业A2',
-                        '关联方案','[]'::jsonb,'PENDING_CONFIRMATION',0)
+                        '关联方案','[]'::jsonb,'CONFIRMED','system-context-test',now(),
+                        'demand-confirmation',now(),'candidate-confirmation',now(),0)
                 RETURNING id
                 """, UUID.class, demandId, ENTERPRISE_A2);
         var linkedAssociationItem = service.create(
@@ -98,11 +101,13 @@ class PostgresCollaborationSystemContextIntegrationTest {
 
         assertEquals(4, service.page(system(null, null), "系统范围回归", false, 0, 20).total());
         assertEquals(3, service.page(system(ASSOCIATION_A, null), "系统范围回归", false, 0, 20).total());
-        assertEquals(1, service.page(system(ASSOCIATION_A, ENTERPRISE_A), "系统范围回归", false, 0, 20).total());
+        assertEquals(2, service.page(system(ASSOCIATION_A, ENTERPRISE_A), "系统范围回归", false, 0, 20).total());
         assertEquals(ENTERPRISE_A, itemA.enterpriseId());
         assertNull(associationItem.enterpriseId());
         assertNull(linkedAssociationItem.enterpriseId());
         assertEquals(matchId, linkedAssociationItem.matchId());
+        assertEquals(linkedAssociationItem.id(), service.get(
+                linkedAssociationItem.id(), system(ASSOCIATION_A, ENTERPRISE_A), false).id());
 
         assertThrows(NotFoundException.class,
                 () -> service.get(itemB.id(), system(ASSOCIATION_A, null), false));
