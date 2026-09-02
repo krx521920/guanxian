@@ -42,7 +42,7 @@ public class CollaborationController {
             @RequestParam(required = false) String query,
             Authentication authentication) {
         return ApiResponse.ok(collaborationService.page(
-                actor(authentication), query, false, 0, 100).items());
+                actor(authentication), query, null, false, 0, 100).items());
     }
 
     @GetMapping("/page")

@@ -51,11 +51,19 @@ public class PolicyController {
     @PreAuthorize("hasAuthority('POLICY_READ')")
     ApiResponse<PolicyPage> page(
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) String level,
             @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             Authentication authentication) {
-        return ApiResponse.ok(policyService.page(actor(authentication), q, includeDeleted, page, size));
+        return ApiResponse.ok(policyService.page(
+                actor(authentication), q, level, includeDeleted, page, size));
+    }
+
+    @GetMapping("/levels")
+    @PreAuthorize("hasAuthority('POLICY_READ')")
+    ApiResponse<List<String>> levels(Authentication authentication) {
+        return ApiResponse.ok(policyService.levels(actor(authentication)));
     }
 
     @GetMapping("/{id}")
