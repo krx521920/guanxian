@@ -61,6 +61,11 @@ sudo docker compose --env-file /opt/guanxian-single/deploy.env -f compose.single
 此时页面应可达，但操作人账号尚未完成数据库绑定，按设计拒绝访问业务数据。
 Flyway 自动创建业务结构及默认协会，不创建106家企业或假业务记录。
 
+Web 镜像中的 `/api/` 代理必须保留强 ETag，不能通过 gzip 将版本号弱化；前端依赖该版本号
+提交审核和编辑。单机网关的 `/api/` 直接连接后端，但其他编排可能经过 Web 代理。
+修改 `apps/web/nginx.conf` 后须重新构建 Web 镜像，不能只 reload 外层网关。更新这类代理
+配置不需要重新执行 `prepare_single_host.py`，也不需要更换账号、密码或重建数据卷。
+
 ## 3. 首次绑定操作人
 
 核对 `/opt/guanxian-single/manifest.json` 中 domain、operator、subject 和协会 ID。

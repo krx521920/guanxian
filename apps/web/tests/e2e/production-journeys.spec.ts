@@ -39,11 +39,26 @@ test('协会通过官方 Excel 完成会员导入、预检和审核', async ({ b
     const row = page.locator('table.member-table tbody tr').filter({ hasText: enterpriseName })
     await expect(row).toHaveCount(1)
     await expect(row).toContainText('待审核')
-    await row.getByRole('link', { name: '审核' }).click()
+    const [memberResponse] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === 'GET'
+        && /\/api\/v1\/members\/[0-9a-f-]+$/.test(new URL(response.url()).pathname)),
+      row.getByRole('link', { name: '审核' }).click(),
+    ])
+    expect(memberResponse.status()).toBe(200)
+    const memberEtag = memberResponse.headers()['etag']
+    expect(memberEtag, 'Nginx must preserve the strong member version').toMatch(/^"(0|[1-9][0-9]*)"$/)
+    expect(memberResponse.headers()['content-encoding']).toBeUndefined()
+    await expect(page.getByLabel('审核意见')).toBeVisible()
     await page.getByLabel('审核意见').fill('E2E 核对来源文件和提交单位后通过。')
+    const reviewResponsePromise = page.waitForResponse((response) => response.request().method() === 'PUT'
+      && /\/api\/v1\/members\/[0-9a-f-]+\/review$/.test(new URL(response.url()).pathname))
     await waitForApiWrite(page, /\/api\/v1\/members\/[0-9a-f-]+\/review$/, async () => {
       await page.getByRole('button', { name: '审核通过' }).click()
     })
+    const reviewResponse = await reviewResponsePromise
+    expect(await reviewResponse.request().headerValue('if-match')).toBe(memberEtag)
+    expect(reviewResponse.headers()['etag']).toMatch(/^"(0|[1-9][0-9]*)"$/)
+    expect(reviewResponse.headers()['etag']).not.toBe(memberEtag)
     await expect(page.getByText('审核通过，企业资料已认证。')).toBeVisible()
   } finally {
     await context.close()

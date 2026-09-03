@@ -13,6 +13,7 @@ jobs:
     env:
       GUANXIAN_SINGLE_HOST_DB_TEST: '1'
       GUANXIAN_SINGLE_HOST_GATEWAY_TEST: '1'
+      GUANXIAN_NGINX_ETAG_TEST: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,8 +23,12 @@ jobs:
         run: |
           docker pull postgres:16-alpine
           docker pull nginx:stable-alpine
+          docker pull python:3.12-slim-bookworm
+          docker pull "$(awk '$1 == "FROM" && $4 == "runtime" {print $2}' apps/web/Dockerfile)"
       - name: Test single-host generation, PostgreSQL bootstrap and real Nginx configuration
         run: python -m unittest discover -s tests/config -p 'test_single_host*.py' -v
+      - name: Test strong ETags through the actual web Nginx runtime
+        run: python -m unittest discover -s tests/config -p 'test_nginx_etag.py' -v
       - name: Check startup script syntax
         run: |
           sh -n infrastructure/single-host/postgres-init.sh

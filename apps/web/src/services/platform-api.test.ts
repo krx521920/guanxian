@@ -112,6 +112,20 @@ describe('member ETag API contract', () => {
     })
   })
 
+  it.each(['W/"0"', 'W/"7"'])('does not promote weak response ETag %j to a write version', async (etag) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      Response.json({ code: 'OK', data: profile }, {
+        headers: { ETag: etag, 'X-Request-Id': 'etag-weak-response' },
+      }),
+    ))
+    const { platformApi } = await loadApi()
+
+    await expect(platformApi.member(profile.id)).rejects.toMatchObject({
+      code: 'MISSING_ETAG',
+      requestId: 'etag-weak-response',
+    })
+  })
+
   it('preserves a stale-write 412 response for the edit page conflict flow', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       Response.json(
@@ -465,7 +479,7 @@ describe('member ETag API contract', () => {
     ])
   })
 
-  it.each(['7', '"07"', 'x"7"', '"7"x', '"-1"', ''])('rejects invalid strong ETag %j before sending a write', async (etag) => {
+  it.each(['7', '"07"', 'x"7"', '"7"x', '"-1"', '', 'W/"0"', 'W/"7"'])('rejects invalid strong ETag %j before sending a write', async (etag) => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
     const { platformApi } = await loadApi()

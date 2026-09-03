@@ -46,7 +46,34 @@
 - 提交 `d68ccfa` 的[完整 CI](https://github.com/krx521920/guanxian/actions/runs/33761282819)
   已通过初始化步骤，实际执行浏览器用例为 **7 通过、1 失败**：会员 Excel 导入后的审核页
   加载失败。追踪记录显示会员 GET 返回 HTTP 200、gzip 和 `ETag: W/"0"`，前端要求强 ETag；
-  `apps/web/nginx.conf` 的 API 压缩配置仍待修复验收。不得将该记录解释为完整上线验收通过。
+  当时 `apps/web/nginx.conf` 的 API 压缩配置尚未修复。不得将该记录解释为完整上线验收通过。
+
+### 2026-09-03：Nginx 强 ETag 回归
+
+- 仅在 Web Nginx 的 `/api/` 中关闭 gzip，并清空传给上游的 `Accept-Encoding`；保留
+  静态资源压缩。没有把 `W/"..."` 强行改写为强 ETag，也没有放宽前端或后端的并发校验。
+- `test_nginx_etag.py` 使用 `apps/web/Dockerfile` 的实际运行镜像、未经改写的
+  `apps/web/nginx.conf`、合成 HTTP 上游及 Docker 内部网络；不发布端口，不连接正式库。
+  7 项检查涵盖 GET/HEAD、审核写入、旧版本拒绝、请求追踪、弱/缺失 ETag 和静态资源压缩。
+  旧配置实测 3 项失败，修复后 7 项通过；这只证明代理契约，不替代真实业务数据库验收。
+- 前端新增弱 ETag 读写拒绝用例；本地 23 个测试文件、227 项测试通过，类型检查与构建通过。
+- 本地 `tests/config` 54 项、`tests/operations` 42 项通过，三个真实依赖测试开关均开启，
+  失败和跳过均为 0；其中包含真实 PostgreSQL 首次绑定及真实 Nginx 配置/响应回归。
+- 会员 Excel 浏览器旅程增加代理后的强 ETag、审核请求 `If-Match` 和审核后版本递增断言，
+  保留真实页面审核成功断言。最终结果以本次提交的 `browser-e2e` 报告为准。
+
+真实代理回归（先拉取官方镜像；PowerShell）：
+
+```powershell
+docker pull python:3.12-slim-bookworm
+docker pull nginxinc/nginx-unprivileged:1.27-alpine
+$env:GUANXIAN_NGINX_ETAG_TEST = '1'
+python -m unittest discover -s tests/config -p test_nginx_etag.py -v
+```
+
+未设置开关时会明确跳过，不算通过。`single-host-deployment.yml` 显式开启此开关并执行
+真实代理测试，缺少 Docker 或启动失败会让任务失败，而不是静默跳过。
+上游请求头处理参考 [Nginx 官方说明](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header)。
 
 ## 3. 常规验证命令
 
