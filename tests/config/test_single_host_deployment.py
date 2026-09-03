@@ -166,6 +166,10 @@ class SingleHostPreparationTests(unittest.TestCase):
             self.assertNotIn(self.password, result.stdout)
             self.assertEqual("production", data["services"]["server"]["environment"]["SPRING_PROFILES_ACTIVE"])
             self.assertTrue(data["networks"]["data"]["internal"])
+            self.assertEqual(512 * 1024 * 1024, int(data["services"]["minio-init"]["mem_limit"]))
+            self.assertEqual("no", data["services"]["minio-init"]["restart"])
+            self.assertEqual("service_completed_successfully",
+                             data["services"]["server"]["depends_on"]["minio-init"]["condition"])
 
 
 if __name__ == "__main__":

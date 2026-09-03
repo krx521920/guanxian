@@ -75,6 +75,27 @@ python -m unittest discover -s tests/config -p test_nginx_etag.py -v
 真实代理测试，缺少 Docker 或启动失败会让任务失败，而不是静默跳过。
 上游请求头处理参考 [Nginx 官方说明](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header)。
 
+### 单机 MinIO 初始化内存与重试回归
+
+单机首次安装实测发现 `minio-init` 在128 MiB上限下被OOM终止，而此前浏览器E2E的
+存储编排并未覆盖这个单机初始化任务。因此浏览器用例通过不等同于单机所有启动步骤均通过。
+现在该一次性任务上限为512 MiB，仍保持失败时阻止业务后端启动。
+
+`test_single_host_minio.py` 用实际 `compose.single-host.yml`、初始化脚本和官方MinIO镜像，
+运行在随机命名的独立项目里，不发布端口；随机测试凭据仅保留在临时目录，不读取生产凭据。
+检查任务成功退出、未被OOM、实际内存上限、应用对象读写、重复初始化后对象保留、私有桶
+和非管理员应用账号，完成后仅清理本次项目的临时卷。CI显式启用，不允许缺失依赖时跳过。
+
+```powershell
+docker pull minio/minio:RELEASE.2025-04-22T22-12-26Z
+docker pull minio/mc:latest
+$env:GUANXIAN_SINGLE_HOST_MINIO_TEST = '1'
+python -m unittest discover -s tests/config -p test_single_host_minio.py -v
+```
+
+测试读取本机镜像的实际digest并固定本次运行；不会覆盖服务器已固定的依赖镜像。单机生产
+恢复步骤见 `docs/single-host-deployment.md`，真实验证结果必须以对应提交的CI记录为准。
+
 ## 3. 常规验证命令
 
 仓库根目录统一入口：

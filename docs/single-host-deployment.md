@@ -66,6 +66,33 @@ Web 镜像中的 `/api/` 代理必须保留强 ETag，不能通过 gzip 将版�
 修改 `apps/web/nginx.conf` 后须重新构建 Web 镜像，不能只 reload 外层网关。更新这类代理
 配置不需要重新执行 `prepare_single_host.py`，也不需要更换账号、密码或重建数据卷。
 
+### 首次安装的 MinIO 初始化 OOM 恢复
+
+若 `minio-init` 返回137，先用 `docker inspect` 的 `State.OOMKilled`、`HostConfig.Memory`
+以及主机 `free -h` 核对。2026-09-03 的实际部署证据为：初始化容器 `OOMKilled=true`、
+上限134217728字节（128 MiB），主机当时仍有约4.6 GiB可用内存；Redis和网关均在运行，
+不能仅凭 Compose 的依赖错误把它们判为崩溃。
+
+本配置将**一次性** `minio-init` 的内存上限修正为512 MiB，成功退出后不继续占用进程内存。
+其余服务上限不变。只调整资源编排时保留已构建应用镜像的 `RELEASE_ID`，无需重建应用，
+也不要重新生成 `/opt/guanxian-single` 或改变其中的任何凭据。
+
+确认当前为首次安装、尚未绑定正式用户，且配置已包含修复后，单独重建失败的初始化容器：
+
+```bash
+git status --short
+git pull --ff-only origin main
+sudo docker compose --env-file /opt/guanxian-single/deploy.env -f compose.single-host.yml --profile app config --quiet
+sudo docker compose --env-file /opt/guanxian-single/deploy.env -f compose.single-host.yml up --no-deps --force-recreate --abort-on-container-exit --exit-code-from minio-init minio-init
+```
+
+每一步成功后才执行下一步。上述 `--force-recreate` **只针对 minio-init**；`--no-deps`
+不会停止或重建数据库、MinIO、Redis、Keycloak及网关，也不删除任何存储卷。应看到
+`Private bucket and scoped application account are ready.`，退出码为0且 `OOMKilled=false`。
+再执行本节正常的 `--profile app up -d --wait --wait-timeout 300 server web`。
+初始化使用原有私有桶/应用账号和相同密码；重试不得清空桶、删除卷、启用演示数据。
+已上线系统或凭据轮换场景须另行审核，不应套用首次安装重试。
+
 ## 3. 首次绑定操作人
 
 核对 `/opt/guanxian-single/manifest.json` 中 domain、operator、subject 和协会 ID。

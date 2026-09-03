@@ -71,7 +71,9 @@ services:
       - ./infrastructure/single-host/minio-policy.json:/setup/policy.json:ro
     depends_on:
       minio: {condition: service_healthy}
-    mem_limit: 128m
+    # Short-lived mc bootstrap exceeds 128 MiB on the deployed image (OOM exit 137).
+    # Keep a bounded allowance; successful completion releases this memory.
+    mem_limit: 512m
     networks: [data]
     logging: *logging
     restart: 'no'
