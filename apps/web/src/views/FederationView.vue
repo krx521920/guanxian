@@ -601,13 +601,13 @@ onMounted(load)
       </section>
     </template>
 
-    <div v-if="requestFormOpen" class="modal-backdrop" @click.self="requestFormOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="createRequest">
+    <div v-if="requestFormOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="申请接入友好协会" @click.self="requestFormOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="createRequest">
       <div class="modal-head"><div><span class="eyebrow">ACCESS REQUEST</span><h2>申请接入友好协会</h2></div><button type="button" class="icon-button" @click="requestFormOpen = false">×</button></div>
       <div class="form-grid modal-form"><label class="form-span-2"><span>目标协会 ID *</span><input v-model="requestForm.targetAssociationId" required placeholder="目标协会 UUID" /></label><label class="form-span-2"><span>申请原因</span><textarea v-model="requestForm.reason" rows="4" maxlength="2000" /></label></div>
       <div class="form-actions"><button type="button" class="secondary-button" @click="requestFormOpen = false">取消</button><button class="primary-button" :disabled="busy">提交申请</button></div>
     </form></div>
 
-    <div v-if="accessActionOpen" class="modal-backdrop" @click.self="accessActionOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="submitAccessAction">
+    <div v-if="accessActionOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="审核协会接入申请" @click.self="accessActionOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="submitAccessAction">
       <div class="modal-head"><div><span class="eyebrow">BILATERAL REVIEW</span><h2>{{ accessAction === 'APPROVE' ? '批准接入申请' : accessAction === 'REJECT' ? '驳回接入申请' : '取消接入申请' }}</h2></div><button type="button" class="icon-button" @click="accessActionOpen = false">×</button></div>
       <div class="form-grid modal-form">
         <label v-if="accessAction === 'APPROVE'" class="form-span-2"><span>授权截止时间 *</span><input v-model="accessForm.expiresAt" type="datetime-local" :min="minimumExpiry" required /></label>
@@ -617,14 +617,14 @@ onMounted(load)
       <div class="form-actions"><button type="button" class="secondary-button" @click="accessActionOpen = false">返回</button><button :class="accessAction === 'APPROVE' ? 'primary-button' : 'secondary-button danger-text'" :disabled="busy">确认</button></div>
     </form></div>
 
-    <div v-if="relationshipActionOpen" class="modal-backdrop" @click.self="relationshipActionOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="submitRelationshipAction">
+    <div v-if="relationshipActionOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="管理友好协会关系" @click.self="relationshipActionOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="submitRelationshipAction">
       <div class="modal-head"><div><span class="eyebrow">RELATIONSHIP</span><h2>{{ relationshipAction === 'ACTIVATE' ? '恢复协会关系' : relationshipAction === 'SUSPEND' ? '暂停协会关系' : '撤销协会关系' }}</h2></div><button type="button" class="icon-button" @click="relationshipActionOpen = false">×</button></div>
       <p v-if="relationshipAction === 'ACTIVATE'">恢复只沿用原授权截止时间；如需延长，须重新发起申请并取得对方批准。</p><p v-if="relationshipAction === 'REVOKE'">撤销后不能单方恢复，双方需要重新走接入审批。</p>
       <div class="form-grid modal-form"><label class="form-span-2"><span>{{ relationshipAction === 'ACTIVATE' ? '恢复说明' : '操作原因 *' }}</span><textarea v-model="relationshipForm.reason" rows="4" maxlength="1000" :required="relationshipAction !== 'ACTIVATE'" /></label></div>
       <div class="form-actions"><button type="button" class="secondary-button" @click="relationshipActionOpen = false">返回</button><button :class="relationshipAction === 'ACTIVATE' ? 'primary-button' : 'secondary-button danger-text'" :disabled="busy">确认</button></div>
     </form></div>
 
-    <div v-if="policyFormOpen" class="modal-backdrop" @click.self="policyFormOpen = false"><form class="panel modal-card" @submit.prevent="savePolicy">
+    <div v-if="policyFormOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="管理跨协会字段策略" @click.self="policyFormOpen = false"><form class="panel modal-card" @submit.prevent="savePolicy">
       <div class="modal-head"><div><span class="eyebrow">FIELD POLICY</span><h2>{{ selectedPolicy ? '编辑字段共享策略' : '新建字段共享策略' }}</h2></div><button type="button" class="icon-button" @click="policyFormOpen = false">×</button></div>
       <div class="form-grid modal-form">
         <label><span>目标协会 *</span><select v-model="policyForm.targetAssociationId" required :disabled="Boolean(selectedPolicy)"><option value="" disabled>请选择</option><option v-for="id in activePartnerIds" :key="id" :value="id">{{ id }}</option><option v-if="selectedPolicy && !activePartnerIds.includes(selectedPolicy.targetAssociationId)" :value="selectedPolicy.targetAssociationId">{{ selectedPolicy.targetAssociationId }}</option></select></label>
@@ -636,13 +636,13 @@ onMounted(load)
       <div class="form-actions"><button type="button" class="secondary-button" @click="policyFormOpen = false">取消</button><button class="primary-button" :disabled="busy">保存策略</button></div>
     </form></div>
 
-    <div v-if="recommendationFormOpen" class="modal-backdrop" @click.self="recommendationFormOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="createRecommendation">
+    <div v-if="recommendationFormOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="创建跨协会推荐" @click.self="recommendationFormOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="createRecommendation">
       <div class="modal-head"><div><span class="eyebrow">RECOMMENDATION</span><h2>发起跨协会推荐</h2></div><button type="button" class="icon-button" @click="recommendationFormOpen = false">×</button></div>
       <div class="form-grid modal-form"><label class="form-span-2"><span>目标协会 *</span><select v-model="recommendationForm.targetAssociationId" required><option value="" disabled>请选择</option><option v-for="id in activePartnerIds" :key="id" :value="id">{{ id }}</option></select></label><label><span>真实需求 ID</span><input v-model="recommendationForm.demandId" placeholder="需求 UUID" /></label><label><span>真实匹配 ID</span><input v-model="recommendationForm.matchId" placeholder="匹配 UUID" /></label><label class="form-span-2"><span>推荐说明 *</span><textarea v-model="recommendationForm.summary" rows="4" maxlength="2000" required /></label></div>
       <p class="form-hint">需求 ID 或匹配 ID 至少填写一个；若两者都填，系统会校验二者归属同一需求。</p><div class="form-actions"><button type="button" class="secondary-button" @click="recommendationFormOpen = false">取消</button><button class="primary-button" :disabled="busy">提交推荐</button></div>
     </form></div>
 
-    <div v-if="recommendationReviewOpen" class="modal-backdrop" @click.self="recommendationReviewOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="submitRecommendationReview">
+    <div v-if="recommendationReviewOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="审核跨协会推荐" @click.self="recommendationReviewOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="submitRecommendationReview">
       <div class="modal-head"><div><span class="eyebrow">RECOMMENDATION REVIEW</span><h2>{{ recommendationAction === 'APPROVE' ? '确认跨协会推荐' : '退回跨协会推荐' }}</h2></div><button type="button" class="icon-button" @click="recommendationReviewOpen = false">×</button></div>
       <div class="form-grid modal-form"><label class="form-span-2"><span>审批意见</span><textarea v-model="recommendationComment" rows="4" maxlength="2000" /></label></div><div class="form-actions"><button type="button" class="secondary-button" @click="recommendationReviewOpen = false">取消</button><button :class="recommendationAction === 'APPROVE' ? 'primary-button' : 'secondary-button danger-text'" :disabled="busy">确认</button></div>
     </form></div>
