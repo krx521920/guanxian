@@ -11,8 +11,43 @@ import subprocess
 import time
 import unittest
 import uuid
+from unittest import mock
 
 from tools.deployment.prepare_single_host import ASSOCIATION_ID, ROOT, bootstrap_sql
+
+
+def postgres_ready(container: str) -> bool:
+    # The official entrypoint's temporary init server only accepts Unix sockets.
+    # Probe container-local TCP so CREATE DATABASE cannot race its shutdown.
+    # https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
+    return subprocess.run(
+        ["docker", "exec", container, "pg_isready", "-h", "127.0.0.1",
+         "-U", "postgres", "-d", "postgres", "-t", "1"],
+        capture_output=True, timeout=5,
+    ).returncode == 0
+
+
+class SingleHostReadinessTests(unittest.TestCase):
+    def test_socket_only_initialization_is_not_reported_ready(self):
+        def socket_only(command, **kwargs):
+            return subprocess.CompletedProcess(command, 1 if "-h" in command else 0)
+
+        with mock.patch.object(subprocess, "run", side_effect=socket_only) as run:
+            self.assertFalse(postgres_ready("isolated-test-container"))
+        command = run.call_args.args[0]
+        self.assertEqual("127.0.0.1", command[command.index("-h") + 1])
+
+    def test_only_successful_tcp_probe_is_ready(self):
+        for code in (0, 1, 2, 3, 125):
+            with self.subTest(exit_code=code), mock.patch.object(
+                subprocess, "run", return_value=subprocess.CompletedProcess([], code)
+            ):
+                self.assertEqual(code == 0, postgres_ready("isolated-test-container"))
+
+    def test_docker_timeout_is_not_masked_as_readiness(self):
+        with mock.patch.object(subprocess, "run", side_effect=subprocess.TimeoutExpired("docker", 5)):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                postgres_ready("isolated-test-container")
 
 
 @unittest.skipUnless(os.environ.get("GUANXIAN_SINGLE_HOST_DB_TEST") == "1", "opt-in isolated Docker database test")
@@ -28,9 +63,7 @@ class SingleHostPostgresTests(unittest.TestCase):
                 check=True, capture_output=True, text=True)
             cls.started = True
             for _ in range(60):
-                probe = subprocess.run(["docker", "exec", cls.container, "pg_isready", "-U", "postgres"],
-                                       capture_output=True)
-                if probe.returncode == 0:
+                if postgres_ready(cls.container):
                     break
                 time.sleep(0.25)
             else:
@@ -57,7 +90,7 @@ class SingleHostPostgresTests(unittest.TestCase):
     @classmethod
     def sql(cls, value, database="bootstrap_template", *, check=True):
         result = subprocess.run(["docker", "exec", "-i", cls.container, "psql", "-X", "-At",
-            "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1"],
+            "-h", "127.0.0.1", "-U", "postgres", "-d", database, "-v", "ON_ERROR_STOP=1"],
             input=value, encoding="utf-8", capture_output=True)
         if check and result.returncode:
             raise AssertionError(result.stderr)

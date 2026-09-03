@@ -33,13 +33,20 @@
 
 2026-09-03 单机部署及 E2E 启动脚本修复的本地验证（局部范围）：
 
-- `tests/config` 44 项、`tests/operations` 42 项，共 86 项通过，失败/跳过均为 0。
+- `tests/config` 47 项、`tests/operations` 42 项，共 89 项通过，失败/跳过均为 0。
 - 配置测试显式开启 `GUANXIAN_SINGLE_HOST_DB_TEST=1` 和 `GUANXIAN_SINGLE_HOST_GATEWAY_TEST=1`，
   包含真实隔离 PostgreSQL 初始化回归及真实 Nginx 配置解析；未操作生产服务器。
 - 新增 13 项启动脚本测试，覆盖成功退出、容器缺失、CLI 失败、多容器、未完成任务、
   非零退出码、OOM 和状态字段不完整等情况。成功退出用例先在旧脚本复现空值错误，再验证修复。
+- 新增 3 项 PostgreSQL 就绪探针回归。测试探针和 SQL 均使用容器内 `127.0.0.1` TCP，
+  避免把[官方镜像的临时 socket-only 初始化实例](https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh)
+  误判为正式数据库已就绪；不向宿主机发布数据库端口。修复后真实数据库测试连续两轮通过。
 - 提交 `92adb52` 的浏览器 CI 在初始化容器检查阶段失败，未执行浏览器旅程。修复后仍须查看
   **同一提交**的完整 CI 和 `browser-e2e` 结果，不以以上命令替身测试或历史浏览器结果代替。
+- 提交 `d68ccfa` 的[完整 CI](https://github.com/krx521920/guanxian/actions/runs/33761282819)
+  已通过初始化步骤，实际执行浏览器用例为 **7 通过、1 失败**：会员 Excel 导入后的审核页
+  加载失败。追踪记录显示会员 GET 返回 HTTP 200、gzip 和 `ETag: W/"0"`，前端要求强 ETag；
+  `apps/web/nginx.conf` 的 API 压缩配置仍待修复验收。不得将该记录解释为完整上线验收通过。
 
 ## 3. 常规验证命令
 
