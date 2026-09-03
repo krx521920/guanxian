@@ -1,0 +1,31 @@
+name: Single-host deployment contract
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  single-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GUANXIAN_SINGLE_HOST_DB_TEST: '1'
+      GUANXIAN_SINGLE_HOST_GATEWAY_TEST: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pull official isolated test images
+        run: |
+          docker pull postgres:16-alpine
+          docker pull nginx:stable-alpine
+      - name: Test single-host generation, PostgreSQL bootstrap and real Nginx configuration
+        run: python -m unittest discover -s tests/config -p 'test_single_host*.py' -v
+      - name: Check startup script syntax
+        run: |
+          sh -n infrastructure/single-host/postgres-init.sh
+          sh -n infrastructure/single-host/minio-init.sh
+          bash -n infrastructure/single-host/keycloak-start.sh

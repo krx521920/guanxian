@@ -1,0 +1,262 @@
+# Single Linux host. Use ONLY with the env file made by prepare_single_host.py.
+# This is a separate topology, not an override for compose.yaml/production.yml.
+name: guanxian-single-host
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?prepare and lock images first}
+    environment:
+      POSTGRES_DB: guanxian
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+    secrets: [postgres_admin_password, postgres_password, keycloak_db_password]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/single-host/postgres-init.sh:/docker-entrypoint-initdb.d/10-keycloak.sh:ro
+    command: [postgres, -c, max_connections=40, -c, shared_buffers=128MB]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres -d guanxian']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 512m
+    networks: [data]
+    logging: *logging
+    restart: unless-stopped
+
+  redis:
+    image: ${REDIS_IMAGE:?prepare and lock images first}
+    command: [redis-server, /run/secrets/redis_config]
+    secrets: [redis_config, redis_password]
+    healthcheck:
+      test: [CMD-SHELL, 'REDISCLI_AUTH="$$(cat /run/secrets/redis_password)" redis-cli ping | grep -q PONG']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: 192m
+    networks: [data]
+    logging: *logging
+    restart: unless-stopped
+
+  minio:
+    image: ${MINIO_IMAGE:?prepare and lock images first}
+    command: [server, /data, --console-address, ':9001']
+    environment:
+      MINIO_ROOT_USER_FILE: /run/secrets/minio_root_user
+      MINIO_ROOT_PASSWORD_FILE: /run/secrets/minio_root_password
+    secrets: [minio_root_user, minio_root_password]
+    volumes: [minio-data:/data]
+    healthcheck:
+      test: [CMD, mc, ready, local]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    networks: [data]
+    logging: *logging
+    restart: unless-stopped
+
+  minio-init:
+    image: ${MINIO_MC_IMAGE:?prepare and lock images first}
+    entrypoint: [/bin/sh, /setup/minio-init.sh]
+    secrets: [minio_root_user, minio_root_password, storage_access_key, storage_secret_key]
+    volumes:
+      - ./infrastructure/single-host/minio-init.sh:/setup/minio-init.sh:ro
+      - ./infrastructure/single-host/minio-policy.json:/setup/policy.json:ro
+    depends_on:
+      minio: {condition: service_healthy}
+    mem_limit: 128m
+    networks: [data]
+    logging: *logging
+    restart: 'no'
+
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:?prepare and lock images first}
+    entrypoint: [/bin/bash, /setup/keycloak-start.sh]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_POOL_INITIAL_SIZE: '1'
+      KC_DB_POOL_MIN_SIZE: '1'
+      KC_DB_POOL_MAX_SIZE: '5'
+      KC_HOSTNAME: https://${SITE_DOMAIN:?required}/identity
+      KC_HOSTNAME_STRICT: 'true'
+      KC_HTTP_RELATIVE_PATH: /identity
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: 'true'
+      KC_CACHE: local
+      JAVA_OPTS_KC_HEAP: '-Xms128m -Xmx512m'
+    secrets:
+      - keycloak_db_password
+      - keycloak_admin_password
+      - source: keycloak_realm
+        target: /opt/keycloak/data/import/guanxian-realm.json
+    volumes:
+      - ./infrastructure/single-host/keycloak-start.sh:/setup/keycloak-start.sh:ro
+    healthcheck:
+      test:
+        - CMD
+        - /bin/bash
+        - -ec
+        - "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3; grep -q ' 200 ' <&3"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    depends_on:
+      postgres: {condition: service_healthy}
+    mem_limit: 1g
+    networks: [app, data]
+    logging: *logging
+    restart: unless-stopped
+
+  clamav:
+    image: ${CLAMAV_IMAGE:?prepare and lock images first}
+    volumes: [clamav-signatures:/var/lib/clamav]
+    environment:
+      CLAMAV_NO_MILTER: 'true'
+    healthcheck:
+      test: [CMD, clamdcheck.sh]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 300s
+    mem_limit: 3g
+    networks: [app, scanner-egress]
+    logging: *logging
+    restart: unless-stopped
+
+  gateway:
+    image: ${NGINX_IMAGE:?prepare and lock images first}
+    depends_on:
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ${SINGLE_HOST_DIR:?required}/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Mount directories, not individual live symlinks: renewal rotates targets.
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+      - ${SINGLE_HOST_DIR:?required}/acme-webroot:/var/www/acme:ro
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/gateway-health']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    mem_limit: 128m
+    networks:
+      edge: {}
+      app:
+        aliases: ['${SITE_DOMAIN:?required}']
+      data: {}
+    logging: *logging
+    restart: unless-stopped
+
+  server:
+    profiles: [app]
+    build: {context: ./apps/server}
+    image: guanxian-single-server:${RELEASE_ID:?required}
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/guanxian
+      SPRING_DATASOURCE_USERNAME: guanxian
+      DB_POOL_MAX_SIZE: '5'
+      DB_POOL_MIN_IDLE: '1'
+      JAVA_TOOL_OPTIONS: '-Xms128m -Xmx512m -XX:MaxDirectMemorySize=128m'
+      GUANXIAN_SECURITY_MODE: jwt
+      GUANXIAN_MEMBER_REPOSITORY: postgres
+      GUANXIAN_BUSINESS_REPOSITORY: postgres
+      GUANXIAN_NOTIFICATION_REPOSITORY: postgres
+      GUANXIAN_SEED_DEMO_DATA: 'false'
+      GUANXIAN_JWT_ISSUER_URI: https://${SITE_DOMAIN}/identity/realms/guanxian
+      GUANXIAN_JWT_JWK_SET_URI: https://${SITE_DOMAIN}/identity/realms/guanxian/protocol/openid-connect/certs
+      GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS: ''
+      GUANXIAN_STORAGE_BACKEND: minio
+      GUANXIAN_STORAGE_BUCKET: guanxian-private
+      GUANXIAN_STORAGE_ENDPOINT: https://${SITE_DOMAIN}:9443
+      GUANXIAN_STORAGE_RATE_LIMIT_ENABLED: 'true'
+      GUANXIAN_STORAGE_SCAN_MODE: clamav
+      GUANXIAN_STORAGE_SCAN_HOST: clamav
+      GUANXIAN_STORAGE_SCAN_TIMEOUT: 30s
+      GUANXIAN_STORAGE_MAX_SIZE_BYTES: '20971520'
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 20MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 21MB
+      GUANXIAN_AI_PROVIDER_ENABLED: 'false'
+      GUANXIAN_EMBEDDING_ENABLED: 'false'
+      GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED: 'false'
+      MANAGEMENT_HEALTH_REDIS_ENABLED: 'false'
+    secrets:
+      - {source: postgres_password, target: spring.datasource.password}
+      - {source: storage_access_key, target: guanxian.storage.access-key}
+      - {source: storage_secret_key, target: guanxian.storage.secret-key}
+      - {source: storage_redis_url, target: guanxian.storage.redis-url}
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1:8080/api/v1/health']
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+      keycloak: {condition: service_healthy}
+      clamav: {condition: service_healthy}
+      gateway: {condition: service_healthy}
+    mem_limit: 1g
+    networks: [app, data]
+    logging: *logging
+    restart: unless-stopped
+
+  web:
+    profiles: [app]
+    build:
+      context: ./apps/web
+      args:
+        VITE_AUTH_MODE: oidc
+        VITE_API_BASE_URL: /api/v1
+        VITE_OIDC_AUTHORITY: https://${SITE_DOMAIN}/identity/realms/guanxian
+        VITE_OIDC_CLIENT_ID: guanxian-web
+        VITE_OIDC_REDIRECT_URI: https://${SITE_DOMAIN}/auth/callback
+        VITE_OIDC_POST_LOGOUT_REDIRECT_URI: https://${SITE_DOMAIN}/login
+        VITE_OIDC_SCOPE: openid profile email
+    image: guanxian-single-web:${RELEASE_ID:?required}
+    depends_on:
+      server: {condition: service_healthy}
+    mem_limit: 64m
+    networks: [app]
+    logging: *logging
+    restart: unless-stopped
+
+networks:
+  edge: {}
+  scanner-egress: {}
+  app: {internal: true}
+  data: {internal: true}
+volumes:
+  postgres-data: {}
+  minio-data: {}
+  clamav-signatures: {}
+secrets:
+  postgres_admin_password: {file: '${SINGLE_HOST_DIR}/secrets/postgres_admin_password'}
+  postgres_password: {file: '${SINGLE_HOST_DIR}/secrets/postgres_password'}
+  keycloak_db_password: {file: '${SINGLE_HOST_DIR}/secrets/keycloak_db_password'}
+  redis_password: {file: '${SINGLE_HOST_DIR}/secrets/redis_password'}
+  redis_config: {file: '${SINGLE_HOST_DIR}/secrets/redis.conf'}
+  minio_root_user: {file: '${SINGLE_HOST_DIR}/secrets/minio_root_user'}
+  minio_root_password: {file: '${SINGLE_HOST_DIR}/secrets/minio_root_password'}
+  storage_access_key: {file: '${SINGLE_HOST_DIR}/secrets/storage_access_key'}
+  storage_secret_key: {file: '${SINGLE_HOST_DIR}/secrets/storage_secret_key'}
+  storage_redis_url: {file: '${SINGLE_HOST_DIR}/secrets/storage_redis_url'}
+  keycloak_admin_password: {file: '${SINGLE_HOST_DIR}/secrets/keycloak_admin_password'}
+  keycloak_realm: {file: '${SINGLE_HOST_DIR}/secrets/guanxian-realm.json'}
