@@ -96,8 +96,13 @@ class SingleHostMinioTests(unittest.TestCase):
                          self.app_client("mc cat app/guanxian-private/sentinel.txt").stdout.strip())
         self.app_client("mc rm app/guanxian-private/sentinel.txt >/dev/null")
         # The application account must remain non-administrative after both runs.
-        denied = self.app_client("if mc --json admin info app; then exit 1; fi")
-        self.assertIn("access denied", denied.stdout.lower())
+        # mc --json admin info can exit zero while returning an error record.
+        # Accept either process outcome, but require the explicit denial response;
+        # empty output, OOM, transport errors and successful admin access must fail.
+        denied = self.app_client("mc --json admin info app || true")
+        denial = json.loads(denied.stdout)
+        self.assertEqual("error", denial["status"])
+        self.assertEqual("Access Denied.", denial["error"])
         root_login = 'export MC_HOST_local="http://$(cat /run/secrets/minio_root_user):$(cat /run/secrets/minio_root_password)@minio:9000"\n'
         permission = self.compose("run", "--rm", "--no-deps", "--entrypoint", "/bin/sh", "minio-init",
                                   "-ec", root_login + "mc --json anonymous get local/guanxian-private", timeout=60)
