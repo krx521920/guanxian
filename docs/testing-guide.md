@@ -1,6 +1,6 @@
 # 测试与质量验收指南
 
-更新时间：2026-09-02。
+更新时间：2026-09-03。
 
 ## 1. 当前批准的验证范围
 
@@ -30,6 +30,16 @@
 本机 Docker engine 可用，但 Docker Hub 的证书链阻止了应用镜像基础层重新拉取；本轮因此使用当前分支构建的后端 JAR 和当前前端源码，连接仓库标准 E2E 依赖容器完成浏览器验收。CI 仍需显式验证完整 Compose 应用镜像构建；正式 IdP、ClamAV、生产 TLS、备份恢复和真实告警也需另行验收。
 
 测试数量、迁移版本或执行范围变化时，必须在同一提交中更新本节；不得继续引用旧的 V1–V18、314 项、167 项或其他不属于当前提交的基线。
+
+2026-09-03 单机部署及 E2E 启动脚本修复的本地验证（局部范围）：
+
+- `tests/config` 44 项、`tests/operations` 42 项，共 86 项通过，失败/跳过均为 0。
+- 配置测试显式开启 `GUANXIAN_SINGLE_HOST_DB_TEST=1` 和 `GUANXIAN_SINGLE_HOST_GATEWAY_TEST=1`，
+  包含真实隔离 PostgreSQL 初始化回归及真实 Nginx 配置解析；未操作生产服务器。
+- 新增 13 项启动脚本测试，覆盖成功退出、容器缺失、CLI 失败、多容器、未完成任务、
+  非零退出码、OOM 和状态字段不完整等情况。成功退出用例先在旧脚本复现空值错误，再验证修复。
+- 提交 `92adb52` 的浏览器 CI 在初始化容器检查阶段失败，未执行浏览器旅程。修复后仍须查看
+  **同一提交**的完整 CI 和 `browser-e2e` 结果，不以以上命令替身测试或历史浏览器结果代替。
 
 ## 3. 常规验证命令
 
@@ -69,6 +79,20 @@ Pop-Location
 ```
 
 该栈固定使用项目名 `guanxian-platform-e2e` 和 `tests/e2e/compose.env` 中的测试专用端口/凭据。Playwright 单 worker、零重试；`E2E_WEB_BASE_URL` 如有变化，必须同步修改 Web OIDC 回调和 Keycloak 客户端登记地址。它只验证隔离环境，不替代正式 IdP、TLS、备份恢复、集中日志或告警验收。
+
+初始化任务 `e2e-seed` 正常完成后就是退出状态，不应当重启以维持“运行中”。启动脚本通过
+`docker compose ps --all --quiet e2e-seed` 查找唯一容器，并核验状态为 `exited`、退出码为 `0`、
+未运行且未发生 OOM。容器缺失、查询失败、多个容器、状态不完整或任务尚未结束都必须报错，
+不能输出 `Seed=completed`；失败诊断也会列出已退出容器。排错不要删除正式库或生产数据卷。
+
+启动脚本回归测试（需要 PowerShell 7，使用命令替身，不会启动容器或接触数据库）：
+
+```bash
+python -m unittest discover -s tests/config -p test_e2e_stack_startup.py -v
+```
+
+该测试已包含在 CI 的 `production-config` 配置测试发现范围内；真实容器和浏览器旅程仍由
+`browser-e2e` 单独验证。命令替身测试通过不代表浏览器 E2E 已通过。
 
 ## 4. PostgreSQL 与身份验收
 
