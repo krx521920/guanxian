@@ -58,6 +58,7 @@ export interface MemberEnterprise {
   contact: string
   completeness: number
   status: '已认证' | '待完善' | '待审核' | '已停用' | '已删除'
+  unifiedSocialCreditCode?: string | null
   visibility: MemberVisibility
   canEdit: boolean
   canReview: boolean

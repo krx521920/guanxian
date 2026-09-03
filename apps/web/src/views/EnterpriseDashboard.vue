@@ -30,15 +30,17 @@ onMounted(load)
 
       <section class="content-grid enterprise-grid">
         <article class="panel">
-          <div class="panel-header"><div><h2>为您推荐的商机</h2><p>根据企业能力与场景偏好智能筛选</p></div><RouterLink to="/matching" class="text-button">查看更多 →</RouterLink></div>
+          <div class="panel-header"><div><h2>为您推荐的商机</h2><p>根据企业能力与场景偏好筛选，仅供辅助参考，是否对接由企业自行决定</p></div><RouterLink to="/matching" class="text-button">查看更多 →</RouterLink></div>
           <div class="compact-match" v-for="item in data.matches" :key="item.id">
-            <div class="score-bubble"><strong>{{ item.score }}</strong><span>匹配度</span></div>
+            <div class="score-bubble"><strong>{{ item.score }}</strong><span>参考评分</span></div>
             <div class="compact-main"><div><span class="tag">{{ item.scene }}</span><StatusBadge :value="item.state" /></div><h3>{{ item.demandTitle }}</h3><p>{{ item.demandCompany }} · 推荐方案：{{ item.solution }}</p></div>
           </div>
+          <div class="data-source panel-source"><span>数据来源：<b>已审核需求库 + 在架能力库</b></span><span>定位：<b>辅助决策，不替代企业决定</b></span></div>
         </article>
         <article class="panel">
           <div class="panel-header"><div><h2>政策影响提醒</h2><p>与企业业务相关的最新政策</p></div><RouterLink to="/policies" class="text-button">政策中心 →</RouterLink></div>
           <div class="policy-compact" v-for="policy in data.recommendedPolicies" :key="policy.id"><span class="date-block"><strong>{{ policy.publishDate.slice(5, 7) }}</strong><small>{{ policy.publishDate.slice(8) }}</small></span><div><StatusBadge :value="policy.status" /><h3>{{ policy.title }}</h3><p>{{ policy.authority }}</p></div></div>
+          <div class="data-source panel-source"><span>数据来源：<b>政策标准中心</b></span><span>原文以发布单位官方渠道为准</span></div>
         </article>
       </section>
     </template>

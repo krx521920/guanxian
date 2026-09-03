@@ -22,6 +22,7 @@ const systemAssociations = ref<SystemAssociationOption[]>([])
 const systemEnterprises = ref<SystemEnterpriseOption[]>([])
 const systemContextError = ref('')
 const contextRevision = ref(0)
+const todayLabel = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())
 
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
@@ -186,7 +187,7 @@ onBeforeUnmount(() => {
     <aside class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
-        <div><strong>管线智联</strong><small>管理协作平台</small></div>
+        <div><strong>管线智联</strong><small>北京地下管线协会主办</small><span class="official-badge">官方平台</span></div>
       </div>
 
       <div class="nav-section-label">工作空间</div>
@@ -216,14 +217,20 @@ onBeforeUnmount(() => {
           <small v-if="systemContextError" class="danger-text">{{ systemContextError }}</small>
         </template>
       </div>
+      <div class="sidebar-status" aria-label="平台运行信息">
+        <div><span class="status-dot" aria-hidden="true"></span>系统状态：<strong>正常运行</strong></div>
+        <div>主办单位：<strong>北京地下管线协会秘书处</strong></div>
+        <div>运营支持：<strong>管线智联平台运营组</strong></div>
+      </div>
     </aside>
     <button v-if="mobileOpen" class="sidebar-mask" aria-label="关闭导航" @click="mobileOpen = false" />
 
     <main class="main-area">
       <header class="topbar">
         <button class="icon-button menu-button" aria-label="打开导航" @click="mobileOpen = true">☰</button>
-        <div class="crumb"><span>北京地下管线协会</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
+        <div class="crumb"><span class="crumb-org">北京地下管线协会</span><b>/</b><strong>{{ route.meta.title }}</strong><span class="topbar-date" aria-label="当前日期">{{ todayLabel }}</span></div>
         <div class="top-actions">
+          <span class="topbar-status"><span class="status-dot" aria-hidden="true"></span>系统正常</span>
           <div ref="notificationWrap" class="notification-wrap">
             <button
               class="icon-button notification-button"
@@ -268,7 +275,7 @@ onBeforeUnmount(() => {
               </div>
             </section>
           </div>
-          <button class="profile-button" @click="profileOpen = !profileOpen">
+          <button class="profile-button" aria-haspopup="menu" :aria-expanded="profileOpen" aria-label="当前账号菜单" @click="profileOpen = !profileOpen">
             <span class="avatar">{{ initials }}</span>
             <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
             <span class="chevron">⌄</span>

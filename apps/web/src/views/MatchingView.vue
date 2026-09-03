@@ -242,31 +242,41 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="ECOSYSTEM MATCHING" title="生态匹配" description="基于已审核的真实需求和在架能力，生成可确认、可反馈的匹配记录">
+    <PageHeader eyebrow="ECOSYSTEM MATCHING" title="生态匹配" description="按“需求 → 推荐企业 → 协作状态”全流程展示，评分仅供辅助参考，由协会与企业人工确认">
       <button class="secondary-button" @click="rulesOpen = true">匹配依据</button><button v-if="canGenerate" class="primary-button" @click="generatorOpen = true">生成新一轮匹配</button>
     </PageHeader>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
     <section class="match-summary">
       <div><span>当前匹配记录</span><strong>{{ items.length }}</strong><small>来自数据库</small></div><div><span>已由协会推荐</span><strong>{{ recommendedCount }}</strong><small>{{ items.length ? `${Math.round(recommendedCount / items.length * 100)}%` : '0%' }}</small></div><div><span>已由参与企业确认</span><strong>{{ confirmedCount }}</strong><small>{{ items.length ? `${Math.round(confirmedCount / items.length * 100)}%` : '0%' }}</small></div>
-      <div class="matching-logic"><span class="ai-chip">规则</span><p><b>记录可解释</b>每条匹配保留分数和具体推荐理由，并由协会与企业人工确认。</p></div>
+      <div class="matching-logic"><span class="ai-chip">辅助</span><p><b>辅助决策，不替代人工</b>评分与推荐依据来自确定性规则，仅供参考；匹配须经协会推荐、企业双方确认后才推进，最终决定权在协会与企业。</p></div>
     </section>
     <div class="segmented match-tabs"><button v-for="itemState in states" :key="itemState" :class="{ active: state === itemState }" @click="state = itemState">{{ itemState }}</button></div>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else class="match-list">
       <article v-for="item in filtered" :key="item.id" class="match-card panel">
-        <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - item.score * 1.13}` }"/></svg><div><strong>{{ item.score }}</strong><span>匹配度</span></div></div>
-        <div class="match-demand"><span class="eyebrow">需求方 · {{ item.scene }}</span><h2>{{ item.demandTitle }}</h2><p>{{ item.demandCompany }}</p></div>
-        <div class="match-arrow"><span>可解释推荐</span>→</div>
-        <div class="match-supplier"><span class="eyebrow">能力供给方</span><h2>{{ item.supplierCompany }}</h2><p>{{ item.solution }}</p></div>
-        <div class="match-actions"><StatusBadge :value="displayBusinessStatus(item.state)" /><small>{{ formatDateTime(item.updatedAt) }}</small><button class="primary-button small" @click="openDetail(item)">查看匹配详情</button></div>
-        <div class="match-reasons"><b>推荐理由</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span></div>
+        <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - item.score * 1.13}` }"/></svg><div><strong>{{ item.score }}</strong><span>参考评分</span></div></div>
+        <div class="match-demand"><span class="match-stage-label">① 需求 · {{ item.scene }}</span><h2>{{ item.demandTitle }}</h2><p>{{ item.demandCompany }}</p></div>
+        <div class="match-arrow" aria-hidden="true"><span>辅助推荐</span>→</div>
+        <div class="match-supplier"><span class="match-stage-label">② 推荐企业</span><h2>{{ item.supplierCompany }}</h2><p>{{ item.solution }}</p></div>
+        <div class="match-state-cell">
+          <span class="match-stage-label">③ 协作状态</span>
+          <StatusBadge :value="displayBusinessStatus(item.state)" />
+          <div class="chip-row">
+            <span class="tag" :class="item.recommendedAt ? 'tone-info' : 'tone-warning'">{{ item.recommendedAt ? '协会推荐' : '待协会推荐' }}</span>
+            <span class="tag" :class="item.demandConfirmedAt ? 'tone-success' : 'tone-neutral'">需求方{{ item.demandConfirmedAt ? '已确认' : '待确认' }}</span>
+            <span class="tag" :class="item.candidateConfirmedAt ? 'tone-success' : 'tone-neutral'">供给方{{ item.candidateConfirmedAt ? '已确认' : '待确认' }}</span>
+          </div>
+          <button class="primary-button small" :aria-label="`查看匹配详情：${item.demandTitle}`" @click="openDetail(item)">查看详情</button>
+          <small class="table-muted">{{ formatDateTime(item.updatedAt) }}</small>
+        </div>
+        <div class="match-reasons"><b>推荐依据</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span><span class="table-muted">数据来源：已审核需求库 + 在架能力库 · 记录版本 v{{ item.version }}</span></div>
       </article>
-      <div v-if="!filtered.length" class="panel empty-business-state"><b>暂无匹配记录</b><span>请先发布需求并完善在架能力，系统才有可用于匹配的真实数据。</span><RouterLink class="secondary-button small row-action" to="/ecosystem">前往供需信息</RouterLink></div>
+      <div v-if="!filtered.length" class="panel empty-business-state"><b>暂无匹配记录</b><span>请先发布需求并完善在架能力，系统才有可用于匹配的真实数据。</span><RouterLink class="secondary-button small row-action" to="/ecosystem">去发布需求</RouterLink></div>
     </section>
 
-    <div v-if="rulesOpen" class="modal-backdrop" @click.self="rulesOpen = false"><section class="panel modal-card compact-modal"><div class="modal-head"><div><span class="eyebrow">MATCH EXPLAINABILITY</span><h2>匹配依据</h2></div><button class="icon-button" @click="rulesOpen = false">×</button></div><div class="modal-copy"><p>系统从需求场景、所需能力、供给方产品/服务、资质与数据可见性中生成候选。</p><p>分数和推荐理由以后端每条记录为准，页面不伪造固定权重。</p><p>匹配不会自动对外推送：必须经协会推荐、企业确认后才进入洽谈。</p></div><div class="form-actions"><button class="primary-button" @click="rulesOpen = false">我知道了</button></div></section></div>
-    <div v-if="generatorOpen" class="modal-backdrop" @click.self="generatorOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="generate()"><div class="modal-head"><div><span class="eyebrow">GENERATE MATCHES</span><h2>选择真实需求</h2></div><button type="button" class="icon-button" aria-label="关闭匹配生成窗口" @click="generatorOpen = false">×</button></div><div class="form-grid modal-form"><label v-if="demands.length" class="form-span-2"><span>需求 *</span><select v-model="selectedDemandId" required><option value="" disabled>请选择</option><option v-for="demand in demands" :key="demand.id" :value="demand.id">{{ demand.title }} · {{ demand.enterpriseName }}</option></select></label><div v-else class="form-span-2 empty-business-state"><b>暂无可匹配需求</b><span>请先在供需信息中发布并审核需求。</span><RouterLink class="secondary-button small row-action" to="/ecosystem">前往供需信息</RouterLink></div></div><div class="form-actions"><button type="button" class="secondary-button" @click="generatorOpen = false">取消</button><button class="primary-button" :disabled="busy || !selectedDemandId">{{ busy ? '正在匹配…' : '生成并保存匹配' }}</button></div></form></div>
-    <div v-if="selected" class="modal-backdrop" @click.self="selected = null">
+    <div v-if="rulesOpen" class="modal-backdrop" role="dialog" aria-modal="true" @click.self="rulesOpen = false"><section class="panel modal-card compact-modal"><div class="modal-head"><div><span class="eyebrow">MATCH EXPLAINABILITY</span><h2>匹配依据</h2></div><button class="icon-button" @click="rulesOpen = false">×</button></div><div class="modal-copy"><p>系统从需求场景、所需能力、供给方产品/服务、资质与数据可见性中生成候选。</p><p>分数和推荐理由以后端每条记录为准，页面不伪造固定权重。</p><p>匹配不会自动对外推送：必须经协会推荐、企业确认后才进入洽谈。</p></div><div class="form-actions"><button class="primary-button" @click="rulesOpen = false">我知道了</button></div></section></div>
+    <div v-if="generatorOpen" class="modal-backdrop" role="dialog" aria-modal="true" @click.self="generatorOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="generate()"><div class="modal-head"><div><span class="eyebrow">GENERATE MATCHES</span><h2>选择真实需求</h2></div><button type="button" class="icon-button" aria-label="关闭匹配生成窗口" @click="generatorOpen = false">×</button></div><div class="form-grid modal-form"><label v-if="demands.length" class="form-span-2"><span>需求 *</span><select v-model="selectedDemandId" required><option value="" disabled>请选择</option><option v-for="demand in demands" :key="demand.id" :value="demand.id">{{ demand.title }} · {{ demand.enterpriseName }}</option></select></label><div v-else class="form-span-2 empty-business-state"><b>暂无可匹配需求</b><span>请先在供需信息中发布并审核需求。</span><RouterLink class="secondary-button small row-action" to="/ecosystem">前往供需信息</RouterLink></div></div><div class="form-actions"><button type="button" class="secondary-button" @click="generatorOpen = false">取消</button><button class="primary-button" :disabled="busy || !selectedDemandId">{{ busy ? '正在匹配…' : '生成并保存匹配' }}</button></div></form></div>
+    <div v-if="selected" class="modal-backdrop" role="dialog" aria-modal="true" :aria-label="`匹配详情：${selected.demandTitle}`" @click.self="selected = null">
       <section class="panel modal-card match-detail-modal">
         <div class="modal-head">
           <div><span class="eyebrow">MATCH DETAIL</span><h2>{{ selected.demandTitle }}</h2></div>
@@ -276,8 +286,10 @@ onMounted(load)
         <div class="detail-grid">
           <div><span>需求方</span><strong>{{ selected.demandCompany }}</strong></div>
           <div><span>供给方</span><strong>{{ selected.supplierCompany }}</strong></div>
-          <div><span>匹配度</span><strong>{{ selected.score }}</strong></div>
+          <div><span>参考评分</span><strong>{{ selected.score }}</strong></div>
           <div><span>当前状态</span><strong>{{ displayBusinessStatus(selected.state) }}</strong></div>
+          <div><span>协会推荐</span><strong>{{ selected.recommendedAt ? formatDateTime(selected.recommendedAt) : '待协会推荐' }}</strong></div>
+          <div><span>记录版本</span><strong>v{{ selected.version }}</strong></div>
           <div><span>需求方确认</span><strong>{{ selected.demandConfirmedAt ? formatDateTime(selected.demandConfirmedAt) : '待确认' }}</strong></div>
           <div><span>供给方确认</span><strong>{{ selected.candidateConfirmedAt ? formatDateTime(selected.candidateConfirmedAt) : '待确认' }}</strong></div>
         </div>
