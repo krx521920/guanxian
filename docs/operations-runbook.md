@@ -59,7 +59,7 @@ V17 不会在迁移时把单个“截止时间已过但状态仍为 `ACTIVE`”�
 2. 回表先进入预生产。运营人员核对源文件 SHA-256、提交单位、提交时间和工作表行号，处理文件内与正式库重复的统一信用代码；错误行修正后重新提交原文件的新版本，禁止直接改库。
 3. 协会管理员逐家核对企业简介、产品、服务、需求、应用场景和联系方式，审核通过后才进入正式可见状态。导入批次、审核人和审计日志共同构成出处链。
 4. 知识附件上传后必须取得 `VALIDATED` 状态；生产 `scan-mode` 必须为 `clamav`，私网 ClamAV 不可用时上传失败关闭。只有草稿送审并由有权审核人发布后才参与检索。
-5. 模型与 Embedding 密钥只通过 `AI_PROVIDER_API_KEY_FILE`、`EMBEDDING_API_KEY_FILE` 指向的只读 secret 文件注入。Chat Agent 只有在 `GUANXIAN_AI_PROVIDER_ENABLED=true` 与 `GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED=true` 同时成立，并配置完整 HTTPS chat-completions endpoint、模型名和费用阈值时才会调用外部模型；任何开关关闭都会安全降级为本地带出处问答。启用数据出境前完成审批并设定单次费用上限，抽查 `model_execution` 中 `PLATFORM_CHAT_AGENT` 记录。单机 Compose 目前继续强制关闭外部模型，启用前必须另行完成受控 egress 与密钥挂载评审。
+5. 模型与 Embedding 密钥只通过 `AI_PROVIDER_API_KEY_FILE`、`EMBEDDING_API_KEY_FILE` 指向的只读 secret 文件注入。Chat Agent 只有在 `GUANXIAN_AI_PROVIDER_ENABLED=true` 与 `GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED=true` 同时成立，并配置完整 HTTPS chat-completions endpoint、模型名和费用阈值时才会调用外部模型；任何开关关闭都会安全降级为本地带出处问答。流式端点为 `POST /api/v1/assistant/chat/stream`，运维代理必须保持该精确路径的 `proxy_buffering off` 和至少 120 秒读取超时。启用数据出境前完成审批并设定单次费用上限，抽查 `model_execution` 中 `PLATFORM_CHAT_AGENT` 的成功、失败和 `STREAM_CANCELLED` 记录。单机 Compose 目前继续强制关闭外部模型，启用前必须另行完成受控 egress 与密钥挂载评审。
 6. 使用协会真实已发布资料建立至少 10 例的证据/拒答混合评测集。只有 readiness 返回 `ready=true` 且业务负责人签字后，才能在该协会范围内使用“AI 平台”名称；任何新语料、新模型或关键参数变更后重新评测。
 
 生产编排使用独立的 `compose.production.yml`。它只公开 80/443；PostgreSQL、后端和前端

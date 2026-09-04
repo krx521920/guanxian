@@ -5,10 +5,13 @@ import com.guanxian.platform.ai.rag.KnowledgeIngestionService;
 import com.guanxian.platform.ai.rag.MemoryKnowledgeRepository;
 import com.guanxian.platform.ai.rag.PolicyRagService;
 import com.guanxian.platform.ai.rag.RagProperties;
+import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,6 +46,20 @@ class PlatformAssistantServiceTest {
         assertEquals("请在会员企业页面选择批量导入。[1]", answer.answer());
         assertTrue(fixture.request.get().prompt().contains("当前权限范围内的检索证据"));
         assertFalse(fixture.request.get().prompt().contains("不允许被调用"));
+    }
+
+    @Test
+    void streamEmitsStartDeltaAndAuditedCompletion() {
+        Fixture fixture = fixture(true);
+        UUID conversationId = UUID.randomUUID();
+
+        var events = fixture.service.stream(
+                question(fixture.associationId, "actor-1", conversationId)).collectList().block();
+
+        assertEquals(List.of("start", "delta", "complete"),
+                events.stream().map(PlatformAssistantService.AssistantStreamEvent::type).toList());
+        assertEquals("请在会员企业页面选择批量导入。[1]", events.getLast().answer().answer());
+        assertTrue(events.getLast().answer().modelConnected());
     }
 
     @Test
@@ -97,9 +114,12 @@ class PlatformAssistantServiceTest {
 
     private static PlatformAssistantService.AssistantQuestion question(
             UUID associationId, String actor, UUID conversationId) {
+        ActorScope actorScope = new ActorScope(
+                null, actor, actor, associationId, null, Set.of("ASSOCIATION_OPERATOR"), Set.of());
         return new PlatformAssistantService.AssistantQuestion(
-                associationId, actor, conversationId, "会员资料怎么批量导入？", 3,
-                "会员企业", "/members", "request-1", true);
+                new AssistantAccessContext(actorScope, Set.of("POLICY_READ", "MEMBER_READ")),
+                conversationId, "会员资料怎么批量导入？", 3,
+                "会员企业", "/members", "request-1");
     }
 
     private record Fixture(

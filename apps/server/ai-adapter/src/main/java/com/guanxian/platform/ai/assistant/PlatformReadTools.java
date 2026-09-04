@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.Map;
 
 @Component
-public class PlatformReadTools {
+public class PlatformReadTools implements AssistantToolProvider {
     static final String PAGE_PATH = "pagePath";
     static final String PAGE_TITLE = "pageTitle";
 
@@ -41,6 +41,11 @@ public class PlatformReadTools {
                 : PAGE_GUIDES.get(route);
         return "页面：" + title + "（" + path + "）。" + guide
                 + " 本工具不会提升权限，也不会代替用户提交、修改或删除数据。";
+    }
+
+    @Override
+    public Object toolObject() {
+        return this;
     }
 
     private static String contextValue(ToolContext toolContext, String key, String fallback) {

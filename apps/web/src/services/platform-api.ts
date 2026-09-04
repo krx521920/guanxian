@@ -1,5 +1,6 @@
 import type {
   AssistantChatAnswer,
+  AssistantStreamEvent,
   AccessBinding, AccessBindingPage,
   AccessBindingPayload,
   AssociationAccessRequest,
@@ -58,7 +59,7 @@ import type {
   SystemEnterpriseOption,
   VersionedMember,
 } from '../types/domain'
-import { ApiRequestError, request, requestBlob } from './http'
+import { ApiRequestError, request, requestBlob, requestEventStream } from './http'
 
 const strongEtag = /^"(0|[1-9][0-9]*)"$/
 const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/
@@ -281,6 +282,55 @@ export const platformApi = {
     'json',
     60000,
   ),
+  streamAssistant: async (
+    message: string,
+    conversationId: string,
+    pageTitle: string,
+    pagePath: string,
+    onDelta: (delta: string) => void | Promise<void>,
+    signal?: AbortSignal,
+    maxCitations = 5,
+    associationId?: string,
+  ): Promise<AssistantChatAnswer> => {
+    let completedAnswer: AssistantChatAnswer | null = null
+    await requestEventStream<AssistantStreamEvent>(
+      '/assistant/chat/stream',
+      {
+        method: 'POST',
+        signal,
+        body: JSON.stringify({
+          message,
+          conversationId,
+          pageTitle,
+          pagePath,
+          maxCitations,
+          associationId: associationId || null,
+        }),
+      },
+      async (event) => {
+        if (event.type === 'delta' && event.delta) await onDelta(event.delta)
+        if (event.type === 'complete' && event.answer) completedAnswer = event.answer
+        if (event.type === 'error') {
+          throw new ApiRequestError(
+            event.error?.message || '智能助手暂时不可用，请稍后重试',
+            `assistant-stream:${conversationId}`,
+            undefined,
+            event.error?.code || 'ASSISTANT_STREAM_FAILED',
+          )
+        }
+      },
+      120000,
+    )
+    if (!completedAnswer) {
+      throw new ApiRequestError(
+        '智能助手未返回完整回答',
+        `assistant-stream:${conversationId}`,
+        undefined,
+        'INCOMPLETE_ASSISTANT_STREAM',
+      )
+    }
+    return completedAnswer
+  },
 
   offerings: (query = '', includeDeleted = false, page = 0, size = 20) => request<EcosystemPage<Offering>>(`/offerings?query=${encodeURIComponent(query)}&includeDeleted=${includeDeleted}&page=${page}&size=${size}`),
   createOffering: (payload: OfferingUpsertPayload) => request<Offering>('/offerings', { method: 'POST', body: JSON.stringify(payload) }),

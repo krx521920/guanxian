@@ -24,8 +24,10 @@ const error = ref('')
 const conversationId = ref(crypto.randomUUID())
 const input = ref<HTMLTextAreaElement | null>(null)
 const messageList = ref<HTMLElement | null>(null)
+const activeMessageId = ref<number | null>(null)
 let messageId = 0
 let requestRevision = 0
+let activeRequest: AbortController | null = null
 
 const welcomeMessage = (): ChatMessage => ({
   id: ++messageId,
@@ -64,8 +66,11 @@ function close() {
 }
 
 function clearConversation() {
+  activeRequest?.abort(new DOMException('用户取消当前回答', 'AbortError'))
+  activeRequest = null
   requestRevision += 1
   busy.value = false
+  activeMessageId.value = null
   error.value = ''
   question.value = ''
   conversationId.value = crypto.randomUUID()
@@ -85,30 +90,55 @@ async function ask(value = question.value) {
   question.value = ''
   error.value = ''
   messages.value.push({ id: ++messageId, role: 'user', content: normalized, citations: [] })
+  const assistantMessage: ChatMessage = {
+    id: ++messageId,
+    role: 'assistant',
+    content: '',
+    citations: [],
+  }
+  messages.value.push(assistantMessage)
+  activeMessageId.value = assistantMessage.id
+  const controller = new AbortController()
+  activeRequest = controller
   busy.value = true
   await scrollToLatest()
   try {
-    const answer = await platformApi.chatWithAssistant(
+    const answer = await platformApi.streamAssistant(
       normalized,
       conversationId.value,
       pageTitle.value,
       route.path,
+      async (delta) => {
+        if (revision !== requestRevision || controller.signal.aborted) return
+        const current = messages.value.find((item) => item.id === assistantMessage.id)
+        if (current) current.content += delta
+        await scrollToLatest()
+      },
+      controller.signal,
       5,
       auth.user.value?.associationId || undefined,
     )
     if (revision !== requestRevision) return
-    messages.value.push({
-      id: ++messageId,
-      role: 'assistant',
-      content: answer.answer,
-      citations: answer.citations,
-      traceId: answer.traceId,
-      mode: answer.mode,
-    })
+    const current = messages.value.find((item) => item.id === assistantMessage.id)
+    if (current) {
+      current.content = answer.answer
+      current.citations = answer.citations
+      current.traceId = answer.traceId
+      current.mode = answer.mode
+    }
   } catch (reason) {
-    if (revision === requestRevision) error.value = assistantErrorMessage(reason)
+    if (revision === requestRevision) {
+      messages.value = messages.value.filter((item) => item.id !== assistantMessage.id)
+      if (!(reason instanceof DOMException && reason.name === 'AbortError')) {
+        error.value = assistantErrorMessage(reason)
+      }
+    }
   } finally {
-    if (revision === requestRevision) busy.value = false
+    if (revision === requestRevision) {
+      busy.value = false
+      activeMessageId.value = null
+    }
+    if (activeRequest === controller) activeRequest = null
     await scrollToLatest()
   }
 }
@@ -125,8 +155,11 @@ function handleEscape(event: KeyboardEvent) {
 }
 
 watch(() => auth.user.value?.associationId, () => {
+  activeRequest?.abort(new DOMException('协会范围已切换', 'AbortError'))
+  activeRequest = null
   requestRevision += 1
   busy.value = false
+  activeMessageId.value = null
   error.value = ''
   conversationId.value = crypto.randomUUID()
   messages.value = [welcomeMessage()]
@@ -134,6 +167,8 @@ watch(() => auth.user.value?.associationId, () => {
 
 window.addEventListener('keydown', handleEscape)
 onBeforeUnmount(() => {
+  activeRequest?.abort(new DOMException('页面已卸载', 'AbortError'))
+  activeRequest = null
   requestRevision += 1
   window.removeEventListener('keydown', handleEscape)
 })
@@ -157,7 +192,7 @@ onBeforeUnmount(() => {
           <strong id="assistant-title">管线智能助手</strong>
           <small>{{ statusText }}</small>
         </div>
-        <button class="assistant-clear" type="button" :disabled="busy || messages.length === 1" @click="clearConversation">清空</button>
+        <button class="assistant-clear" type="button" :disabled="messages.length === 1" @click="clearConversation">{{ busy ? '取消并清空' : '清空' }}</button>
         <button class="assistant-close" type="button" aria-label="关闭智能助手" @click="close">×</button>
       </header>
 
@@ -165,7 +200,10 @@ onBeforeUnmount(() => {
         <article v-for="message in messages" :key="message.id" class="assistant-message" :class="message.role">
           <span class="assistant-role">{{ message.role === 'assistant' ? '助手' : '您' }}</span>
           <div class="assistant-bubble">
-            <p>{{ message.content }}</p>
+            <div v-if="message.role === 'assistant' && message.id === activeMessageId && !message.content" class="assistant-thinking">
+              <i /><i /><i /><span>正在检索可见资料</span>
+            </div>
+            <p v-else>{{ message.content }}</p>
             <details v-if="message.citations.length" class="assistant-citations">
               <summary>{{ message.citations.length }} 条引用依据</summary>
               <ol>
@@ -183,10 +221,6 @@ onBeforeUnmount(() => {
             </details>
             <small v-if="message.traceId" class="assistant-trace">追踪编号 {{ message.traceId }}</small>
           </div>
-        </article>
-        <article v-if="busy" class="assistant-message assistant">
-          <span class="assistant-role">助手</span>
-          <div class="assistant-bubble assistant-thinking"><i /><i /><i /><span>正在检索可见资料</span></div>
         </article>
       </div>
 

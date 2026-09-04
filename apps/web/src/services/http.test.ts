@@ -558,6 +558,85 @@ describe('request', () => {
 
     await expect(request('/members')).rejects.toBe(unexpectedError)
   })
+
+  it('parses text event streams across transport chunk boundaries', async () => {
+    const encoder = new TextEncoder()
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"type":"sta'))
+        controller.enqueue(encoder.encode('rt","conversationId":"conversation-1"}\r\n\r'))
+        controller.enqueue(encoder.encode('\ndata: {"type":"delta","delta":"你好"}\n\n'))
+        controller.enqueue(encoder.encode('data: {"type":"complete","answer":{"answer":"你好"}}\n\n'))
+        controller.close()
+      },
+    })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream', 'X-Request-Id': 'stream-request-1' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { requestEventStream } = await loadRequest()
+    const events: Array<Record<string, unknown>> = []
+
+    await requestEventStream('/assistant/chat/stream', { method: 'POST', body: '{}' }, (event) => {
+      events.push(event as Record<string, unknown>)
+    })
+
+    expect(events).toEqual([
+      { type: 'start', conversationId: 'conversation-1' },
+      { type: 'delta', delta: '你好' },
+      { type: 'complete', answer: { answer: '你好' } },
+    ])
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/assistant/chat/stream')
+    expect(new Headers(init.headers).get('Accept')).toBe('text/event-stream')
+  })
+
+  it('rejects malformed event data without exposing the raw payload', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('data: {not-json}\n\n'))
+        controller.close()
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, {
+      status: 200,
+      headers: { 'X-Request-Id': 'stream-request-2' },
+    })))
+    const { requestEventStream } = await loadRequest()
+
+    await expect(requestEventStream('/assistant/chat/stream', {}, vi.fn())).rejects.toMatchObject({
+      message: '流式响应格式无效',
+      requestId: 'stream-request-2',
+      code: 'INVALID_EVENT_STREAM',
+    })
+  })
+
+  it('preserves caller cancellation while reading an event stream', async () => {
+    const externalController = new AbortController()
+    let streamController: ReadableStreamDefaultController<Uint8Array> | undefined
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller
+      },
+      cancel() {
+        streamController = undefined
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })))
+    const { requestEventStream } = await loadRequest()
+    const cancellation = new DOMException('用户取消流式回答', 'AbortError')
+
+    const pending = requestEventStream(
+      '/assistant/chat/stream',
+      { signal: externalController.signal },
+      vi.fn(),
+    )
+    externalController.abort(cancellation)
+    streamController?.error(cancellation)
+
+    await expect(pending).rejects.toBe(cancellation)
+  })
   it('adds the in-memory OIDC access token without overriding caller authorization', async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ code: 'OK', data: 'done' })))
     vi.stubGlobal('fetch', fetchMock)

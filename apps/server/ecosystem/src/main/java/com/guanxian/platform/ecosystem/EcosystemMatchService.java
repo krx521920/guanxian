@@ -123,6 +123,38 @@ public class EcosystemMatchService {
         return persistedPageInternal(actor, page, size, state);
     }
 
+    /**
+     * Strictly read-only listing for assistant tools. Unlike the interactive endpoint, this path
+     * does not materialize expired invitation state while reading.
+     */
+    @Transactional(readOnly = true)
+    public EcosystemPage<PersistedMatchView> persistedReadOnly(
+            ActorScope actor, int requestedPage, int requestedSize, String requestedState) {
+        int page = requirePage(requestedPage);
+        int size = requirePageSize(requestedSize);
+        String state = normalizeState(requestedState);
+        if (actor.isSystemAdmin() || actor.partnerAssociationIds().isEmpty()) {
+            long offset = Math.multiplyExact((long) page, size);
+            List<PersistedMatchView> items = outboundMatches(
+                    matchStore.list(actor, state, offset, size), actor).stream()
+                    .filter(value -> state == null || state.equals(value.state()))
+                    .toList();
+            return new EcosystemPage<>(items, matchStore.count(actor, state), page, size);
+        }
+        List<PersistedMatchView> authorized = outboundMatches(matchStore.list(actor), actor).stream()
+                .filter(value -> state == null || state.equals(value.state()))
+                .toList();
+        long offset = Math.multiplyExact((long) page, size);
+        List<PersistedMatchView> items;
+        if (offset >= authorized.size()) {
+            items = List.of();
+        } else {
+            int from = Math.toIntExact(offset);
+            items = authorized.subList(from, Math.min(from + size, authorized.size()));
+        }
+        return new EcosystemPage<>(items, authorized.size(), page, size);
+    }
+
     private EcosystemPage<PersistedMatchView> persistedPageInternal(
             ActorScope actor, int page, int size, String state) {
         if (actor.isSystemAdmin() || actor.partnerAssociationIds().isEmpty()) {

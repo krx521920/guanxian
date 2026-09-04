@@ -7,7 +7,10 @@ import com.guanxian.platform.shared.security.ActorScopeResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -38,6 +41,8 @@ class AssistantControllerScopeTest {
         actorScopeResolver = mock(ActorScopeResolver.class);
         authentication = mock(Authentication.class);
         controller = new AssistantController(assistantService, actorScopeResolver);
+        org.mockito.Mockito.doReturn(List.of(new SimpleGrantedAuthority("POLICY_READ")))
+                .when(authentication).getAuthorities();
         when(assistantService.chat(any())).thenReturn(new PlatformAssistantService.AssistantAnswer(
                 "暂无证据", List.of(), UUID.randomUUID(), "NO_EVIDENCE", "LEXICAL",
                 0, 0, BigDecimal.ZERO, CONVERSATION, false));
@@ -52,9 +57,30 @@ class AssistantControllerScopeTest {
         ArgumentCaptor<PlatformAssistantService.AssistantQuestion> question =
                 ArgumentCaptor.forClass(PlatformAssistantService.AssistantQuestion.class);
         verify(assistantService).chat(question.capture());
-        assertThat(question.getValue().associationId()).isEqualTo(ASSOCIATION_A);
+        assertThat(question.getValue().access().actor().associationId()).isEqualTo(ASSOCIATION_A);
+        assertThat(question.getValue().access().hasAuthority("POLICY_READ")).isTrue();
         assertThat(question.getValue().conversationId()).isEqualTo(CONVERSATION);
         assertThat(question.getValue().pagePath()).isEqualTo("/members");
+    }
+
+    @Test
+    void streamDisablesProxyBufferingAndKeepsTheServerAuthorizationSnapshot() {
+        when(actorScopeResolver.resolve(authentication)).thenReturn(systemAdmin(ASSOCIATION_A));
+        when(assistantService.stream(any())).thenReturn(Flux.just(
+                PlatformAssistantService.AssistantStreamEvent.start(CONVERSATION)));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        var events = controller.stream(request(ASSOCIATION_A), authentication, response)
+                .collectList().block();
+
+        assertThat(events).hasSize(1);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-cache, no-transform");
+        assertThat(response.getHeader("X-Accel-Buffering")).isEqualTo("no");
+        ArgumentCaptor<PlatformAssistantService.AssistantQuestion> question =
+                ArgumentCaptor.forClass(PlatformAssistantService.AssistantQuestion.class);
+        verify(assistantService).stream(question.capture());
+        assertThat(question.getValue().access().actor().associationId()).isEqualTo(ASSOCIATION_A);
+        assertThat(question.getValue().access().hasAuthority("POLICY_READ")).isTrue();
     }
 
     @Test

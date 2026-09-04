@@ -339,6 +339,17 @@ export interface AssistantChatAnswer extends PolicyQuestionAnswer {
   modelConnected: boolean
 }
 
+export interface AssistantStreamEvent {
+  type: 'start' | 'delta' | 'complete' | 'error'
+  conversationId: string
+  delta: string | null
+  answer: AssistantChatAnswer | null
+  error: {
+    code: string
+    message: string
+  } | null
+}
+
 export interface EcosystemMatch {
   id: string
   demandCompany: string | null
