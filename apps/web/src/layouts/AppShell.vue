@@ -37,6 +37,7 @@ const notificationPageSize = 10
 const notificationBusyIds = ref<Set<string>>(new Set())
 const unreadTotal = ref(0)
 const notificationWrap = ref<HTMLElement | null>(null)
+const profileWrap = ref<HTMLElement | null>(null)
 const systemAssociations = ref<SystemAssociationOption[]>([])
 const systemEnterprises = ref<SystemEnterpriseOption[]>([])
 const systemContextError = ref('')
@@ -306,6 +307,9 @@ function closeOverlays(event: PointerEvent) {
   if (notificationOpen.value && !notificationWrap.value?.contains(event.target as Node)) {
     closeNotifications()
   }
+  if (profileOpen.value && !profileWrap.value?.contains(event.target as Node)) {
+    profileOpen.value = false
+  }
 }
 
 function closeOnEscape(event: KeyboardEvent) {
@@ -323,6 +327,11 @@ function toggleSidebar() {
     return
   }
   sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
+function toggleProfile() {
+  profileOpen.value = !profileOpen.value
+  if (profileOpen.value) closeNotifications()
 }
 
 function openSettings() {
@@ -499,20 +508,28 @@ onBeforeUnmount(() => {
               </div>
             </section>
           </div>
-          <button class="profile-button" @click="profileOpen = !profileOpen">
-            <span class="avatar">{{ initials }}</span>
-            <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
-            <span class="chevron">⌄</span>
-          </button>
-          <div v-if="profileOpen" class="profile-menu">
-            <template v-if="auth.isDemoMode">
-              <label>本地测试身份</label>
-              <select :value="auth.user.value?.role" @change="switchRole">
-                <option v-for="(user, role) in auth.demoUsers" :key="role" :value="role">{{ user.title }}</option>
-              </select>
-            </template>
-            <button class="preferences-button" type="button" @click="openSettings">界面设置</button>
-            <button type="button" @click="logout">退出登录</button>
+          <div ref="profileWrap" class="profile-wrap">
+            <button
+              class="profile-button"
+              type="button"
+              aria-controls="profile-menu"
+              :aria-expanded="profileOpen"
+              @click="toggleProfile"
+            >
+              <span class="avatar">{{ initials }}</span>
+              <span class="profile-copy"><strong>{{ auth.user.value?.name }}</strong><small>{{ auth.user.value?.title }}</small></span>
+              <span class="chevron" :class="{ open: profileOpen }" aria-hidden="true">⌄</span>
+            </button>
+            <div v-if="profileOpen" id="profile-menu" class="profile-menu">
+              <template v-if="auth.isDemoMode">
+                <label>本地测试身份</label>
+                <select :value="auth.user.value?.role" @change="switchRole">
+                  <option v-for="(user, role) in auth.demoUsers" :key="role" :value="role">{{ user.title }}</option>
+                </select>
+              </template>
+              <button class="preferences-button" type="button" @click="openSettings">界面设置</button>
+              <button type="button" @click="logout">退出登录</button>
+            </div>
           </div>
         </div>
       </header>
