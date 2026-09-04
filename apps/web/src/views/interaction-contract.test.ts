@@ -67,6 +67,17 @@ describe('生产界面交互契约', () => {
     expect(apiClient).not.toMatch(/(?:from|import\s*\()\s*["'][^"']*mocks\/data["']/)
   })
 
+  it('业务弹窗使用可见的固定遮罩，并为匹配依据提供对话框语义', () => {
+    const stylesheet = readFileSync(join(sourceRoot, 'styles', 'main.css'), 'utf8')
+    const matchingView = readFileSync(join(sourceRoot, 'views', 'MatchingView.vue'), 'utf8')
+
+    expect(stylesheet).toMatch(/\.modal-backdrop\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?z-index:\s*80;/)
+    expect(stylesheet).toMatch(/\.modal-card\s*\{[\s\S]*?max-height:\s*calc\(100vh - 64px\);/)
+    expect(matchingView).toContain('@click="rulesOpen = true"')
+    expect(matchingView).toContain('role="dialog" aria-modal="true" aria-labelledby="matching-rules-title"')
+    expect(matchingView).toContain('id="matching-rules-title"')
+  })
+
   it('匹配详情把邀请、应答、洽谈、反馈和成果归档连接到显式用户操作', () => {
     const matchingView = readFileSync(join(sourceRoot, 'views', 'MatchingView.vue'), 'utf8')
     expect(matchingView).toContain('@submit.prevent="sendInvitation"')
