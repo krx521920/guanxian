@@ -206,6 +206,33 @@ describe('member ETag API contract', () => {
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes)
   })
 
+  it('sends assistant questions through the authenticated knowledge endpoint', async () => {
+    const answer = {
+      answer: '应建立巡检制度。[1]',
+      citations: [],
+      traceId: 'trace-1',
+      mode: 'RETRIEVAL_SUMMARY',
+      retrievalMode: 'LEXICAL',
+      inputTokens: 20,
+      outputTokens: 8,
+      estimatedCost: 0,
+    }
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: answer }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await expect(platformApi.askPolicyQuestion('  有哪些巡检要求？  ', 5, 'association-1')).resolves.toEqual(answer)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/knowledge/questions')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: '  有哪些巡检要求？  ',
+      maxCitations: 5,
+      associationId: 'association-1',
+    })
+  })
+
   it('uses exact paths and methods for every collection endpoint', async () => {
     const fetchMock = vi.fn().mockImplementation(async () =>
       Response.json({ code: 'OK', data: {} }),
