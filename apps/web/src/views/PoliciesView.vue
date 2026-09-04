@@ -56,6 +56,11 @@ const message = ref('')
 const keyword = ref('')
 const activeLevel = ref('')
 const policyLevels = ref<string[]>([])
+const effectiveFilter = ref('全部')
+const audienceFilter = ref('全部')
+const sortMode = ref('最新发布')
+const effectiveOptions = ['全部', '现行有效', '即将施行', '未定施行日期']
+const audienceOptions = ['全部', '全体会员', '本协会', '友好协会', '公开']
 const selected = ref<Policy | null>(null)
 const editing = ref<Policy | null>(null)
 const editorOpen = ref(false)
@@ -75,6 +80,38 @@ const canManageDeleted = computed(() => canWriteHere.value)
 const hasSubscriptionContext = computed(() => auth.user.value?.role !== 'SYSTEM_ADMIN' || Boolean(auth.user.value?.associationId))
 const affectedEnterprises = computed(() => new Set(impacts.value.map((item) => item.enterpriseId)).size)
 const policySubscription = computed(() => subscriptions.value.find((item) => item.subscriptionType === 'POLICY'))
+
+function visibilityLabel(value?: string | null): string {
+  return ({ PRIVATE: '仅本单位', ASSOCIATION: '本协会', PARTNERS: '友好协会', MEMBERS: '全体会员', PUBLIC: '公开' } as Record<string, string>)[value || ''] || '会员'
+}
+
+function effectiveState(policy: Policy): string {
+  if (!policy.effectiveDate) return '未定施行日期'
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  return new Date(`${policy.effectiveDate}T00:00:00`).getTime() <= today.getTime() ? '现行有效' : '即将施行'
+}
+
+function impactsFor(policy: Policy): PolicyImpactAnalysis[] {
+  return impacts.value.filter((item) => item.policyTitle === policy.title)
+}
+
+function adviceFor(policy: Policy): string[] {
+  if (policy.status === 'DRAFT') return ['补充发布单位、文号与原文链接', '核对摘要与适用对象后提交审核']
+  if (policy.status === 'PENDING_REVIEW') return ['核对原文来源与文号', '确认适用对象与可见范围后发布']
+  if (policy.status === 'REJECTED') return ['按退回意见修订后重新提交']
+  const advice = ['转发相关会员企业并组织学习', '跟踪施行日期，提前提醒受影响企业']
+  if (impactsFor(policy).length) advice.push('跟进已归档影响分析中的整改建议')
+  return advice
+}
+
+const filtered = computed(() => {
+  let list = [...items.value]
+  if (effectiveFilter.value !== '全部') list = list.filter((policy) => effectiveState(policy) === effectiveFilter.value)
+  if (audienceFilter.value !== '全部') list = list.filter((policy) => visibilityLabel(policy.visibility) === audienceFilter.value)
+  const factor = sortMode.value === '最新发布' ? -1 : 1
+  list.sort((left, right) => left.publishDate.localeCompare(right.publishDate) * factor)
+  return list
+})
 const form = reactive({ title: '', authority: '', documentNumber: '', level: '', category: '', publishDate: '', effectiveDate: '', sourceUrl: '', summary: '', tags: '', visibility: 'MEMBERS' })
 let searchTimer: number | null = null
 let memberSearchTimer: number | null = null

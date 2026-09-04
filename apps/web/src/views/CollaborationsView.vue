@@ -351,7 +351,7 @@ onMounted(async () => {
       当前为全平台只读视图。请先在顶部选择协会，再发起、审核或推进协作。
     </div>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
-    <section class="workflow-strip panel">
+    <section class="workflow-strip panel" aria-label="协作流程概览">
       <div><i>1</i><span><b>建立草稿</b><small>参与方确认</small></span></div><em>→</em>
       <div><i>2</i><span><b>协会审核</b><small>开放协作</small></span></div><em>→</em>
       <div class="active"><i>3</i><span><b>协同推进</b><small>记录每次进展</small></span></div><em>→</em>
@@ -383,7 +383,7 @@ onMounted(async () => {
       <PaginationBar :page="page" :size="size" :total="total" :disabled="loading" @change="changePage" @resize="resizePage" />
     </section>
 
-    <div v-if="editorOpen" class="modal-backdrop" @click.self="editorOpen = false">
+    <div v-if="editorOpen" class="modal-backdrop" role="dialog" aria-modal="true" :aria-label="activeMaintenance ? '维护协作推进信息' : editing ? '编辑协作草稿' : '发起协作'" @click.self="editorOpen = false">
       <form class="panel modal-card" @submit.prevent="save">
         <div class="modal-head"><div><span class="eyebrow">COLLABORATION DRAFT</span><h2>{{ activeMaintenance ? '维护协作推进信息' : editing ? '编辑协作草稿' : '发起协作' }}</h2></div><button type="button" class="icon-button" @click="editorOpen = false">×</button></div>
         <div class="form-grid modal-form">
@@ -400,7 +400,7 @@ onMounted(async () => {
       </form>
     </div>
 
-    <div v-if="selected" class="modal-backdrop" @click.self="closeDetail">
+    <div v-if="selected" class="modal-backdrop" role="dialog" aria-modal="true" :aria-label="`协作详情：${selected.title}`" @click.self="closeDetail">
       <section class="panel modal-card collaboration-detail">
         <div class="modal-head"><div><span class="eyebrow">COLLABORATION DETAIL</span><h2>{{ selected.title }}</h2></div><button class="icon-button" type="button" @click="closeDetail">×</button></div>
         <div v-if="detailError" class="save-message" role="alert">{{ detailError }} <button class="text-button" type="button" @click="openDetail(selected)">重新加载</button></div>

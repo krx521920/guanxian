@@ -52,6 +52,7 @@ const primaryThemes = [
   { value: 'orange', label: '黄铜棕', color: '#94613c' },
   { value: 'rose', label: '勃艮第红', color: '#884a59' },
 ] as const
+const todayLabel = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date())
 
 const navItems = computed(() => auth.user.value ? navigationForRole(auth.user.value.role) : [])
 const initials = computed(() => auth.user.value?.name.slice(-2) || '用户')
@@ -400,7 +401,7 @@ onBeforeUnmount(() => {
     <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
-        <div><strong>管线智联</strong><small>管理协作平台</small></div>
+        <div><strong>管线智联</strong><small>北京地下管线协会主办</small><span class="official-badge">官方平台</span></div>
       </div>
 
       <div class="nav-section-label">工作空间</div>
@@ -430,6 +431,11 @@ onBeforeUnmount(() => {
           <small v-if="systemContextError" class="danger-text">{{ systemContextError }}</small>
         </template>
       </div>
+      <div class="sidebar-status" aria-label="平台运行信息">
+        <div><span class="status-dot" aria-hidden="true"></span>系统状态：<strong>正常运行</strong></div>
+        <div>主办单位：<strong>北京地下管线协会秘书处</strong></div>
+        <div>运营支持：<strong>管线智联平台运营组</strong></div>
+      </div>
     </aside>
     <button v-if="mobileOpen" class="sidebar-mask" aria-label="关闭导航" @click="mobileOpen = false" />
 
@@ -446,8 +452,9 @@ onBeforeUnmount(() => {
         <RouterLink class="topbar-back-button" :to="workspaceHome" aria-label="返回工作台" title="返回工作台">
           <span aria-hidden="true">←</span><span>返回</span>
         </RouterLink>
-        <div class="crumb"><span>{{ crumbOrganization }}</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
+        <div class="crumb"><span class="crumb-org">{{ crumbOrganization }}</span><b>/</b><strong>{{ route.meta.title }}</strong><span class="topbar-date" aria-label="当前日期">{{ todayLabel }}</span></div>
         <div class="top-actions">
+          <span class="topbar-status"><span class="status-dot" aria-hidden="true"></span>系统正常</span>
           <div ref="notificationWrap" class="notification-wrap">
             <button
               class="icon-button notification-button"
@@ -512,6 +519,8 @@ onBeforeUnmount(() => {
             <button
               class="profile-button"
               type="button"
+              aria-haspopup="menu"
+              aria-label="当前账号菜单"
               aria-controls="profile-menu"
               :aria-expanded="profileOpen"
               @click="toggleProfile"

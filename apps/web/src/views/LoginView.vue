@@ -35,12 +35,12 @@ async function login() {
     <section class="login-visual">
       <div class="login-brand">
         <div class="brand-mark light"><span /><span /><span /></div>
-        <strong>管线智联</strong>
+        <div><strong>管线智联</strong><span class="official-badge">官方平台</span></div>
       </div>
       <div class="visual-copy">
-        <span class="visual-kicker">北京地下管线协会</span>
-        <h1>让行业资源<br />真正连接起来</h1>
-        <p>向上连接政策标准，横向协同兄弟协会，向下服务会员企业，以可信业务数据支持行业协作。</p>
+        <span class="visual-kicker">北京地下管线协会 · 管理协作平台</span>
+        <h1>政务可信<br />企业高效 · 数据可追溯</h1>
+        <p>向上连接政策标准，横向协同兄弟协会，向下服务会员企业，以可信业务数据支持行业协作。每一项数据注明来源与更新时间，每一次操作都留痕可查。</p>
         <div class="network-visual" aria-hidden="true">
           <div class="network-core"><b>协作</b><span>业务中枢</span></div>
           <div class="network-node node-a">政策</div>
@@ -50,12 +50,13 @@ async function login() {
           <i class="line-a" /><i class="line-b" /><i class="line-c" /><i class="line-d" />
         </div>
       </div>
-      <small class="visual-footer">可信数据 · 规则匹配 · 协同闭环</small>
+      <small class="visual-footer">主办单位：北京地下管线协会 · 可信数据 · 规则匹配 · 协同闭环</small>
     </section>
 
     <section class="login-panel">
       <form class="login-card" @submit.prevent="login">
-        <div class="mobile-brand"><div class="brand-mark"><span /><span /><span /></div><strong>管线智联</strong></div>
+        <div class="mobile-brand"><div class="brand-mark"><span /><span /><span /></div><strong>北京地下管线协会管理协作平台</strong></div>
+        <span class="eyebrow">{{ auth.isDemoMode ? 'LOCAL DEMO' : 'SECURE ACCESS' }}</span>
         <h2>欢迎使用管理协作平台</h2>
         <p>{{ auth.isDemoMode ? '请选择本地测试身份' : '使用统一身份认证安全登录' }}</p>
 

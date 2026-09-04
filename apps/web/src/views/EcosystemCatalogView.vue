@@ -358,7 +358,7 @@ onMounted(async () => {
       <PaginationBar :page="demandPage" :size="pageSize" :total="demandTotal" :disabled="loading" @change="changePage" @resize="resizePage" />
     </section>
 
-    <div v-if="editorOpen" class="modal-backdrop" @click.self="editorOpen = false">
+    <div v-if="editorOpen" class="modal-backdrop" role="dialog" aria-modal="true" @click.self="editorOpen = false">
       <form class="panel modal-card" @submit.prevent="saveEditor">
         <div class="modal-head"><div><span class="eyebrow">{{ tab === 'offerings' ? 'OFFERING' : 'DEMAND' }}</span><h2>{{ (editingOffering || editingDemand) ? '编辑资料' : '新建资料' }}</h2></div><button type="button" class="icon-button" aria-label="关闭" @click="editorOpen = false">×</button></div>
         <div v-if="tab === 'offerings'" class="form-grid modal-form"><label><span>名称 *</span><input v-model="offeringForm.name" required maxlength="200" /></label><label><span>类型</span><select v-model="offeringForm.kind"><option value="PRODUCT">产品</option><option value="SERVICE">服务</option></select></label><label class="form-span-2"><span>详细说明</span><textarea v-model="offeringForm.description" rows="5" /></label><label><span>适用场景</span><textarea v-model="offeringForm.scenarios" rows="4" /></label><label><span>资质与证书</span><textarea v-model="offeringForm.qualifications" rows="4" /></label><label><span>可见范围</span><select v-model="offeringForm.visibility"><option value="PRIVATE">仅本企业与协会</option><option value="MEMBERS">本协会会员</option><option value="PARTNERS">友好协会</option><option value="PUBLIC">公开</option></select></label></div>

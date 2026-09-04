@@ -629,24 +629,24 @@ onBeforeUnmount(() => {
 
 <template>
   <div>
-    <PageHeader eyebrow="ECOSYSTEM MATCHING" title="生态匹配" description="基于已审核的真实需求和在架能力，生成可确认、可反馈的匹配记录">
+    <PageHeader eyebrow="ECOSYSTEM MATCHING" title="生态匹配" description="按“需求 → 推荐企业 → 协作状态”全流程展示，评分仅供辅助参考，由协会与企业人工确认">
       <button class="secondary-button" @click="rulesOpen = true">匹配依据</button><button v-if="canGenerate" class="primary-button" @click="openGenerator">生成新一轮匹配</button>
     </PageHeader>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
     <section class="match-summary">
-      <div><span>符合当前筛选</span><strong>{{ total }}</strong><small>数据库总数</small></div><div><span>本页已由协会推荐</span><strong>{{ recommendedCount }}</strong><small>本页 {{ items.length }} 条</small></div><div><span>本页双方均已确认</span><strong>{{ confirmedCount }}</strong><small>仅统计当前页</small></div>
-      <div class="matching-logic"><span class="ai-chip">规则</span><p><b>记录可解释</b>每条匹配保留分数和具体推荐理由，并由协会与企业人工确认。</p></div>
+      <div><span>符合当前筛选</span><strong>{{ total }}</strong><small>数据库总数</small></div><div><span>本页已由协会推荐</span><strong>{{ recommendedCount }}</strong><small>{{ items.length ? `${Math.round(recommendedCount / items.length * 100)}%` : '0%' }}</small></div><div><span>本页双方均已确认</span><strong>{{ confirmedCount }}</strong><small>{{ items.length ? `${Math.round(confirmedCount / items.length * 100)}%` : '0%' }}</small></div>
+      <div class="matching-logic"><span class="ai-chip">辅助</span><p><b>辅助决策，不替代人工</b>评分与推荐依据来自确定性规则，仅供参考；匹配须经协会推荐、企业双方确认后才推进。</p></div>
     </section>
     <div class="segmented match-tabs"><button v-for="filter in MATCH_STATE_FILTERS" :key="filter.value || 'ALL'" :class="{ active: state === filter.value }" :disabled="loading || busy" @click="selectState(filter.value)">{{ filter.label }}</button></div>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else class="match-list">
       <article v-for="item in items" :key="item.id" class="match-card panel">
-        <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - (item.score ?? 0) * 1.13}` }"/></svg><div><strong>{{ item.score ?? '—' }}</strong><span>匹配度</span></div></div>
-        <div class="match-demand"><span class="eyebrow">需求方 · {{ item.scene || '场景未授权' }}</span><h2>{{ item.demandTitle || '需求标题未授权' }}</h2><p>{{ item.demandCompany || '需求企业未授权' }}</p></div>
-        <div class="match-arrow"><span>可解释推荐</span>→</div>
-        <div class="match-supplier"><span class="eyebrow">能力供给方</span><h2>{{ item.supplierCompany || '供给企业未授权' }}</h2><p>{{ item.solution || '方案未授权' }}</p></div>
-        <div class="match-actions"><StatusBadge :value="displayBusinessStatus(item.state)" /><small>{{ formatDateTime(item.updatedAt) }}</small><button class="primary-button small" @click="openDetail(item)">查看匹配详情</button></div>
-        <div class="match-reasons"><b>推荐理由</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span></div>
+        <div class="match-score"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18"/><circle class="score-line" cx="22" cy="22" r="18" :style="{ strokeDashoffset: `${113 - (item.score ?? 0) * 1.13}` }"/></svg><div><strong>{{ item.score ?? '—' }}</strong><span>参考评分</span></div></div>
+        <div class="match-demand"><span class="match-stage-label">① 需求 · {{ item.scene || '场景未授权' }}</span><h2>{{ item.demandTitle || '需求标题未授权' }}</h2><p>{{ item.demandCompany || '需求企业未授权' }}</p></div>
+        <div class="match-arrow" aria-hidden="true"><span>辅助推荐</span>→</div>
+        <div class="match-supplier"><span class="match-stage-label">② 推荐企业</span><h2>{{ item.supplierCompany || '供给企业未授权' }}</h2><p>{{ item.solution || '方案未授权' }}</p></div>
+        <div class="match-state-cell"><span class="match-stage-label">③ 协作状态</span><StatusBadge :value="displayBusinessStatus(item.state)" /><div class="chip-row"><span class="tag" :class="item.recommendedAt ? 'tone-info' : 'tone-warning'">{{ item.recommendedAt ? '协会推荐' : '待协会推荐' }}</span><span class="tag" :class="item.demandConfirmedAt ? 'tone-success' : 'tone-neutral'">需求方{{ item.demandConfirmedAt ? '已确认' : '待确认' }}</span><span class="tag" :class="item.candidateConfirmedAt ? 'tone-success' : 'tone-neutral'">供给方{{ item.candidateConfirmedAt ? '已确认' : '待确认' }}</span></div><button class="primary-button small" :aria-label="`查看匹配详情：${item.demandTitle || '未授权需求'}`" @click="openDetail(item)">查看详情</button><small class="table-muted">{{ formatDateTime(item.updatedAt) }}</small></div>
+        <div class="match-reasons"><b>推荐依据</b><span v-for="reason in item.reasons" :key="reason">✓ {{ reason }}</span><span v-if="!item.reasons.length">暂无理由说明</span><span class="table-muted">数据来源：已审核需求库 + 在架能力库 · 记录版本 v{{ item.version }}</span></div>
       </article>
       <div v-if="!items.length" class="panel empty-business-state"><b>{{ state ? '当前状态下暂无匹配记录' : '暂无匹配记录' }}</b><span v-if="canGenerate">可从“生成新一轮匹配”选择当前身份有权操作的开放需求。</span><span v-else-if="hasGenerationRole">当前身份暂无有权生成匹配的开放需求。</span><span v-else>当前身份可查看已授权的匹配记录，但不能发起生成。</span></div>
       <PaginationBar v-if="total > 0" :page="page" :size="size" :total="total" :disabled="loading || busy" @change="changePage" @resize="resizePage" />
@@ -664,8 +664,10 @@ onBeforeUnmount(() => {
         <div class="detail-grid">
           <div><span>需求方</span><strong>{{ selected.demandCompany || '未授权' }}</strong></div>
           <div><span>供给方</span><strong>{{ selected.supplierCompany || '未授权' }}</strong></div>
-          <div><span>匹配度</span><strong>{{ selected.score ?? '未授权' }}</strong></div>
+          <div><span>参考评分</span><strong>{{ selected.score ?? '未授权' }}</strong></div>
           <div><span>当前状态</span><strong>{{ displayBusinessStatus(selected.state) }}</strong></div>
+          <div><span>协会推荐</span><strong>{{ selected.recommendedAt ? formatDateTime(selected.recommendedAt) : '待协会推荐' }}</strong></div>
+          <div><span>记录版本</span><strong>v{{ selected.version }}</strong></div>
           <div><span>需求方确认</span><strong>{{ selected.demandConfirmedAt ? formatDateTime(selected.demandConfirmedAt) : '待确认' }}</strong></div>
           <div><span>供给方确认</span><strong>{{ selected.candidateConfirmedAt ? formatDateTime(selected.candidateConfirmedAt) : '待确认' }}</strong></div>
         </div>
