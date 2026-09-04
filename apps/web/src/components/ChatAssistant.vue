@@ -21,6 +21,7 @@ const open = ref(false)
 const busy = ref(false)
 const question = ref('')
 const error = ref('')
+const conversationId = ref(crypto.randomUUID())
 const input = ref<HTMLTextAreaElement | null>(null)
 const messageList = ref<HTMLElement | null>(null)
 let messageId = 0
@@ -67,6 +68,7 @@ function clearConversation() {
   busy.value = false
   error.value = ''
   question.value = ''
+  conversationId.value = crypto.randomUUID()
   messages.value = [welcomeMessage()]
   void nextTick(() => input.value?.focus())
 }
@@ -86,8 +88,11 @@ async function ask(value = question.value) {
   busy.value = true
   await scrollToLatest()
   try {
-    const answer = await platformApi.askPolicyQuestion(
+    const answer = await platformApi.chatWithAssistant(
       normalized,
+      conversationId.value,
+      pageTitle.value,
+      route.path,
       5,
       auth.user.value?.associationId || undefined,
     )
@@ -123,6 +128,7 @@ watch(() => auth.user.value?.associationId, () => {
   requestRevision += 1
   busy.value = false
   error.value = ''
+  conversationId.value = crypto.randomUUID()
   messages.value = [welcomeMessage()]
 })
 

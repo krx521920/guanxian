@@ -334,6 +334,11 @@ export interface PolicyQuestionAnswer {
   estimatedCost: number
 }
 
+export interface AssistantChatAnswer extends PolicyQuestionAnswer {
+  conversationId: string
+  modelConnected: boolean
+}
+
 export interface EcosystemMatch {
   id: string
   demandCompany: string | null

@@ -233,6 +233,45 @@ describe('member ETag API contract', () => {
     })
   })
 
+  it('sends stateful chat messages with page and association context', async () => {
+    const answer = {
+      answer: '可以从会员企业页面执行批量导入。',
+      citations: [],
+      traceId: 'trace-2',
+      mode: 'SPRING_AI_AGENT',
+      retrievalMode: 'LEXICAL',
+      inputTokens: 30,
+      outputTokens: 10,
+      estimatedCost: 0,
+      conversationId: '11111111-1111-4111-8111-111111111111',
+      modelConnected: true,
+    }
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: answer }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await expect(platformApi.chatWithAssistant(
+      '批量导入在哪里？',
+      answer.conversationId,
+      '会员企业',
+      '/members',
+      5,
+      'association-1',
+    )).resolves.toEqual(answer)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/assistant/chat')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      message: '批量导入在哪里？',
+      conversationId: answer.conversationId,
+      pageTitle: '会员企业',
+      pagePath: '/members',
+      maxCitations: 5,
+      associationId: 'association-1',
+    })
+  })
+
   it('uses exact paths and methods for every collection endpoint', async () => {
     const fetchMock = vi.fn().mockImplementation(async () =>
       Response.json({ code: 'OK', data: {} }),

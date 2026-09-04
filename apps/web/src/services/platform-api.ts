@@ -1,4 +1,5 @@
 import type {
+  AssistantChatAnswer,
   AccessBinding, AccessBindingPage,
   AccessBindingPayload,
   AssociationAccessRequest,
@@ -252,6 +253,30 @@ export const platformApi = {
   askPolicyQuestion: (question: string, maxCitations = 5, associationId?: string) => request<PolicyQuestionAnswer>(
     '/knowledge/questions',
     { method: 'POST', body: JSON.stringify({ question, maxCitations, associationId: associationId || null }) },
+    undefined,
+    'json',
+    60000,
+  ),
+  chatWithAssistant: (
+    message: string,
+    conversationId: string,
+    pageTitle: string,
+    pagePath: string,
+    maxCitations = 5,
+    associationId?: string,
+  ) => request<AssistantChatAnswer>(
+    '/assistant/chat',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        conversationId,
+        pageTitle,
+        pagePath,
+        maxCitations,
+        associationId: associationId || null,
+      }),
+    },
     undefined,
     'json',
     60000,
