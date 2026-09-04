@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useAuth } from '../services/auth'
 import { platformApi } from '../services/platform-api'
 import type { KnowledgeCitation } from '../types/domain'
-import { assistantErrorMessage, safeCitationUrl } from './chat-assistant'
+import { assistantErrorMessage, assistantModeLabel, safeCitationUrl } from './chat-assistant'
 
 interface ChatMessage {
   id: number
@@ -32,24 +32,34 @@ let activeRequest: AbortController | null = null
 const welcomeMessage = (): ChatMessage => ({
   id: ++messageId,
   role: 'assistant',
-  content: '您好，我是管线智能助手。我会依据您当前有权查看的协会资料回答，并为答案标注出处。',
+  content: '您好，我是管线智能助手。我会自动选择业务查询或知识库模式，只读取当前身份可见的数据，并在每条回答中标注模式。',
   citations: [],
+  mode: 'AUTO',
 })
 
 const messages = ref<ChatMessage[]>([welcomeMessage()])
 const pageTitle = computed(() => String(route.meta.title || '当前页面'))
 const requiresAssociation = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN' && !auth.user.value.associationId)
 const available = computed(() => !requiresAssociation.value)
-const statusText = computed(() => requiresAssociation.value ? '请先在左侧选择管理协会' : `${pageTitle.value} · 只读问答`)
+const latestMode = computed(() => [...messages.value].reverse().find((item) => item.role === 'assistant' && item.mode)?.mode || 'AUTO')
+const statusText = computed(() => requiresAssociation.value
+  ? '请先在左侧选择管理协会'
+  : `${pageTitle.value} · ${assistantModeLabel(latestMode.value)}`)
 const quickQuestions = computed(() => {
   if (route.path.startsWith('/policies')) {
     return ['资料中有哪些安全管理要求？', '哪些条款与会员企业有关？']
   }
   if (route.path.startsWith('/members')) {
-    return ['会员企业需要重点关注哪些政策？', '资料中有哪些企业合规要求？']
+    return ['现在有哪些会员企业？', '哪些会员企业有管线监测能力？', '会员企业需要重点关注哪些政策？']
   }
   if (route.path.startsWith('/matching')) {
-    return ['供需匹配需要关注哪些合规要求？', '资料中对项目合作有哪些规定？']
+    return ['当前有哪些生态匹配记录？', '供需匹配需要关注哪些合规要求？']
+  }
+  if (route.path.startsWith('/collaborations')) {
+    return ['当前有哪些协作事项？', '进行中的协作事项有哪些？']
+  }
+  if (route.path.startsWith('/ecosystem')) {
+    return ['当前有哪些产品与服务？', '当前有哪些合作需求？']
   }
   return ['概括当前资料库的核心要求', '有哪些内容值得会员企业关注？']
 })
@@ -204,6 +214,7 @@ onBeforeUnmount(() => {
               <i /><i /><i /><span>正在检索可见资料</span>
             </div>
             <p v-else>{{ message.content }}</p>
+            <span v-if="message.role === 'assistant' && message.mode" class="assistant-mode">{{ assistantModeLabel(message.mode) }}</span>
             <details v-if="message.citations.length" class="assistant-citations">
               <summary>{{ message.citations.length }} 条引用依据</summary>
               <ol>
@@ -246,7 +257,7 @@ onBeforeUnmount(() => {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h13"/></svg>
         </button>
       </form>
-      <footer>仅依据当前身份可见资料回答 · 不会代替您执行系统操作</footer>
+      <footer>每条回答均标注知识库或业务查询模式 · 不会代替您执行系统操作</footer>
     </section>
 
     <button
@@ -290,6 +301,7 @@ onBeforeUnmount(() => {
 .assistant-bubble { padding: 11px 13px; border: 1px solid var(--line); border-radius: 5px 13px 13px 13px; background: var(--surface-soft); font-size: 12px; line-height: 1.7; }
 .assistant-message.user .assistant-bubble { border-color: transparent; border-radius: 13px 5px 13px 13px; background: var(--primary); color: #fff; }
 .assistant-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.assistant-mode { display: inline-flex; margin-top: 8px; padding: 3px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 9px; font-weight: 700; }
 .assistant-citations { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--muted); }
 .assistant-citations summary { cursor: pointer; color: var(--primary); font-size: 10px; font-weight: 700; }
 .assistant-citations ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 10px; }

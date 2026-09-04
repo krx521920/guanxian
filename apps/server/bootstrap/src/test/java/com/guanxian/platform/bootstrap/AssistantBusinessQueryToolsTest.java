@@ -106,6 +106,38 @@ class AssistantBusinessQueryToolsTest {
         verify(collaborationService).page(actor, "巡检", "IN_PROGRESS", false, 0, 10);
     }
 
+    @Test
+    void localRouterAnswersMemberQueryWithoutModelAndKeepsSensitiveFieldsOut() {
+        MemberProfile member = new MemberProfile(
+                UUID.randomUUID(), actor.associationId(), "京城管网科技", "91110000SECRET0001",
+                "技术服务", "北京市", "张工", "13800000000", "zhang@example.cn", "简介",
+                List.of("管线监测"), List.of("监测平台"), List.of("数据服务"), List.of("燃气"),
+                List.of(), "MEMBERS", "ACTIVE", 1, Instant.EPOCH, Instant.EPOCH,
+                null, null, null);
+        when(memberService.findAll("管线监测", null, false, actor)).thenReturn(List.of(member));
+
+        var answer = tools.answer(new com.guanxian.platform.ai.assistant.AssistantLocalQueryProvider.LocalQueryRequest(
+                new AssistantAccessContext(actor, Set.of("MEMBER_READ")),
+                "哪些会员企业有管线监测能力？", "会员企业", "/members"));
+
+        assertThat(answer).isPresent();
+        assertThat(answer.orElseThrow().mode()).isEqualTo("LOCAL_BUSINESS_QUERY");
+        assertThat(answer.orElseThrow().answer())
+                .contains("京城管网科技", "管线监测", "监测平台", "数据服务")
+                .doesNotContain("13800000000", "zhang@example.cn", "91110000SECRET0001");
+        verify(memberService).findAll("管线监测", null, false, actor);
+    }
+
+    @Test
+    void localRouterLeavesPolicyQuestionForKnowledgeMode() {
+        var answer = tools.answer(new com.guanxian.platform.ai.assistant.AssistantLocalQueryProvider.LocalQueryRequest(
+                new AssistantAccessContext(actor, Set.of("POLICY_READ", "MEMBER_READ")),
+                "会员企业需要重点关注哪些政策？", "会员企业", "/members"));
+
+        assertThat(answer).isEmpty();
+        verify(memberService, never()).findAll(any(), any(), anyBoolean(), any());
+    }
+
     private ToolContext context(Set<String> authorities) {
         return new ToolContext(Map.of(
                 AssistantAccessContext.TOOL_CONTEXT_KEY,

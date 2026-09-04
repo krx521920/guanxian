@@ -328,7 +328,7 @@ export interface PolicyQuestionAnswer {
   citations: KnowledgeCitation[]
   traceId: string
   mode: string
-  retrievalMode: 'HYBRID_VECTOR' | 'LEXICAL'
+  retrievalMode: 'HYBRID_VECTOR' | 'LEXICAL' | 'SCOPED_SERVICE'
   inputTokens: number
   outputTokens: number
   estimatedCost: number

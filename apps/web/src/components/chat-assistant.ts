@@ -22,3 +22,10 @@ export function assistantErrorMessage(reason: unknown): string {
   if (error?.code === 'REQUEST_TIMEOUT') return '回答超时，请稍后重试。'
   return '智能助手暂时无法回答，请稍后重试。'
 }
+
+export function assistantModeLabel(mode: string | null | undefined): string {
+  if (mode === 'LOCAL_BUSINESS_QUERY') return '业务查询模式'
+  if (mode === 'SPRING_AI_AGENT') return 'AI 综合模式'
+  if (mode === 'AUTO') return '自动选择模式'
+  return '知识库模式'
+}

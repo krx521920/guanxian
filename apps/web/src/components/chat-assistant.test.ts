@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assistantErrorMessage, safeCitationUrl } from './chat-assistant'
+import { assistantErrorMessage, assistantModeLabel, safeCitationUrl } from './chat-assistant'
 
 describe('chat assistant safety helpers', () => {
   it('only exposes HTTP(S) citation links', () => {
@@ -17,5 +17,12 @@ describe('chat assistant safety helpers', () => {
     expect(assistantErrorMessage({ code: 'RAG_LIMIT_EXCEEDED' })).toContain('缩短')
     expect(assistantErrorMessage({ code: 'REQUEST_TIMEOUT' })).toContain('超时')
     expect(assistantErrorMessage(new Error('secret backend detail'))).not.toContain('secret')
+  })
+
+  it('labels the source mode without implying that local queries use a model', () => {
+    expect(assistantModeLabel('LOCAL_BUSINESS_QUERY')).toBe('业务查询模式')
+    expect(assistantModeLabel('RETRIEVAL_SUMMARY')).toBe('知识库模式')
+    expect(assistantModeLabel('SPRING_AI_AGENT')).toBe('AI 综合模式')
+    expect(assistantModeLabel('AUTO')).toBe('自动选择模式')
   })
 })

@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -32,22 +33,26 @@ public class PlatformAssistantService {
     private final AssistantChatClient assistantChatClient;
     private final KnowledgeRepository repository;
     private final RagProperties ragProperties;
+    private final List<AssistantLocalQueryProvider> localQueryProviders;
 
     public PlatformAssistantService(
             PolicyRagService ragService,
             AssistantChatClient assistantChatClient,
             KnowledgeRepository repository,
-            RagProperties ragProperties) {
+            RagProperties ragProperties,
+            List<AssistantLocalQueryProvider> localQueryProviders) {
         this.ragService = ragService;
         this.assistantChatClient = assistantChatClient;
         this.repository = repository;
         this.ragProperties = ragProperties;
+        this.localQueryProviders = localQueryProviders == null ? List.of() : List.copyOf(localQueryProviders);
     }
 
     public AssistantAnswer chat(AssistantQuestion question) {
         PreparedRequest prepared = prepare(question);
         if (!assistantChatClient.enabled()) {
-            return fromLocalEvidence(question.conversationId(), prepared.evidence());
+            return fromLocalQuery(question, prepared.evidence())
+                    .orElseGet(() -> fromLocalEvidence(question.conversationId(), prepared.evidence()));
         }
 
         long started = System.nanoTime();
@@ -79,7 +84,8 @@ public class PlatformAssistantService {
         PreparedRequest prepared = prepare(question);
         AssistantStreamEvent start = AssistantStreamEvent.start(question.conversationId());
         if (!assistantChatClient.enabled()) {
-            AssistantAnswer answer = fromLocalEvidence(question.conversationId(), prepared.evidence());
+            AssistantAnswer answer = fromLocalQuery(question, prepared.evidence())
+                    .orElseGet(() -> fromLocalEvidence(question.conversationId(), prepared.evidence()));
             Flux<AssistantStreamEvent> deltas = Flux.fromIterable(textChunks(answer.answer()))
                     .map(chunk -> AssistantStreamEvent.delta(question.conversationId(), chunk));
             return Flux.concat(Flux.just(start), deltas, Flux.just(AssistantStreamEvent.complete(answer)));
@@ -170,6 +176,24 @@ public class PlatformAssistantService {
                 evidence.answer(), evidence.citations(), evidence.traceId(), evidence.mode(),
                 evidence.retrievalMode(), evidence.inputTokens(), evidence.outputTokens(),
                 evidence.estimatedCost(), conversationId, false);
+    }
+
+    private Optional<AssistantAnswer> fromLocalQuery(AssistantQuestion question, RagAnswer evidence) {
+        AssistantLocalQueryProvider.LocalQueryRequest request =
+                new AssistantLocalQueryProvider.LocalQueryRequest(
+                        question.access(), question.message(), question.pageTitle(), question.pagePath());
+        return localQueryProviders.stream()
+                .map(provider -> provider.answer(request))
+                .flatMap(Optional::stream)
+                .findFirst()
+                .map(result -> {
+                    int outputTokens = DocumentTextChunker.estimateTokens(result.answer());
+                    enforceCompletionLimits(outputTokens, BigDecimal.ZERO);
+                    return new AssistantAnswer(
+                            result.answer().strip(), List.of(), evidence.traceId(), result.mode(),
+                            "SCOPED_SERVICE", 0, outputTokens, BigDecimal.ZERO,
+                            question.conversationId(), false);
+                });
     }
 
     private AssistantAnswer modelAnswer(

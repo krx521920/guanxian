@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -67,6 +68,7 @@ public class AssistantController {
             HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-cache, no-transform");
         response.setHeader("X-Accel-Buffering", "no");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         ActorScope actor = actorScopeResolver.resolve(authentication);
         UUID associationId = readAssociationId(request.associationId(), actor);
         return assistantService.stream(question(request, authentication, actor, associationId))

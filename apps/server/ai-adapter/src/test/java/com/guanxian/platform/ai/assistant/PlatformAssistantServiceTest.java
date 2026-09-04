@@ -108,7 +108,7 @@ class PlatformAssistantServiceTest {
             }
         };
         return new Fixture(
-                new PlatformAssistantService(ragService, chatClient, repository, properties),
+                new PlatformAssistantService(ragService, chatClient, repository, properties, List.of()),
                 associationId, request);
     }
 
