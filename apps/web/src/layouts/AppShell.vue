@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView, type RouteLocationRaw } from 'vue-router'
 import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
-import { roleLabels } from '../config/roles'
+import { defaultRouteForRole, roleLabels } from '../config/roles'
 import { useAuth } from '../services/auth'
 import { createLatestRequestGate } from '../services/latest-request'
 import { platformApi } from '../services/platform-api'
@@ -62,6 +62,7 @@ const notificationPageCount = computed(() => Math.max(
 const notificationHasNextPage = computed(() => notificationPageIndex.value + 1 < notificationPageCount.value)
 const isSystemAdmin = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN')
 const crumbOrganization = computed(() => auth.user.value?.organization || '管线智联平台')
+const workspaceHome = computed(() => auth.user.value ? defaultRouteForRole(auth.user.value.role) : '/')
 
 function refreshContextDependentState() {
   notificationRequestRevision += 1
@@ -433,6 +434,9 @@ onBeforeUnmount(() => {
           :aria-label="mobileOpen ? '关闭导航' : sidebarCollapsed ? '展开导航' : '收起导航'"
           @click="toggleSidebar"
         >☰</button>
+        <RouterLink class="topbar-back-button" :to="workspaceHome" aria-label="返回工作台" title="返回工作台">
+          <span aria-hidden="true">←</span><span>返回</span>
+        </RouterLink>
         <div class="crumb"><span>{{ crumbOrganization }}</span><b>/</b><strong>{{ route.meta.title }}</strong></div>
         <div class="top-actions">
           <div ref="notificationWrap" class="notification-wrap">

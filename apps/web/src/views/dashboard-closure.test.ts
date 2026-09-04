@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
+import appShell from '../layouts/AppShell.vue?raw'
 import associationDashboard from './AssociationDashboard.vue?raw'
 import enterpriseDashboard from './EnterpriseDashboard.vue?raw'
 import loginView from './LoginView.vue?raw'
 import membersView from './MembersView.vue?raw'
 
 describe('dashboard and member UI closure', () => {
+  it('keeps a persistent return-to-workspace control in the application header', () => {
+    expect(appShell).toContain("const workspaceHome = computed(() => auth.user.value ? defaultRouteForRole(auth.user.value.role) : '/')")
+    expect(appShell).toContain('class="topbar-back-button"')
+    expect(appShell).toContain(':to="workspaceHome"')
+    expect(appShell).toContain('aria-label="返回工作台"')
+  })
+
   it('keeps every association dashboard action connected to a route or reload', () => {
     expect(associationDashboard).toContain('to="/members"')
     expect(associationDashboard).toContain('to="/collaborations"')
