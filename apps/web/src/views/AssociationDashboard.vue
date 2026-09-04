@@ -118,7 +118,7 @@ const quickLinks = computed(() => {
                 <strong>{{ todo.title }}</strong>
                 <small :class="{ overdue: todo.overdue }">{{ todo.meta }}</small>
               </div>
-              <RouterLink class="secondary-button small" :to="todo.to">{{ todo.action }}</RouterLink>
+              <RouterLink class="todo-action" :class="todo.kind" :to="todo.to">{{ todo.action }}</RouterLink>
             </div>
           </div>
           <div v-else class="empty-business-state"><b>当前没有待办事项</b><span>新的审核、推进和逾期提醒会出现在这里。</span><RouterLink class="secondary-button small" to="/collaborations">查看协作事项</RouterLink></div>
