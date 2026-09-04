@@ -652,7 +652,16 @@ onBeforeUnmount(() => {
       <PaginationBar v-if="total > 0" :page="page" :size="size" :total="total" :disabled="loading || busy" @change="changePage" @resize="resizePage" />
     </section>
 
-    <div v-if="rulesOpen" class="modal-backdrop" @click.self="rulesOpen = false"><section class="panel modal-card compact-modal"><div class="modal-head"><div><span class="eyebrow">MATCH EXPLAINABILITY</span><h2>匹配依据</h2></div><button class="icon-button" @click="rulesOpen = false">×</button></div><div class="modal-copy"><p>系统从需求场景、所需能力、供给方产品/服务、资质与数据可见性中生成候选。</p><p>分数和推荐理由以后端每条记录为准，页面不伪造固定权重。</p><p>匹配不会自动对外推送：必须经协会推荐、企业确认后才进入洽谈。</p></div><div class="form-actions"><button class="primary-button" @click="rulesOpen = false">我知道了</button></div></section></div>
+    <div v-if="rulesOpen" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="matching-rules-title" @click.self="rulesOpen = false">
+      <section class="panel modal-card compact-modal">
+        <div class="modal-head">
+          <div><span class="eyebrow">MATCH EXPLAINABILITY</span><h2 id="matching-rules-title">匹配依据</h2></div>
+          <button type="button" class="icon-button" aria-label="关闭匹配依据" @click="rulesOpen = false">×</button>
+        </div>
+        <div class="modal-copy"><p>系统从需求场景、所需能力、供给方产品/服务、资质与数据可见性中生成候选。</p><p>分数和推荐理由以后端每条记录为准，页面不伪造固定权重。</p><p>匹配不会自动对外推送：必须经协会推荐、企业确认后才进入洽谈。</p></div>
+        <div class="form-actions"><button type="button" class="primary-button" @click="rulesOpen = false">我知道了</button></div>
+      </section>
+    </div>
     <div v-if="generatorOpen" class="modal-backdrop" @click.self="generatorOpen = false"><form class="panel modal-card compact-modal" @submit.prevent="generate()"><div class="modal-head"><div><span class="eyebrow">GENERATE MATCHES</span><h2>选择真实需求</h2></div><button type="button" class="icon-button" @click="generatorOpen = false">×</button></div><div v-if="message" class="save-message modal-message" aria-live="polite">{{ message }}</div><div class="form-grid modal-form"><label class="form-span-2"><span>需求 *</span><select v-model="selectedDemandId" required><option value="" disabled>请选择</option><option v-for="demand in demands" :key="demand.id" :value="demand.id">{{ demand.title }} · {{ demand.enterpriseName || '企业名称未授权' }}</option></select></label><p v-if="!demands.length" class="form-span-2 workflow-note">当前身份下没有可生成匹配的已开放需求。</p></div><div class="form-actions"><button type="button" class="secondary-button" @click="generatorOpen = false">取消</button><button class="primary-button" :disabled="busy || !demands.length">{{ busy ? '正在匹配…' : '生成并保存匹配' }}</button></div></form></div>
     <div v-if="selected" class="modal-backdrop" @click.self="closeDetail">
       <section class="panel modal-card match-detail-modal">
