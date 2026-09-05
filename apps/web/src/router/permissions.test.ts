@@ -11,12 +11,14 @@ describe('protected route permissions', () => {
       '/ecosystem',
       '/ecosystem/overview',
       '/enterprise',
+      '/enterprise/profile',
       '/federation',
       '/matching',
       '/members',
       '/members/edit',
       '/members/new',
       '/operations',
+      '/operations/invitations',
       '/policies',
     ])
     Object.values(protectedRouteRoles).forEach((roles) => expect(roles.length).toBeGreaterThan(0))

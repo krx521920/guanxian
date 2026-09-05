@@ -8,12 +8,11 @@ import StatusBadge from '../components/StatusBadge.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
 import { platformApi } from '../services/platform-api'
 import { useAuth } from '../services/auth'
+import { roleLabels } from '../config/roles'
 
 const auth = useAuth()
 const { data, loading, error, load } = useAsyncResource(platformApi.enterpriseDashboard)
-const profileRoute = computed(() => auth.user.value?.role === 'ENTERPRISE_ADMIN' && auth.user.value.enterpriseId
-  ? `/members/${auth.user.value.enterpriseId}/edit`
-  : '/members')
+const profileRoute = '/enterprise/profile'
 const profileTitle = computed(() => {
   const completeness = data.value?.completeness ?? 0
   if (completeness >= 80) return '企业资料已达到较高完整度'
@@ -31,13 +30,14 @@ onMounted(load)
 <template>
   <div class="enterprise-page">
     <PageHeader title="企业工作台" :description="`${auth.user.value?.organization} · 管理能力资产，发现政策与合作机会`">
-      <RouterLink class="secondary-button" to="/members">查看企业资料</RouterLink><RouterLink class="primary-button icon-label-button" to="/matching"><Plus aria-hidden="true" /><span>进入供需匹配</span></RouterLink>
+      <RouterLink v-if="auth.user.value?.role === 'ENTERPRISE_ADMIN'" class="secondary-button" :to="profileRoute">维护本企业资料</RouterLink><RouterLink v-else class="secondary-button" to="/members">浏览会员目录</RouterLink><RouterLink class="primary-button icon-label-button" to="/matching"><Plus aria-hidden="true" /><span>进入供需匹配</span></RouterLink>
     </PageHeader>
+    <p class="enterprise-identity-note" role="note">当前绑定企业：<strong>{{ auth.user.value?.organization }}</strong> · {{ auth.user.value ? roleLabels[auth.user.value.role] : '' }}<span>{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '仅可维护本企业资料，其他企业资料按授权查看。' : '当前为企业只读身份，企业主档由企业管理员维护。' }}</span></p>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="data">
       <section class="profile-completeness panel">
         <div class="completeness-ring" :style="{ '--progress': `${data.completeness * 3.6}deg` }"><div><strong>{{ data.completeness }}%</strong><span>资料完整度</span></div></div>
-        <div><h2>{{ profileTitle }}</h2><p>完整度由服务端依据当前可见企业字段计算；页面不会推断尚缺材料的具体数量。</p><RouterLink class="text-button" :to="profileRoute">{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '维护企业资料' : '查看企业资料' }} →</RouterLink></div>
+        <div><h2>{{ profileTitle }}</h2><p>完整度由服务端依据当前可见企业字段计算；页面不会推断尚缺材料的具体数量。</p><RouterLink class="text-button" :to="profileRoute">{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '维护企业资料' : '查看我的企业' }} →</RouterLink></div>
         <div class="profile-checks"><span :class="data.completeness >= 80 ? 'done' : 'todo'">{{ data.completeness >= 80 ? '✓' : '•' }} 当前完整度 {{ data.completeness }}%</span><span class="todo">• 以最新服务端数据为准</span></div>
       </section>
 
@@ -63,3 +63,8 @@ onMounted(load)
     </template>
   </div>
 </template>
+
+<style scoped>
+.enterprise-identity-note { padding: 14px 18px; margin: 0 0 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--muted); font-size: 13px; line-height: 1.8; }
+.enterprise-identity-note strong { color: var(--ink); }.enterprise-identity-note span { display: block; }
+</style>

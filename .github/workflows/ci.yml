@@ -136,6 +136,18 @@ jobs:
           java-version: "21"
           cache: maven
       - run: mvn --batch-mode --no-transfer-progress verify
+      - name: Require actual PostgreSQL publication and invitation tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest'):
+              reports = list(Path('bootstrap/target/surefire-reports').glob(f'TEST-*{name}.xml'))
+              assert len(reports) == 1, f'Missing real database report: {name}'
+              suite = ET.parse(reports[0]).getroot()
+              assert int(suite.get('tests', '0')) > 0, f'No tests ran: {name}'
+              assert all(int(suite.get(key, '0')) == 0 for key in ('skipped', 'failures', 'errors')), f'Database release gate failed: {name}'
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: server-jar
@@ -254,11 +266,16 @@ jobs:
       - name: Run repeatable browser business journeys
         working-directory: apps/web
         run: npm run test:e2e
+      - name: Verify public entry and profile review UI contracts
+        working-directory: apps/web
+        run: npx playwright test --config playwright.entry.config.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: browser-e2e-report
-          path: test-results/browser-e2e/
+          path: |
+            test-results/browser-e2e/
+            test-results/entry-routing/
           if-no-files-found: warn
           retention-days: 14
       - name: Stop isolated browser E2E stack

@@ -8,6 +8,7 @@ import {
 import { defaultRouteForRole } from '../config/roles'
 import { ROLES, type SessionUser, type UserRole } from '../types/domain'
 import { request } from './http'
+import { safeLocalPath } from './local-path'
 import {
   getSystemContext,
   setAccessToken,
@@ -49,12 +50,6 @@ function isUserRole(value: string | null | undefined): value is UserRole {
   return Boolean(value && ROLES.includes(value as UserRole))
 }
 
-function safeLocalPath(value: unknown, fallback = '/'): string {
-  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
-    ? value
-    : fallback
-}
-
 function clearLegacySession() {
   try {
     localStorage.removeItem(LEGACY_STORAGE_KEY)
@@ -83,11 +78,13 @@ function loadDemoSession(): SessionUser | null {
 
 const state = reactive<{
   user: SessionUser | null
+  onboardingIdentity: { subject: string; username: string; displayName: string } | null
   initialized: boolean
   error: string | null
   postLoginRoute: string | null
 }>({
   user: loadDemoSession(),
+  onboardingIdentity: null,
   initialized: demoMode,
   error: null,
   postLoginRoute: null,
@@ -128,6 +125,7 @@ function userManager(): UserManager {
     setAccessToken(null)
     setTransportSystemContext(null, null)
     state.user = null
+    state.onboardingIdentity = null
   })
   return manager
 }
@@ -149,6 +147,7 @@ function setDemoUser(user: SessionUser | null) {
 }
 
 async function loadVerifiedUser(oidcUser: User): Promise<void> {
+  state.onboardingIdentity = null
   if (!oidcUser.access_token || oidcUser.expired) {
     setAccessToken(null)
     setTransportSystemContext(null, null)
@@ -161,13 +160,21 @@ async function loadVerifiedUser(oidcUser: User): Promise<void> {
   // verification. Restore it only after the backend has confirmed the account
   // is still a system administrator, then validate the selected scope again.
   setTransportSystemContext(null, null)
-  const baseIdentity = await request<CurrentUserView>('/users/me')
-  const role = baseIdentity.roles.find(isUserRole)
+  let baseIdentity: CurrentUserView
+  try {
+    baseIdentity = await request<CurrentUserView>('/users/me')
+  } catch (error) {
+    if (error instanceof Error && 'status' in error && error.status === 403) {
+      await loadOnboardingIdentity()
+      return
+    }
+    throw error
+  }
+  // Stable workspace precedence uses only backend-verified roles, never login-card selection.
+  const role = ROLES.find((candidate) => baseIdentity.roles.includes(candidate))
   if (!role) {
-    setAccessToken(null)
-    setTransportSystemContext(null, null)
-    state.user = null
-    throw new Error('当前账号没有平台角色')
+    await loadOnboardingIdentity()
+    return
   }
   let verified = baseIdentity
   if (role === 'SYSTEM_ADMIN' && persistedContext.associationId) {
@@ -202,6 +209,16 @@ async function loadVerifiedUser(oidcUser: User): Promise<void> {
   )
 }
 
+async function loadOnboardingIdentity() {
+  state.user = null
+  setTransportSystemContext(null, null)
+  const identity = await request<{ subject: string; username: string; displayName: string }>('/onboarding/session')
+  if (!identity?.subject || !identity.username) throw new Error('无法核验待绑定账号')
+  // This is not a SessionUser: onboarding never unlocks business routes or operations.
+  state.onboardingIdentity = identity
+  state.postLoginRoute = '/join'
+}
+
 async function initializeOidc(): Promise<void> {
   if (state.initialized) return
   if (initialization) return initialization
@@ -213,11 +230,14 @@ async function initializeOidc(): Promise<void> {
       const callback = window.location.pathname === '/auth/callback'
       const user = callback ? await oidc.signinRedirectCallback() : await oidc.getUser()
       if (user) await loadVerifiedUser(user)
-    } catch {
+    } catch (error) {
       setAccessToken(null)
       setTransportSystemContext(null, null)
       state.user = null
-      state.error = '身份验证失败，请重新登录；如持续失败请联系系统管理员检查 OIDC 配置。'
+      state.onboardingIdentity = null
+      state.error = error instanceof Error && 'status' in error && error.status === 403
+        ? '账号没有平台访问权限，或尚未完成组织绑定。请联系协会管理员核验账号。'
+        : '身份验证失败，请重新登录；如持续失败请联系系统管理员检查 OIDC 配置。'
     } finally {
       state.initialized = true
       initialization = null
@@ -230,12 +250,28 @@ export function useAuth() {
   return {
     state: readonly(state),
     user: computed(() => state.user),
+    onboardingIdentity: computed(() => state.onboardingIdentity),
     isAuthenticated: computed(() => Boolean(state.user)),
     isInitialized: computed(() => state.initialized),
     error: computed(() => state.error),
     isDemoMode: demoMode,
     demoUsers,
     initialize: demoMode ? async () => undefined : initializeOidc,
+    async refreshIdentity() {
+      if (demoMode) return
+      state.error = null
+      try {
+        const user = await userManager().getUser()
+        if (!user || user.expired) throw new Error('登录已过期，请重新登录')
+        await loadVerifiedUser(user)
+      } catch (error) {
+        setAccessToken(null)
+        setTransportSystemContext(null, null)
+        state.user = null
+        state.onboardingIdentity = null
+        throw error
+      }
+    },
     async login(returnTo = '/') {
       if (demoMode) throw new Error('演示模式应使用 loginDemo')
       state.error = null
@@ -270,6 +306,7 @@ export function useAuth() {
       setAccessToken(null)
       setTransportSystemContext(null, null)
       state.user = null
+      state.onboardingIdentity = null
       if (demoMode) {
         setDemoUser(null)
         return

@@ -38,6 +38,8 @@ import java.util.Set;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private EnterpriseOwnerAuthorities enterpriseOwners;
     private static final Set<String> KNOWN_ROLES = Set.of(
             "SYSTEM_ADMIN",
             "ASSOCIATION_ADMIN",
@@ -93,6 +95,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/v1/health", "/actuator/health").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/v1/public/enterprises", "/api/v1/public/enterprises/{id}").permitAll()
                         .requestMatchers("/actuator/prometheus").hasAuthority("OBSERVABILITY_READ")
                         .anyRequest().authenticated())
                 .exceptionHandling(errors -> errors
@@ -126,7 +130,15 @@ public class SecurityConfig {
         }
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setPrincipalClaimName(principalClaim.trim());
-        converter.setJwtGrantedAuthoritiesConverter(SecurityConfig::authoritiesFor);
+        converter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            var authorities = new LinkedHashSet<GrantedAuthority>(authoritiesFor(jwt));
+            if (enterpriseOwners != null && enterpriseOwners.isOwner(jwt)) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_ENTERPRISE_ADMIN"));
+                ROLE_PERMISSIONS.get("ENTERPRISE_ADMIN").forEach(permission ->
+                        authorities.add(new SimpleGrantedAuthority(permission)));
+            }
+            return authorities;
+        });
         return converter;
     }
 

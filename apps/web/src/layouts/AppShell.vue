@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView, type RouteLocationRaw } from 'vue-router'
 import ChatAssistant from '../components/ChatAssistant.vue'
 import NavIcon from '../components/NavIcon.vue'
@@ -66,6 +66,11 @@ const notificationHasNextPage = computed(() => notificationPageIndex.value + 1 <
 const isSystemAdmin = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN')
 const crumbOrganization = computed(() => auth.user.value?.organization || '管线智联平台')
 const workspaceHome = computed(() => auth.user.value ? defaultRouteForRole(auth.user.value.role) : '/')
+const identityKey = computed(() => `${auth.user.value?.id}:${auth.user.value?.role}`)
+
+watch(() => auth.user.value, (user) => {
+  if (!user) void router.replace({ path: '/login', query: { redirect: route.fullPath } })
+})
 
 function refreshContextDependentState() {
   notificationRequestRevision += 1
@@ -398,7 +403,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'keyboard-navigation': keyboardNavigation }">
+  <div v-if="auth.user.value" class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'keyboard-navigation': keyboardNavigation }">
     <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
@@ -538,12 +543,13 @@ onBeforeUnmount(() => {
                 </select>
               </template>
               <button class="preferences-button" type="button" @click="openSettings">界面设置</button>
+              <RouterLink class="public-portal-link" to="/public" @click="profileOpen = false">浏览公开页面</RouterLink>
               <button type="button" @click="logout">退出登录</button>
             </div>
           </div>
         </div>
       </header>
-      <div class="page-container"><RouterView :key="`${route.fullPath}:${contextRevision}`" /></div>
+      <div class="page-container"><RouterView :key="`${identityKey}:${route.fullPath}:${contextRevision}`" /></div>
     </main>
 
     <div v-if="settingsOpen" class="settings-backdrop" @click.self="closeSettings">
@@ -578,12 +584,14 @@ onBeforeUnmount(() => {
         </form>
       </section>
     </div>
-    <ChatAssistant />
+    <ChatAssistant :key="identityKey" />
   </div>
 </template>
 
 <style scoped>
 .preferences-button { color: var(--ink) !important; }
+.public-portal-link { display: block; padding: 10px 12px; color: var(--ink); font-size: 13px; border-radius: 6px; }
+.public-portal-link:hover { background: var(--primary-soft); }
 .settings-backdrop { position: fixed; inset: 0; z-index: 90; padding: 24px; background: rgba(10, 20, 28, .52); display: grid; place-items: center; }
 .settings-dialog { width: min(520px, 100%); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: var(--panel); box-shadow: 0 24px 70px rgba(8, 20, 32, .28); }
 .settings-dialog-head { padding: 20px 22px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 18px; }
@@ -602,4 +610,11 @@ onBeforeUnmount(() => {
 .settings-error { margin: -8px 0 0; padding: 10px 12px; border-radius: 8px; color: #9a3412; background: #fff2e8; font-size: 12px; }
 .settings-actions { padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
 @media (max-width: 560px) { .settings-backdrop { padding: 12px; } .settings-theme-options { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .topbar .topbar-status, .topbar .profile-copy { display: none; }
+  .topbar .menu-button, .topbar .topbar-back-button, .topbar .top-actions { flex-shrink: 0; }
+  .topbar .crumb { min-width: 0; flex: 1; margin-right: 8px; }
+  .topbar .crumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .notification-panel { width: min(350px, calc(100vw - 32px)); right: -64px; }
+}
 </style>

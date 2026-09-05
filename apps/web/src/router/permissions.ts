@@ -4,6 +4,8 @@ import type { UserRole } from '../types/domain'
 export const protectedRouteRoles: Record<string, readonly UserRole[]> = {
   '/association': associationRoles,
   '/enterprise': enterpriseRoles,
+  '/enterprise/profile': enterpriseRoles,
+  '/operations/invitations': ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'],
   '/members': allRoles,
   '/members/edit': [...associationRoles, 'ENTERPRISE_ADMIN'],
   '/members/new': associationRoles,

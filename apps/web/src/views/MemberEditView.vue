@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import ProfileWorkflowPanel from '../components/ProfileWorkflowPanel.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
@@ -214,15 +215,19 @@ onMounted(load)
 
 <template>
   <div>
-    <PageHeader eyebrow="MEMBER PROFILE" title="编辑会员企业" description="修改通过 ETag 防止并发覆盖；企业自助修改后自动进入协会审核">
+    <PageHeader eyebrow="MEMBER PROFILE" title="编辑会员企业" description="普通资料修改走草稿、独立审核与发布；下方管理主档仅供身份和生命周期核验">
       <RouterLink class="secondary-button" to="/members">返回会员列表</RouterLink>
     </PageHeader>
     <AsyncResourceState v-if="loading || loadError" :loading="loading" :error="loadError" @retry="load" />
-    <form v-else-if="versioned" class="panel member-edit-form" @submit.prevent="save">
+    <ProfileWorkflowPanel v-if="versioned" :enterprise-id="memberId" @approved="load" />
+    <details v-if="versioned && canSetStatus" class="panel">
+    <summary class="admin-master-summary">管理员主档核验（身份、共享范围与可用状态）</summary>
+    <p class="admin-master-summary">日常资料修改请使用上方草稿流程。此处保留受审计的管理员主档维护，不会更新游客公开快照；主档版本变化会阻止旧稿覆盖。</p>
+    <form class="member-edit-form" @submit.prevent="save">
       <div class="edit-version-bar"><span>当前数据版本：{{ versioned.member.version }} · 数据范围：{{ versioned.member.visibility }}</span><button class="text-button" type="button" @click="load">重新加载最新版本</button></div>
       <section class="form-section"><h3>企业基础信息</h3><div class="form-grid">
-        <label><span>企业名称 *</span><input v-model="form.name" required maxlength="200" /></label>
-        <label><span>统一社会信用代码</span><input v-model="form.unifiedSocialCreditCode" maxlength="32" /></label>
+        <label><span>企业名称 *</span><input v-model="form.name" :disabled="auth.user.value?.role === 'ENTERPRISE_ADMIN'" required maxlength="200" /></label>
+        <label><span>统一社会信用代码</span><input v-model="form.unifiedSocialCreditCode" :disabled="auth.user.value?.role === 'ENTERPRISE_ADMIN'" maxlength="32" /></label>
         <label><span>单位类别 *</span><input v-model="form.category" required maxlength="100" /></label>
         <label><span>资料状态</span><select v-model="form.status" :disabled="!canSetStatus"><option value="ACTIVE">已认证</option><option value="PENDING_REVIEW">待审核</option><option value="INCOMPLETE">待完善</option><option value="DISABLED">已停用</option></select></label>
         <label><span>可见范围</span><select v-model="form.visibility" :disabled="!canSetVisibility"><option value="MEMBERS">全体会员</option><option value="ASSOCIATION">本协会</option><option value="PARTNERS">本协会及友好协会</option><option value="PRIVATE">仅本企业与协会</option><option value="PUBLIC">公开</option></select></label>
@@ -256,5 +261,9 @@ onMounted(load)
       <div v-if="saveMessage" class="save-message" :class="{ conflict }" aria-live="polite">{{ saveMessage }}</div>
       <div class="form-actions"><RouterLink class="secondary-button" to="/members">取消</RouterLink><button class="primary-button" type="submit" :disabled="saving || reviewing">{{ saving ? '正在保存…' : '保存企业资料' }}</button></div>
     </form>
+    </details>
   </div>
 </template>
+<style scoped>
+.admin-master-summary{padding:18px 24px;line-height:1.8}.admin-master-summary:first-child{cursor:pointer;font-weight:700}
+</style>

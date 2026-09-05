@@ -48,6 +48,8 @@ test('协会通过官方 Excel 完成会员导入、预检和审核', async ({ b
     const memberEtag = memberResponse.headers()['etag']
     expect(memberEtag, 'Nginx must preserve the strong member version').toMatch(/^"(0|[1-9][0-9]*)"$/)
     expect(memberResponse.headers()['content-encoding']).toBeUndefined()
+    // Membership/lifecycle review is separate from profile publication and is now an explicit admin panel.
+    await page.getByText('管理员主档核验（身份、共享范围与可用状态）', { exact: true }).click()
     await expect(page.getByLabel('审核意见')).toBeVisible()
     await page.getByLabel('审核意见').fill('E2E 核对来源文件和提交单位后通过。')
     const reviewResponsePromise = page.waitForResponse((response) => response.request().method() === 'PUT'

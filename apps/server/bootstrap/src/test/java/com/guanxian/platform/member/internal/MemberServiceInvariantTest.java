@@ -27,6 +27,22 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MemberServiceInvariantTest {
+    @Test
+    void ownerCanEditOwnOrdinaryFieldsButCannotChangeIdentityScopeOrApproveTheProfile() {
+        MemberService service = new MemberService(new InMemoryMemberRepository());
+        var own = service.create(request("既有主体", "OWNER001", "ACTIVE", ASSOCIATION));
+        var other = service.create(request("其他主体", "OWNER002", "ACTIVE", ASSOCIATION));
+        var owner = new ActorScope(UUID.randomUUID(), "owner", "owner", ASSOCIATION, own.id(), Set.of("ENTERPRISE_ADMIN"), Set.of());
+        assertThrows(ForbiddenException.class, () -> service.update(own.id(),0,request("改名主体","OWNER001","ACTIVE",ASSOCIATION),owner));
+        assertThrows(ForbiddenException.class, () -> service.update(own.id(),0,request("既有主体","CHANGED","ACTIVE",ASSOCIATION),owner));
+        assertThrows(ForbiddenException.class, () -> service.update(own.id(),0,request("既有主体","OWNER001","ACTIVE",OTHER_ASSOCIATION),owner));
+        assertThrows(ApiException.class, () -> service.update(other.id(),0,request("其他主体","OWNER002","ACTIVE",ASSOCIATION),owner));
+        assertThrows(ForbiddenException.class, () -> service.update(own.id(),0,request("既有主体","OWNER001","ACTIVE",ASSOCIATION),owner));
+        assertEquals("ACTIVE",service.get(own.id()).status());
+        assertEquals(0,service.get(own.id()).version());
+        assertThrows(PreconditionFailedException.class, () -> service.update(own.id(),99,request("既有主体","OWNER001","ACTIVE",ASSOCIATION),owner));
+        assertThrows(ForbiddenException.class, () -> service.review(own.id(),0,new MemberReviewRequest("ACTIVE","自己审核"),owner));
+    }
     private static final UUID ASSOCIATION = UUID.fromString("71000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_ASSOCIATION = UUID.fromString("71000000-0000-0000-0000-000000000002");
 
