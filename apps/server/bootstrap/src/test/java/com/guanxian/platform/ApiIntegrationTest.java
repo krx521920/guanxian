@@ -10,15 +10,19 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -52,6 +56,64 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.data.username").value("association-admin"))
                 .andExpect(jsonPath("$.data.roles[0]").value("ASSOCIATION_ADMIN"))
                 .andExpect(jsonPath("$.data.permissions").isArray());
+    }
+
+    @Test
+    void assistantStreamUsesStructuredEventsAndStreamingHeaders() throws Exception {
+        String conversationId = "20000000-0000-4000-8000-000000000001";
+        var result = mockMvc.perform(post("/api/v1/assistant/chat/stream")
+                        .with(httpBasic("association-admin", "admin123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {
+                                  "conversationId": "%s",
+                                  "message": "当前有哪些资料？",
+                                  "maxCitations": 5,
+                                  "pageTitle": "政策标准",
+                                  "pagePath": "/policies"
+                                }
+                                """.formatted(conversationId)))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(header().string("Cache-Control", "no-cache, no-transform"))
+                .andExpect(header().string("X-Accel-Buffering", "no"))
+                .andExpect(content().string(containsString("\"type\":\"start\"")))
+                .andExpect(content().string(containsString("\"type\":\"complete\"")))
+                .andExpect(content().string(containsString(conversationId)));
+    }
+
+    @Test
+    void assistantStreamQueriesScopedBusinessDataWhenModelIsDisabled() throws Exception {
+        String conversationId = "20000000-0000-4000-8000-000000000002";
+        var result = mockMvc.perform(post("/api/v1/assistant/chat/stream")
+                        .with(httpBasic("association-admin", "admin123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .accept(MediaType.TEXT_EVENT_STREAM)
+                        .content("""
+                                {
+                                  "conversationId": "%s",
+                                  "message": "当前有哪些会员企业？",
+                                  "maxCitations": 5,
+                                  "pageTitle": "会员企业",
+                                  "pagePath": "/members"
+                                }
+                                """.formatted(conversationId)))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(result))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().string(containsString("LOCAL_BUSINESS_QUERY")))
+                .andExpect(content().string(containsString("京城管网科技有限公司")))
+                .andExpect(content().string(containsString("北方阀门制造有限公司")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("13800000001"))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("91110000DEMO00001"))));
     }
 
     @Test

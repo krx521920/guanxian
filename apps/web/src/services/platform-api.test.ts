@@ -206,6 +206,125 @@ describe('member ETag API contract', () => {
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes)
   })
 
+  it('sends assistant questions through the authenticated knowledge endpoint', async () => {
+    const answer = {
+      answer: '应建立巡检制度。[1]',
+      citations: [],
+      traceId: 'trace-1',
+      mode: 'RETRIEVAL_SUMMARY',
+      retrievalMode: 'LEXICAL',
+      inputTokens: 20,
+      outputTokens: 8,
+      estimatedCost: 0,
+    }
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: answer }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await expect(platformApi.askPolicyQuestion('  有哪些巡检要求？  ', 5, 'association-1')).resolves.toEqual(answer)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/knowledge/questions')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: '  有哪些巡检要求？  ',
+      maxCitations: 5,
+      associationId: 'association-1',
+    })
+  })
+
+  it('sends stateful chat messages with page and association context', async () => {
+    const answer = {
+      answer: '可以从会员企业页面执行批量导入。',
+      citations: [],
+      traceId: 'trace-2',
+      mode: 'SPRING_AI_AGENT',
+      retrievalMode: 'LEXICAL',
+      inputTokens: 30,
+      outputTokens: 10,
+      estimatedCost: 0,
+      conversationId: '11111111-1111-4111-8111-111111111111',
+      modelConnected: true,
+    }
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ code: 'OK', data: answer }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+
+    await expect(platformApi.chatWithAssistant(
+      '批量导入在哪里？',
+      answer.conversationId,
+      '会员企业',
+      '/members',
+      5,
+      'association-1',
+    )).resolves.toEqual(answer)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/assistant/chat')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toEqual({
+      message: '批量导入在哪里？',
+      conversationId: answer.conversationId,
+      pageTitle: '会员企业',
+      pagePath: '/members',
+      maxCitations: 5,
+      associationId: 'association-1',
+    })
+  })
+
+  it('streams assistant deltas and resolves only with the completed answer', async () => {
+    const answer = {
+      answer: '当前有 5 家会员企业。',
+      citations: [],
+      traceId: 'trace-stream-1',
+      mode: 'SPRING_AI_AGENT',
+      retrievalMode: 'LEXICAL',
+      inputTokens: 42,
+      outputTokens: 11,
+      estimatedCost: 0,
+      conversationId: '11111111-1111-4111-8111-111111111111',
+      modelConnected: true,
+    }
+    const payload = [
+      { type: 'start', conversationId: answer.conversationId, delta: null, answer: null, error: null },
+      { type: 'delta', conversationId: answer.conversationId, delta: '当前有 ', answer: null, error: null },
+      { type: 'delta', conversationId: answer.conversationId, delta: '5 家会员企业。', answer: null, error: null },
+      { type: 'complete', conversationId: answer.conversationId, delta: null, answer, error: null },
+    ].map((event) => `data:${JSON.stringify(event)}\n\n`).join('')
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(payload))
+        controller.close()
+      },
+    })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(stream, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const { platformApi } = await loadApi()
+    const deltas: string[] = []
+
+    await expect(platformApi.streamAssistant(
+      '有多少会员企业？',
+      answer.conversationId,
+      '会员企业',
+      '/members',
+      (delta) => { deltas.push(delta) },
+      undefined,
+      5,
+      'association-1',
+    )).resolves.toEqual(answer)
+
+    expect(deltas).toEqual(['当前有 ', '5 家会员企业。'])
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/v1/assistant/chat/stream')
+    expect(init.method).toBe('POST')
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      message: '有多少会员企业？',
+      conversationId: answer.conversationId,
+      pagePath: '/members',
+      associationId: 'association-1',
+    })
+  })
+
   it('uses exact paths and methods for every collection endpoint', async () => {
     const fetchMock = vi.fn().mockImplementation(async () =>
       Response.json({ code: 'OK', data: {} }),

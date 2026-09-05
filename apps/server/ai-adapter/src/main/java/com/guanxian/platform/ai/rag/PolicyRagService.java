@@ -95,7 +95,9 @@ public class PolicyRagService {
         BigDecimal estimatedCost = BigDecimal.ZERO;
         long latencyMs = 0;
         String providerRequestId = null;
-        boolean externalModelAllowed = modelProvider.enabled() && properties.isExternalModelDataEgressEnabled();
+        boolean externalModelAllowed = question.allowModelCompletion()
+                && modelProvider.enabled()
+                && properties.isExternalModelDataEgressEnabled();
 
         if (chunks.isEmpty()) {
             answer = "未在当前可见知识库中检索到可引用资料，无法形成有出处的回答。";
@@ -234,14 +236,24 @@ public class PolicyRagService {
     }
 
     public record RagQuestion(UUID associationId, String actorSubject, String question, Integer maxCitations,
-                              String requestId, boolean privilegedKnowledgeAccess) {
+                              String requestId, boolean privilegedKnowledgeAccess, boolean allowModelCompletion) {
+        public RagQuestion(
+                UUID associationId,
+                String actorSubject,
+                String question,
+                Integer maxCitations,
+                String requestId,
+                boolean privilegedKnowledgeAccess) {
+            this(associationId, actorSubject, question, maxCitations, requestId, privilegedKnowledgeAccess, true);
+        }
+
         public RagQuestion(
                 UUID associationId,
                 String actorSubject,
                 String question,
                 Integer maxCitations,
                 String requestId) {
-            this(associationId, actorSubject, question, maxCitations, requestId, false);
+            this(associationId, actorSubject, question, maxCitations, requestId, false, true);
         }
     }
 

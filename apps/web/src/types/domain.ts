@@ -328,10 +328,26 @@ export interface PolicyQuestionAnswer {
   citations: KnowledgeCitation[]
   traceId: string
   mode: string
-  retrievalMode: 'HYBRID_VECTOR' | 'LEXICAL'
+  retrievalMode: 'HYBRID_VECTOR' | 'LEXICAL' | 'SCOPED_SERVICE'
   inputTokens: number
   outputTokens: number
   estimatedCost: number
+}
+
+export interface AssistantChatAnswer extends PolicyQuestionAnswer {
+  conversationId: string
+  modelConnected: boolean
+}
+
+export interface AssistantStreamEvent {
+  type: 'start' | 'delta' | 'complete' | 'error'
+  conversationId: string
+  delta: string | null
+  answer: AssistantChatAnswer | null
+  error: {
+    code: string
+    message: string
+  } | null
 }
 
 export interface EcosystemMatch {

@@ -221,6 +221,132 @@ export async function request<T>(
   }
 }
 
+export async function requestEventStream<T>(
+  path: string,
+  options: RequestInit,
+  onEvent: (event: T) => void | Promise<void>,
+  timeoutMs = 120000,
+): Promise<void> {
+  const { headers, requestId } = prepareHeaders(options.headers, options.body)
+  headers.set('Accept', 'text/event-stream')
+  const controller = new AbortController()
+  const externalSignal = options.signal
+  let abortSource: 'external' | 'timeout' | undefined
+
+  const externalAbortError = () => externalSignal!.reason instanceof Error
+    ? externalSignal!.reason
+    : new DOMException('请求已取消', 'AbortError')
+  const abortFromExternal = () => {
+    if (controller.signal.aborted) return
+    abortSource = 'external'
+    controller.abort(externalSignal!.reason)
+  }
+  if (externalSignal?.aborted) abortFromExternal()
+  else externalSignal?.addEventListener('abort', abortFromExternal, { once: true })
+
+  const timeout = window.setTimeout(() => {
+    if (controller.signal.aborted) return
+    abortSource = 'timeout'
+    controller.abort()
+  }, normalizedRequestTimeout(timeoutMs))
+
+  const dispatchBlock = async (block: string, response: Response) => {
+    const data = block
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).replace(/^ /, ''))
+      .join('\n')
+    if (!data) return
+    try {
+      await onEvent(JSON.parse(data) as T)
+    } catch (reason) {
+      if (reason instanceof SyntaxError) {
+        throw new ApiRequestError(
+          '流式响应格式无效',
+          responseRequestId(response, requestId),
+          response.status,
+          'INVALID_EVENT_STREAM',
+        )
+      }
+      throw reason
+    }
+  }
+
+  try {
+    if (abortSource === 'external') throw externalAbortError()
+
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}${path.startsWith('/') ? path : `/${path}`}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      })
+    } catch (reason) {
+      if (abortSource === 'timeout') {
+        throw new ApiRequestError('请求超时', requestId, undefined, 'REQUEST_TIMEOUT')
+      }
+      if (abortSource === 'external') throw externalAbortError()
+      throw reason
+    }
+
+    if (!response.ok) {
+      let payload: ApiEnvelopeCandidate<unknown> | undefined
+      try {
+        const candidate = await response.json() as unknown
+        if (isEnvelopeCandidate(candidate)) payload = candidate
+      } catch {
+        // The HTTP status remains the authoritative fallback for non-JSON errors.
+      }
+      throw errorFromResponse(response, requestId, payload)
+    }
+    if (!response.body) {
+      throw new ApiRequestError(
+        '浏览器未收到流式响应',
+        responseRequestId(response, requestId),
+        response.status,
+        'MISSING_EVENT_STREAM',
+      )
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        let boundary = /\r?\n\r?\n/.exec(buffer)
+        while (boundary?.index !== undefined) {
+          const block = buffer.slice(0, boundary.index)
+          buffer = buffer.slice(boundary.index + boundary[0].length)
+          await dispatchBlock(block, response)
+          boundary = /\r?\n\r?\n/.exec(buffer)
+        }
+      }
+      buffer += decoder.decode()
+      if (buffer.trim()) await dispatchBlock(buffer, response)
+    } catch (reason) {
+      if (abortSource === 'timeout') {
+        throw new ApiRequestError(
+          '请求超时',
+          responseRequestId(response, requestId),
+          response.status,
+          'REQUEST_TIMEOUT',
+        )
+      }
+      if (abortSource === 'external') throw externalAbortError()
+      throw reason
+    } finally {
+      reader.releaseLock()
+    }
+  } finally {
+    window.clearTimeout(timeout)
+    externalSignal?.removeEventListener('abort', abortFromExternal)
+  }
+}
+
 export function requestBlob(path: string, options: RequestInit = {}, timeoutMs = defaultTimeoutMs): Promise<Blob> {
   return request<Blob>(path, options, undefined, 'blob', timeoutMs)
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView, type RouteLocationRaw } from 'vue-router'
+import ChatAssistant from '../components/ChatAssistant.vue'
 import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
 import { defaultRouteForRole, roleLabels } from '../config/roles'
@@ -577,6 +578,7 @@ onBeforeUnmount(() => {
         </form>
       </section>
     </div>
+    <ChatAssistant />
   </div>
 </template>
 
