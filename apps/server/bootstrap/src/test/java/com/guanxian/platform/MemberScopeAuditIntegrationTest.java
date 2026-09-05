@@ -51,15 +51,14 @@ class MemberScopeAuditIntegrationTest {
         JsonNode own = objectMapper.readTree(ownResponse.getContentAsByteArray()).path("data");
         String ownEtag = ownResponse.getHeader(HttpHeaders.ETAG);
 
-        var updatedResponse = mockMvc.perform(put("/api/v1/members/{id}", OWN_ENTERPRISE_ID)
+        mockMvc.perform(put("/api/v1/members/{id}", OWN_ENTERPRISE_ID)
                         .with(httpBasic("enterprise-admin", "enterprise123"))
                         .header(HttpHeaders.IF_MATCH, ownEtag)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(upsertBody(own, own.path("name").asText(), own.path("visibility").asText())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
-                .andReturn().getResponse();
-        String reviewEtag = updatedResponse.getHeader(HttpHeaders.ETAG);
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PROFILE_DRAFT_REQUIRED"));
+        String reviewEtag = ownEtag;
 
         mockMvc.perform(put("/api/v1/members/{id}/review", OWN_ENTERPRISE_ID)
                         .with(httpBasic("association-operator", "operator123"))
@@ -87,9 +86,7 @@ class MemberScopeAuditIntegrationTest {
                 .andExpect(jsonPath("$.data[0].action").value("MEMBER_REVIEW"))
                 .andExpect(jsonPath("$.data[0].resourceVersion").value(reviewedVersion))
                 .andExpect(jsonPath("$.data[0].actorUsername").value("association-admin"))
-                .andExpect(jsonPath("$.data[0].requestId").isNotEmpty())
-                .andExpect(jsonPath("$.data[1].action").value("MEMBER_UPDATE"))
-                .andExpect(jsonPath("$.data[1].actorUsername").value("enterprise-admin"));
+                .andExpect(jsonPath("$.data[0].requestId").isNotEmpty());
 
         deleteMember(foreignId, "\"0\"");
     }

@@ -53,8 +53,9 @@ export async function loginThroughOidc(page: Page, user: E2eUser): Promise<void>
   const applicationOrigin = new URL(
     process.env.E2E_WEB_BASE_URL?.trim() || 'http://127.0.0.1:18082',
   ).origin
-  await page.goto('/login')
-  await expect(page.getByRole('heading', { name: '欢迎使用管理协作平台' })).toBeVisible()
+  const entry = user === e2eUsers.associationAdmin ? 'admin' : 'enterprise'
+  await page.goto(`/login?entry=${entry}`)
+  await expect(page.getByRole('heading', { name: entry === 'admin' ? '管理员账号登录' : '企业账号登录' })).toBeVisible()
 
   await page.getByRole('button', { name: /统一身份登录/ }).click()
   await page.waitForURL((url) => url.pathname.includes('/realms/guanxian-ci/'))

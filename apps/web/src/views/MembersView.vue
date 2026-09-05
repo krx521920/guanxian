@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import ProfileReviewQueue from '../components/ProfileReviewQueue.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
@@ -308,6 +309,7 @@ onMounted(async () => {
         <input ref="fileInput" class="visually-hidden" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="previewFile" />
       </template>
     </PageHeader>
+    <ProfileReviewQueue v-if="canCollect" />
 
     <div v-if="canCollectRole && !hasAssociationContext" class="save-message page-message" role="status">系统管理员需先在管理上下文中选择协会，才能新增、导入、删除或恢复会员企业。</div>
     <div v-if="importMessage" class="save-message import-message" aria-live="polite">{{ importMessage }}</div>

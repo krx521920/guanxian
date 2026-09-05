@@ -14,6 +14,7 @@ export interface NavItem {
 export const navigation: NavItem[] = [
   { label: '协会工作台', to: '/association', icon: 'dashboard', roles: associationRoles },
   { label: '企业工作台', to: '/enterprise', icon: 'dashboard', roles: enterpriseRoles },
+  { label: '我的企业', to: '/enterprise/profile', icon: 'enterprise', roles: enterpriseRoles },
   { label: '会员企业', to: '/members', icon: 'enterprise', roles: allRoles },
   { label: '政策标准', to: '/policies', icon: 'policy', roles: allRoles },
   { label: '生态全景', to: '/ecosystem/overview', icon: 'ecosystem', roles: workspaceRoles },
@@ -23,6 +24,7 @@ export const navigation: NavItem[] = [
   { label: '资料附件', to: '/attachments', icon: 'enterprise', roles: workspaceRoles },
   { label: '友好协会', to: '/federation', icon: 'match', roles: associationRoles },
   { label: '审计与账号', to: '/operations', icon: 'task', roles: ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'] },
+  { label: '负责人邀请', to: '/operations/invitations', icon: 'task', roles: ['SYSTEM_ADMIN', 'ASSOCIATION_ADMIN'] },
 ]
 
 export function navigationForRole(role: UserRole): NavItem[] {
