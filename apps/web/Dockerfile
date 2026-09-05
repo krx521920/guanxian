@@ -25,10 +25,14 @@ RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# A maintenance checkout can have umask 077. This non-secret config must remain
+# readable by the unprivileged runtime, independently of host file permissions.
+COPY --chmod=0644 nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 USER 101:101
+
+RUN test -r /etc/nginx/conf.d/default.conf && test -r /usr/share/nginx/html/index.html
 
 EXPOSE 8080
 
