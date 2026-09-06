@@ -86,7 +86,7 @@ async function login(page: Page, username: string, password: string) {
 async function changeRequiredPassword(page: Page, password: string) {
   await expect(page.locator('#password-new')).toBeVisible()
   await page.locator('#password-new').fill(password); await page.locator('#password-confirm').fill(password)
-  await page.locator('#kc-passwd-update-form input[name="login"][type="submit"]').click()
+  await page.locator('#kc-passwd-update-form [name="login"][type="submit"]').click()
 }
 async function sessionApi(page: Page, path: string): Promise<{ status: number; data: any }> {
   return page.evaluate(async path => {
