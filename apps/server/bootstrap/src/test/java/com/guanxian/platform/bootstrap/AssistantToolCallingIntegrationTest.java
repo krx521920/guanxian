@@ -2,6 +2,7 @@ package com.guanxian.platform.bootstrap;
 
 import com.guanxian.platform.ai.assistant.AssistantAccessContext;
 import com.guanxian.platform.ai.assistant.AssistantChatClient;
+import com.guanxian.platform.ai.assistant.AssistantBusinessResults;
 import com.guanxian.platform.ai.assistant.PlatformAssistantService;
 import com.guanxian.platform.ai.assistant.SpringAiAssistantChatClient;
 import com.guanxian.platform.ai.rag.AiProviderProperties;
@@ -45,6 +46,46 @@ import static org.mockito.Mockito.when;
  * service -> streamed assistant completion.
  */
 class AssistantToolCallingIntegrationTest {
+    @Test
+    void structuredSelectionAndCriteriaSurviveRealSpringToolArgumentConversion() {
+        MemberService members = mock(MemberService.class);
+        ActorScope actor = new ActorScope(null, "actor", "operator", UUID.randomUUID(), null,
+                Set.of("ASSOCIATION_OPERATOR"), Set.of());
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        for (UUID id : List.of(first, second)) {
+            when(members.get(id, actor)).thenReturn(new MemberProfile(id, actor.associationId(), "虚构企业", "SECRET",
+                    "技术服务", "虚构地址", "SECRET", "13800000000", "secret@example.invalid", "简介",
+                    List.of("管线监测"), List.of(), List.of(), List.of(), List.of(), "MEMBERS", "ACTIVE", 1,
+                    Instant.EPOCH, Instant.EPOCH, null, null, null));
+        }
+        var businessTools = new AssistantBusinessQueryTools(members, mock(EcosystemCatalogService.class),
+                mock(EcosystemMatchService.class), mock(CollaborationService.class));
+        ChatModel model = new ChatModel() {
+            @Override public ChatResponse call(Prompt prompt) {
+                var options = (ToolCallingChatOptions) prompt.getOptions();
+                var context = new ToolContext(options.getToolContext());
+                for (String name : List.of("compare_member_enterprises", "explain_member_fit")) {
+                    var callback = options.getToolCallbacks().stream().filter(c -> name.equals(c.getToolDefinition().name())).findFirst().orElseThrow();
+                    String json = "{\"enterpriseIds\":[\"" + first + "\",\"" + second + "\"]"
+                            + (name.startsWith("explain") ? ",\"criteria\":[{\"field\":\"capabilities\",\"value\":\"管线监测\"}]" : "") + "}";
+                    assertThat(callback.call(json, context)).contains("OK", "虚构企业").doesNotContain("SECRET", "13800000000");
+                }
+                return new ChatResponse(List.of(new Generation(new AssistantMessage("已核对指定企业。"))));
+            }
+        };
+        var beans = new DefaultListableBeanFactory();
+        beans.registerSingleton("platformAssistantChatClient", ChatClient.builder(model).build());
+        var provider = new AiProviderProperties(); provider.setEnabled(true); provider.setModel("fixture");
+        var properties = new RagProperties(); properties.setExternalModelDataEgressEnabled(true);
+        var client = new SpringAiAssistantChatClient(beans.getBeanProvider(ChatClient.class), List.of(businessTools), provider, properties);
+        var request = new AssistantChatClient.CompletionRequest(new AssistantAccessContext(actor, Set.of("MEMBER_READ", "POLICY_READ")),
+                "fixture-comparison", "比较指定企业", "会员企业", "/members", "比较指定企业");
+        client.complete(request);
+        assertThat(request.businessResults().snapshot()).extracting(AssistantBusinessResults.Result::kind)
+                .containsExactly("COMPARISON", "RECOMMENDATIONS");
+        assertThat(request.businessResults().snapshot().getLast().items().getFirst().evidence().getFirst().state()).isEqualTo("MATCHED");
+    }
+
     @Test
     void modelSelectedBusinessToolUsesScopedServiceAndStreamsItsResult() {
         MemberService memberService = mock(MemberService.class);
@@ -98,12 +139,18 @@ class AssistantToolCallingIntegrationTest {
 
         assertThat(events).isNotNull();
         assertThat(events).extracting(PlatformAssistantService.AssistantStreamEvent::type)
-                .containsExactly("start", "delta", "delta", "complete");
+                .containsExactly("start", "status", "status", "delta", "delta", "complete");
         var answer = events.getLast().answer();
         assertThat(answer.mode()).isEqualTo("SPRING_AI_AGENT");
         assertThat(answer.modelConnected()).isTrue();
         assertThat(answer.answer()).contains("京城管网科技", "管线监测");
         assertThat(answer.answer()).doesNotContain("13800000000", "91110000SECRET0001");
+        assertThat(answer.businessResults()).hasSize(1).isEqualTo(events.get(2).businessResults());
+        var receipt = answer.businessResults().getFirst();
+        assertThat(receipt.filters()).containsEntry("关键词", "监测");
+        assertThat(receipt.items()).hasSize(1);
+        assertThat(receipt.items().getFirst().id()).isEqualTo(member.id());
+        assertThat(receipt.toString()).doesNotContain("13800000000", "91110000SECRET0001", "zhang@example.cn");
         verify(memberService).findAll("监测", null, false, actor);
     }
 

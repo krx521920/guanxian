@@ -335,12 +335,13 @@ export interface PolicyQuestionAnswer {
 }
 
 export interface AssistantChatAnswer extends PolicyQuestionAnswer {
-  conversationId: string
-  modelConnected: boolean
+    conversationId: string
+    modelConnected: boolean
+    businessResults?: import('../services/assistant-business-results').BusinessResult[]
 }
 
 export interface AssistantStreamEvent {
-  type: 'start' | 'delta' | 'complete' | 'error'
+  type: 'start' | 'status' | 'delta' | 'complete' | 'error'
   conversationId: string
   delta: string | null
   answer: AssistantChatAnswer | null
@@ -348,6 +349,12 @@ export interface AssistantStreamEvent {
     code: string
     message: string
   } | null
+  status?: AssistantStreamStatus | null
+}
+
+export interface AssistantStreamStatus {
+  phase: 'PREPARING' | 'GENERATING' | 'LOCAL_RESULT'
+  mode: string
 }
 
 export interface EcosystemMatch {

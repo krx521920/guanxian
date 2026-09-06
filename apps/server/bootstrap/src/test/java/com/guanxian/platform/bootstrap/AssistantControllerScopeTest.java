@@ -26,6 +26,55 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AssistantControllerScopeTest {
+    @Test
+    void explicitEnterpriseIdsArePassedAsDataWithoutAddingAnyAuthority() {
+        when(actorScopeResolver.resolve(authentication)).thenReturn(systemAdmin(ASSOCIATION_A));
+        var ids = List.of(UUID.randomUUID(), UUID.randomUUID());
+        controller.chat(new AssistantController.AssistantChatRequest(ASSOCIATION_A, CONVERSATION, "这两家如何", 5,
+                "会员企业", "/members", "AUTO", null, ids), authentication);
+        var capture = ArgumentCaptor.forClass(PlatformAssistantService.AssistantQuestion.class);
+        verify(assistantService).chat(capture.capture());
+        assertThat(capture.getValue().selectedEnterpriseIds()).containsExactlyElementsOf(ids);
+        assertThat(capture.getValue().access().authorities()).containsExactly("POLICY_READ");
+    }
+
+    @Test
+    void selectionValidationRejectsOversizedOrNullIds() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            for (var ids : List.of(java.util.stream.IntStream.range(0, 5).mapToObj(i -> UUID.randomUUID()).toList(),
+                    java.util.Arrays.asList(UUID.randomUUID(), null))) {
+                var value = new AssistantController.AssistantChatRequest(ASSOCIATION_A, CONVERSATION, "问题", 5, "会员企业", "/members", "AUTO", null, ids);
+                assertThat(validator.validate(value)).isNotEmpty();
+            }
+        }
+    }
+
+    @Test
+    void responsePreferencesAreForwardedWithoutChangingAuthorization() {
+        when(actorScopeResolver.resolve(authentication)).thenReturn(systemAdmin(ASSOCIATION_A));
+        controller.chat(new AssistantController.AssistantChatRequest(
+                ASSOCIATION_A, CONVERSATION, "先查现状，然后给建议", 5, "会员企业", "/members",
+                "DETAILED", "只读，不发送邀请"), authentication);
+        var capture = ArgumentCaptor.forClass(PlatformAssistantService.AssistantQuestion.class);
+        verify(assistantService).chat(capture.capture());
+        assertThat(capture.getValue().responseDetail()).isEqualTo("DETAILED");
+        assertThat(capture.getValue().taskGoal()).isEqualTo("只读，不发送邀请");
+        assertThat(capture.getValue().access().authorities()).containsExactly("POLICY_READ");
+    }
+
+    @Test
+    void preferenceValidationRejectsUnknownStrategyAndOversizedGoal() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            var invalid = new AssistantController.AssistantChatRequest(
+                    ASSOCIATION_A, CONVERSATION, "问题", 5, "会员企业", "/members", "EXECUTE", "字".repeat(401));
+            assertThat(validator.validate(invalid)).extracting(v -> v.getPropertyPath().toString())
+                    .containsExactlyInAnyOrder("responseDetail", "taskGoal");
+            assertThat(validator.validate(request(ASSOCIATION_A))).isEmpty();
+        }
+    }
+
     private static final UUID ASSOCIATION_A = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID ASSOCIATION_B = UUID.fromString("10000000-0000-0000-0000-000000000002");
     private static final UUID CONVERSATION = UUID.fromString("20000000-0000-4000-8000-000000000001");

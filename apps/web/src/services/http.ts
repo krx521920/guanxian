@@ -224,7 +224,7 @@ export async function request<T>(
 export async function requestEventStream<T>(
   path: string,
   options: RequestInit,
-  onEvent: (event: T) => void | Promise<void>,
+  onEvent: (event: T) => void | boolean | Promise<void | boolean>,
   timeoutMs = 120000,
 ): Promise<void> {
   const { headers, requestId } = prepareHeaders(options.headers, options.body)
@@ -251,6 +251,8 @@ export async function requestEventStream<T>(
   }, normalizedRequestTimeout(timeoutMs))
 
   const dispatchBlock = async (block: string, response: Response) => {
+    if (controller.signal.aborted) throw externalSignal?.reason || new DOMException('请求已取消', 'AbortError')
+    if (block.length > 262144) throw new ApiRequestError('流式响应过长', requestId, undefined, 'EVENT_STREAM_LIMIT')
     const data = block
       .split(/\r?\n/)
       .filter((line) => line.startsWith('data:'))
@@ -258,7 +260,7 @@ export async function requestEventStream<T>(
       .join('\n')
     if (!data) return
     try {
-      await onEvent(JSON.parse(data) as T)
+      return await onEvent(JSON.parse(data) as T)
     } catch (reason) {
       if (reason instanceof SyntaxError) {
         throw new ApiRequestError(
@@ -300,6 +302,15 @@ export async function requestEventStream<T>(
       }
       throw errorFromResponse(response, requestId, payload)
     }
+    if (controller.signal.aborted) {
+      await response.body?.cancel().catch(() => {})
+      if (abortSource !== 'timeout' && externalSignal?.aborted) throw externalAbortError()
+      throw new ApiRequestError('请求超时', requestId, undefined, 'REQUEST_TIMEOUT')
+    }
+    if (!(response.headers.get('Content-Type') || '').toLowerCase().startsWith('text/event-stream')) {
+      await response.body?.cancel().catch(() => {})
+      throw new ApiRequestError('流式响应格式无效', responseRequestId(response, requestId), response.status, 'INVALID_EVENT_STREAM')
+    }
     if (!response.body) {
       throw new ApiRequestError(
         '浏览器未收到流式响应',
@@ -312,18 +323,27 @@ export async function requestEventStream<T>(
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
+    let received = 0
+    // Also unblock readers supplied by a custom transport when AbortSignal alone does not cancel them.
+    const cancelReader = () => { void reader.cancel().catch(() => {}) }
+    controller.signal.addEventListener('abort', cancelReader, { once: true })
     try {
       while (true) {
+        if (controller.signal.aborted) throw new DOMException('请求已取消', 'AbortError')
         const { done, value } = await reader.read()
+        if (controller.signal.aborted) throw new DOMException('请求已取消', 'AbortError')
         if (done) break
+        received += value.byteLength
+        if (received > 2 * 1024 * 1024) throw new ApiRequestError('流式响应过长', requestId, undefined, 'EVENT_STREAM_LIMIT')
         buffer += decoder.decode(value, { stream: true })
         let boundary = /\r?\n\r?\n/.exec(buffer)
         while (boundary?.index !== undefined) {
           const block = buffer.slice(0, boundary.index)
           buffer = buffer.slice(boundary.index + boundary[0].length)
-          await dispatchBlock(block, response)
+          if (await dispatchBlock(block, response) === true) return
           boundary = /\r?\n\r?\n/.exec(buffer)
         }
+        if (buffer.length > 262144) throw new ApiRequestError('流式响应过长', requestId, undefined, 'EVENT_STREAM_LIMIT')
       }
       buffer += decoder.decode()
       if (buffer.trim()) await dispatchBlock(buffer, response)
@@ -339,6 +359,8 @@ export async function requestEventStream<T>(
       if (abortSource === 'external') throw externalAbortError()
       throw reason
     } finally {
+      controller.signal.removeEventListener('abort', cancelReader)
+      await reader.cancel().catch(() => {})
       reader.releaseLock()
     }
   } finally {

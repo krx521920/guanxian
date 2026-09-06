@@ -9,6 +9,11 @@ import java.util.Optional;
 public interface AssistantLocalQueryProvider {
     Optional<LocalQueryResult> answer(LocalQueryRequest request);
 
+    /** Optional scoped preflight for explicit user selection, for both model and local modes. */
+    default Optional<LocalQueryResult> selected(AssistantAccessContext access, java.util.List<java.util.UUID> enterpriseIds) {
+        return Optional.empty();
+    }
+
     record LocalQueryRequest(
             AssistantAccessContext access,
             String message,
@@ -16,8 +21,10 @@ public interface AssistantLocalQueryProvider {
             String pagePath) {
     }
 
-    record LocalQueryResult(String answer, String mode) {
+    record LocalQueryResult(String answer, String mode, java.util.List<AssistantBusinessResults.Result> businessResults) {
+        public LocalQueryResult(String answer, String mode) { this(answer, mode, java.util.List.of()); }
         public LocalQueryResult {
+            businessResults = java.util.List.copyOf(businessResults);
             if (answer == null || answer.isBlank()) {
                 throw new IllegalArgumentException("local assistant answer is required");
             }

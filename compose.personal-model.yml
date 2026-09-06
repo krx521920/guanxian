@@ -1,0 +1,17 @@
+# Opt-in overlay only. Do not include until an administrator approves external model data egress.
+# Keep this file in every subsequent compose invocation for the opted-in deployment.
+services:
+  server:
+    environment:
+      GUANXIAN_RAG_EXTERNAL_MODEL_DATA_EGRESS_ENABLED: ${GUANXIAN_PERSONAL_MODEL_EGRESS_ALLOWED:-false}
+    secrets:
+      - {source: personal_model_encryption_key, target: guanxian.ai.personal.encryption-key}
+    networks:
+      - personal-model-egress
+
+networks:
+  personal-model-egress: {}
+
+secrets:
+  personal_model_encryption_key:
+    file: ${SINGLE_HOST_DIR:?required}/secrets/ai_personal_encryption_key

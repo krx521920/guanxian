@@ -93,10 +93,10 @@ public class AssistantController {
                         .collect(Collectors.toUnmodifiableSet()));
         return new PlatformAssistantService.AssistantQuestion(
                 access, request.conversationId(), request.message(), request.maxCitations(),
-                request.pageTitle(), request.pagePath(), MDC.get("requestId"));
+                request.pageTitle(), request.pagePath(), MDC.get("requestId"), request.responseDetail(), request.taskGoal(), request.selectedEnterpriseIds());
     }
 
-    private static UUID readAssociationId(UUID requested, ActorScope actor) {
+    static UUID readAssociationId(UUID requested, ActorScope actor) {
         if (actor.associationId() == null) {
             throw new ForbiddenException(
                     "ASSOCIATION_CONTEXT_REQUIRED",
@@ -147,6 +147,16 @@ public class AssistantController {
             @NotBlank @Size(max = 2000) String message,
             @Min(1) @Max(12) Integer maxCitations,
             @NotBlank @Size(max = 100) String pageTitle,
-            @NotBlank @Size(max = 300) String pagePath) {
+            @NotBlank @Size(max = 300) String pagePath,
+            @jakarta.validation.constraints.Pattern(regexp = "AUTO|BRIEF|STANDARD|DETAILED") String responseDetail,
+            @Size(max = 400) String taskGoal,
+            @Size(max = 4) java.util.List<@NotNull UUID> selectedEnterpriseIds) {
+        public AssistantChatRequest(UUID associationId, UUID conversationId, String message, Integer maxCitations, String pageTitle, String pagePath,
+                                    String responseDetail, String taskGoal) {
+            this(associationId, conversationId, message, maxCitations, pageTitle, pagePath, responseDetail, taskGoal, java.util.List.of());
+        }
+        public AssistantChatRequest(UUID associationId, UUID conversationId, String message, Integer maxCitations, String pageTitle, String pagePath) {
+            this(associationId, conversationId, message, maxCitations, pageTitle, pagePath, "AUTO", null);
+        }
     }
 }
