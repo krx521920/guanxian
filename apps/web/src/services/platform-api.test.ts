@@ -297,7 +297,7 @@ describe('member ETag API contract', () => {
         controller.close()
       },
     })
-    const fetchMock = vi.fn().mockResolvedValue(new Response(stream, { status: 200 }))
+    const fetchMock = vi.fn().mockResolvedValue(new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } }))
     vi.stubGlobal('fetch', fetchMock)
     const { platformApi } = await loadApi()
     const deltas: string[] = []

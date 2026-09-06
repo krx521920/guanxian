@@ -213,17 +213,15 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         }
         ensureNotDeleted(existing);
         ensureVersion(existing, expectedVersion);
+        if (actor.isEnterpriseAdmin() || actor.hasRole("ASSOCIATION_OPERATOR")) {
+            throw new ForbiddenException("PROFILE_DRAFT_REQUIRED", "请在资料草稿中修改并提交审核，不能直接覆盖正式资料");
+        }
         ensureUnique(existing.associationId(), request.name(), normalizeCreditCode(request.unifiedSocialCreditCode()), id);
         if (existing.version() == Long.MAX_VALUE) {
             throw new ConflictException("member version is exhausted");
         }
-        boolean requiresReview = actor.isEnterpriseAdmin() || actor.hasRole("ASSOCIATION_OPERATOR");
-        String status = requiresReview
-                ? "PENDING_REVIEW"
-                : normalizeStatus(request.status(), existing.status());
-        String visibility = actor.isEnterpriseAdmin()
-                ? existing.visibility()
-                : normalizeVisibility(request.visibility(), existing.visibility());
+        String status = normalizeStatus(request.status(), existing.status());
+        String visibility = normalizeVisibility(request.visibility(), existing.visibility());
         MemberProfile updated = fromRequest(
                 id, existing.associationId(), request, visibility, status,
                 existing.version() + 1, existing.createdAt(), Instant.now());
@@ -356,7 +354,7 @@ public class MemberService implements MemberDirectory, EnterpriseLifecycle {
         }
     }
 
-    private static MemberProfile fromRequest(
+    static MemberProfile fromRequest(
             UUID id, UUID associationId, MemberUpsertRequest request, String visibility, String status,
             long version, Instant createdAt, Instant updatedAt) {
         return new MemberProfile(

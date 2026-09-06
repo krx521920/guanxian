@@ -3,8 +3,10 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
+import ProfileReviewQueue from '../components/ProfileReviewQueue.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import MemberProfileDialog from '../components/MemberProfileDialog.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
 import { ApiRequestError } from '../services/http'
@@ -32,6 +34,7 @@ const importPreview = ref<MemberImportPreview | null>(null)
 const importBusy = ref(false)
 const importMessage = ref<string | null>(null)
 const viewing = ref<MemberProfile | null>(null)
+const viewReturnFocus = ref<HTMLElement | null>(null)
 const viewBusy = ref(false)
 const loadedAt = ref<Date | null>(null)
 const sortKey = ref<'' | 'completeness' | 'updatedAt'>('')
@@ -130,14 +133,6 @@ async function bulkReview() {
     : `已完成批量审核：${success} 家企业通过审核。`
   bulkBusy.value = false
   await load()
-}
-
-function displayMemberStatus(value: string): string {
-  return ({ ACTIVE: '已认证', PENDING_REVIEW: '待审核', INCOMPLETE: '待完善', DISABLED: '已停用', DELETED: '已删除' } as Record<string, string>)[value] || value
-}
-
-function visibilityLabel(value: string): string {
-  return ({ PRIVATE: '仅本单位', ASSOCIATION: '本协会', PARTNERS: '友好协会', MEMBERS: '全体会员', PUBLIC: '公开' } as Record<string, string>)[value] || value
 }
 
 function clearFilters() {
@@ -259,6 +254,7 @@ async function commitImport() {
 
 async function viewMember(id: string, includeDeleted = false) {
   if (viewBusy.value) return
+  viewReturnFocus.value = document.activeElement as HTMLElement | null
   viewBusy.value = true; importMessage.value = null
   try { viewing.value = (await platformApi.member(id, includeDeleted)).member }
   catch (reason) { importMessage.value = importError(reason) }
@@ -308,6 +304,7 @@ onMounted(async () => {
         <input ref="fileInput" class="visually-hidden" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" @change="previewFile" />
       </template>
     </PageHeader>
+    <ProfileReviewQueue v-if="canCollect" />
 
     <div v-if="canCollectRole && !hasAssociationContext" class="save-message page-message" role="status">系统管理员需先在管理上下文中选择协会，才能新增、导入、删除或恢复会员企业。</div>
     <div v-if="importMessage" class="save-message import-message" aria-live="polite">{{ importMessage }}</div>
@@ -345,6 +342,6 @@ onMounted(async () => {
       <div class="data-source panel-source"><span>数据来源：<b>会员企业档案库</b></span><span>更新时间：<b>{{ updatedAtLabel }}</b></span><span>可见范围：<b>按当前账号数据域</b></span><span>状态口径：<b>已认证 / 待审核 / 待完善 / 已停用</b></span></div>
       <PaginationBar :page="page" :size="size" :total="total" :disabled="loading" @change="changePage" @resize="resizePage" />
     </section>
-    <div v-if="viewing" class="modal-backdrop" role="dialog" aria-modal="true" :aria-label="`${viewing.name} 企业详情`" @click.self="viewing = null"><section class="panel modal-card"><div class="modal-head"><div><span class="eyebrow">MEMBER PROFILE</span><h2>{{ viewing.name }}</h2></div><button class="icon-button" aria-label="关闭会员详情" @click="viewing = null">×</button></div><div class="detail-grid"><div><span>单位类别</span><strong>{{ viewing.category }}</strong></div><div><span>统一信用代码</span><strong>{{ viewing.unifiedSocialCreditCode || '—' }}</strong></div><div><span>联系人</span><strong>{{ viewing.contactName || '—' }}</strong></div><div><span>联系电话</span><strong>{{ viewing.contactPhone || '—' }}</strong></div><div><span>联系邮箱</span><strong>{{ viewing.contactEmail || '—' }}</strong></div><div><span>认证状态</span><strong>{{ displayMemberStatus(viewing.status) }}</strong></div><div><span>可见范围</span><strong>{{ visibilityLabel(viewing.visibility) }}</strong></div><div><span>档案版本</span><strong>v{{ viewing.version }}</strong></div><div><span>更新时间</span><strong>{{ formatDateTime(viewing.updatedAt) }}</strong></div></div><div class="modal-copy"><h3>企业简介</h3><p>{{ viewing.introduction || '暂无简介' }}</p><h3>核心能力</h3><div class="tags"><span v-for="value in viewing.capabilities" :key="value">{{ value }}</span></div><h3>产品</h3><div class="tags"><span v-for="value in viewing.products" :key="value">{{ value }}</span></div><h3>服务</h3><div class="tags"><span v-for="value in viewing.services" :key="value">{{ value }}</span></div><h3>应用场景</h3><div class="tags"><span v-for="value in viewing.applicationScenarios" :key="value">{{ value }}</span></div><h3>合作需求</h3><div class="tags"><span v-for="value in viewing.cooperationNeeds" :key="value">{{ value }}</span></div></div></section></div>
+    <MemberProfileDialog v-if="viewing" :member="viewing" :return-focus="viewReturnFocus" @close="viewing = null" />
   </div>
 </template>

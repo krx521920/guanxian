@@ -151,6 +151,16 @@ afterEach(() => {
 })
 
 describe('OIDC authentication', () => {
+  it('chooses a stable workspace from verified roles, not their order or token claims', async () => {
+    const oidc = await loadOidc({
+      user: { access_token: 'test-token', expired: false, profile: { roles: ['SYSTEM_ADMIN'] } },
+      currentUser: { subject: 'multi-role', username: 'multi-role', roles: ['ENTERPRISE_MEMBER', 'ASSOCIATION_ADMIN'], permissions: [], associationId: 'a' },
+    })
+    await oidc.auth.initialize()
+    expect(oidc.auth.user.value?.role).toBe('ASSOCIATION_ADMIN')
+    expect(oidc.auth.user.value?.role).not.toBe('SYSTEM_ADMIN')
+  })
+
   it('configures authorization-code login and derives identity only from the backend', async () => {
     const oidc = await loadOidc({
       user: {
@@ -300,7 +310,7 @@ describe('OIDC authentication', () => {
     expect(oidc.setAccessToken).toHaveBeenCalledWith(null)
   })
 
-  it('rejects expired sessions and backend identities without a platform role', async () => {
+  it('rejects expired sessions and keeps role-less verified accounts strictly in onboarding', async () => {
     const expired = await loadOidc({
       user: { access_token: 'expired-token', expired: true },
     })
@@ -323,12 +333,53 @@ describe('OIDC authentication', () => {
     })
     await unassigned.auth.initialize()
     expect(unassigned.auth.user.value).toBeNull()
-    expect(unassigned.auth.error.value).not.toBeNull()
+    expect(unassigned.auth.error.value).toBeNull()
+    expect(unassigned.auth.onboardingIdentity.value?.username).toBe('no.role')
+    expect(unassigned.auth.isAuthenticated.value).toBe(false)
+    expect(unassigned.request).toHaveBeenCalledWith('/onboarding/session')
     expect(unassigned.setAccessToken.mock.calls).toEqual([
       ['valid-token'],
-      [null],
-      [null],
     ])
+  })
+
+  it('a missing binding can only become an onboarding identity after a second backend verification', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'onboarding-token', expired: false } })
+    oidc.request.mockRejectedValueOnce(Object.assign(new Error('unbound'), { status: 403 }))
+      .mockResolvedValueOnce({ subject: 'pending-subject', username: 'pending.user', displayName: '待绑定用户' })
+    await oidc.auth.initialize()
+    expect(oidc.auth.user.value).toBeNull()
+    expect(oidc.auth.onboardingIdentity.value?.subject).toBe('pending-subject')
+    expect(oidc.auth.takePostLoginRoute()).toBe('/join')
+    oidc.request.mockResolvedValueOnce({ subject: 'pending-subject', username: 'pending.user', roles: ['ENTERPRISE_ADMIN'], permissions: ['ENTERPRISE_WRITE'], associationId: 'a', enterpriseId: 'e' })
+    await oidc.auth.refreshIdentity()
+    expect(oidc.auth.user.value?.enterpriseId).toBe('e')
+    expect(oidc.auth.onboardingIdentity.value).toBeNull()
+    oidc.expire()
+    expect(oidc.auth.user.value).toBeNull()
+    expect(oidc.auth.onboardingIdentity.value).toBeNull()
+  })
+
+  it.each([401, 403, 500])('clears credentials if onboarding verification returns %s', async status => {
+    const oidc = await loadOidc({ user: { access_token: 'pending-token', expired: false } })
+    oidc.request.mockRejectedValueOnce(Object.assign(new Error('unbound'), { status: 403 }))
+      .mockRejectedValueOnce(Object.assign(new Error('not eligible'), { status }))
+    await oidc.auth.initialize()
+    expect(oidc.auth.user.value).toBeNull()
+    expect(oidc.auth.onboardingIdentity.value).toBeNull()
+    expect(oidc.setAccessToken).toHaveBeenLastCalledWith(null)
+  })
+
+  it('invalid tokens never fall back to onboarding and pending sessions are cleared on expiry', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'invalid-token', expired: false } })
+    oidc.request.mockRejectedValueOnce(Object.assign(new Error('invalid token'), { status: 401 }))
+    await oidc.auth.initialize()
+    expect(oidc.request).toHaveBeenCalledTimes(1)
+    expect(oidc.auth.onboardingIdentity.value).toBeNull()
+    const pending = await loadOidc({ user: { access_token: 'pending-token', expired: false }, currentUser: { subject:'s', username:'u', roles:[] } })
+    await pending.auth.initialize()
+    expect(pending.auth.onboardingIdentity.value).not.toBeNull()
+    pending.expire()
+    expect(pending.auth.onboardingIdentity.value).toBeNull()
   })
 
   it('keeps login return paths local and forbids demo switching in OIDC mode', async () => {

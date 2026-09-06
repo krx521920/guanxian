@@ -90,6 +90,7 @@ describe('role navigation', () => {
     expect(navigation.map(({ label, to, icon, badge }) => ({ label, to, icon, badge }))).toEqual([
       { label: '协会工作台', to: '/association', icon: 'dashboard', badge: undefined },
       { label: '企业工作台', to: '/enterprise', icon: 'dashboard', badge: undefined },
+      { label: '我的企业', to: '/enterprise/profile', icon: 'enterprise', badge: undefined },
       { label: '会员企业', to: '/members', icon: 'enterprise', badge: undefined },
       { label: '政策标准', to: '/policies', icon: 'policy', badge: undefined },
       { label: '生态全景', to: '/ecosystem/overview', icon: 'ecosystem', badge: undefined },
@@ -99,6 +100,7 @@ describe('role navigation', () => {
       { label: '资料附件', to: '/attachments', icon: 'enterprise', badge: undefined },
       { label: '友好协会', to: '/federation', icon: 'match', badge: undefined },
       { label: '审计与账号', to: '/operations', icon: 'task', badge: undefined },
+      { label: '负责人邀请', to: '/operations/invitations', icon: 'task', badge: undefined },
     ])
   })
 })

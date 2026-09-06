@@ -91,6 +91,9 @@ guanxian:
       bootstrap-system-admin-subjects: ${GUANXIAN_JWT_BOOTSTRAP_SYSTEM_ADMIN_SUBJECTS:}
 
   ai:
+    personal:
+      # Independent AES-256 key; blank disables personal credential storage (never fall back to plaintext).
+      encryption-key: ${GUANXIAN_AI_PERSONAL_ENCRYPTION_KEY:}
     provider:
       enabled: ${GUANXIAN_AI_PROVIDER_ENABLED:false}
       endpoint: ${GUANXIAN_AI_PROVIDER_ENDPOINT:}

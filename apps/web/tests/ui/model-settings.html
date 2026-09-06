@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Personal model UI fixture</title></head>
+<body><div id="app"></div><script type="module">
+import { createApp, h } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import AppShell from '../../src/layouts/AppShell.vue'
+import { useAuth } from '../../src/services/auth'
+import '../../src/styles/main.css'
+useAuth().loginDemo('ASSOCIATION_OPERATOR')
+const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/members', component: AppShell, meta: { title: '会员企业' } }] })
+await router.push('/members')
+createApp({ render: () => h(RouterView) }).use(router).mount('#app')
+</script></body></html>
