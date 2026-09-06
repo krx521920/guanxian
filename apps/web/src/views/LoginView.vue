@@ -32,7 +32,7 @@ async function login() {
   localError.value = null
   try {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect
-      : entry.value === 'enterprise' ? '/my-enterprise' : '/'
+      : entry.value === 'enterprise' ? '/enterprise/profile' : '/'
     if (auth.isDemoMode) {
       auth.loginDemo(selectedRole.value)
       await router.replace(postLoginDestination(router, auth.user.value!, redirect))
