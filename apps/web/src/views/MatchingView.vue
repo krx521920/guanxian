@@ -692,7 +692,7 @@ onBeforeUnmount(() => {
         <div class="form-actions match-state-actions">
           <button v-if="canRecommend(selected)" class="primary-button" :disabled="busy" @click="transition('recommend')">协会推荐</button>
           <button v-if="canConfirm(selected)" class="primary-button" :disabled="busy" @click="transition('confirm')">确认本方意向</button>
-          <RouterLink v-if="!workflowLoading && canOpenCollaboration(selected) && ['NEGOTIATING', 'OUTCOME_PENDING', 'ARCHIVED'].includes(selected.state || '')" class="primary-button" :to="`/collaborations?match=${selected.id}`">进入协作事项</RouterLink>
+          <RouterLink v-if="!workflowLoading && canOpenCollaboration(selected) && ['NEGOTIATING', 'OUTCOME_PENDING', 'ARCHIVED'].includes(selected.state || '')" class="primary-button" :to="`${route.path === '/enterprise/cooperation' ? '/enterprise/cooperation?view=projects&' : '/collaborations?'}match=${selected.id}`">进入协作事项</RouterLink>
         </div>
 
         <div class="match-workflow">

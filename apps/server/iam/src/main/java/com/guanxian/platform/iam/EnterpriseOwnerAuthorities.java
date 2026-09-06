@@ -14,6 +14,14 @@ class EnterpriseOwnerAuthorities {
     EnterpriseOwnerAuthorities(NamedParameterJdbcTemplate jdbc) { this.jdbc = jdbc; }
 
     boolean isOwner(Jwt jwt) {
+        return hasRole(jwt, "ENTERPRISE_ADMIN");
+    }
+
+    boolean isMember(Jwt jwt) {
+        return hasRole(jwt, "ENTERPRISE_MEMBER");
+    }
+
+    private boolean hasRole(Jwt jwt, String role) {
         if (jwt.getSubject() == null || jwt.getSubject().isBlank()) return false;
         Long count = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM enterprise_owner_grant g
@@ -26,11 +34,11 @@ class EnterpriseOwnerAuthorities {
                   AND u.version=g.binding_version AND u.status='ACTIVE'
                   AND e.association_id=g.association_id AND e.deleted_at IS NULL
                   AND e.status NOT IN ('DISABLED', 'DELETED') AND a.status='ACTIVE'
-                  AND g.role_code='ENTERPRISE_ADMIN' AND i.status='APPROVED'
+                  AND g.role_code=:role AND i.target_role=g.role_code AND i.status='APPROVED'
                   AND i.account_id=u.id AND i.claim_subject=g.external_subject
                   AND i.enterprise_id=g.enterprise_id AND i.association_id=g.association_id
                   AND NOT EXISTS (SELECT 1 FROM revoked_identity_subject r WHERE r.external_subject=g.external_subject)
-                """, Map.of("subject", jwt.getSubject()), Long.class);
+                """, Map.of("subject", jwt.getSubject(), "role", role), Long.class);
         return count != null && count == 1;
     }
 }

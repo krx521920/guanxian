@@ -137,6 +137,11 @@ public class SecurityConfig {
                 ROLE_PERMISSIONS.get("ENTERPRISE_ADMIN").forEach(permission ->
                         authorities.add(new SimpleGrantedAuthority(permission)));
             }
+            if (enterpriseOwners != null && enterpriseOwners.isMember(jwt)) {
+                authorities.add(new SimpleGrantedAuthority("ROLE_ENTERPRISE_MEMBER"));
+                ROLE_PERMISSIONS.get("ENTERPRISE_MEMBER").forEach(permission ->
+                        authorities.add(new SimpleGrantedAuthority(permission)));
+            }
             return authorities;
         });
         return converter;

@@ -188,8 +188,39 @@ class EcosystemCatalogServiceTest {
         guarded.demands(actor, null, false, Integer.MAX_VALUE, 100);
 
         long expectedOffset = (long) Integer.MAX_VALUE * 100;
-        verify(store).listOfferings(actor, null, false, expectedOffset, 100);
-        verify(store).listDemands(actor, null, false, expectedOffset, 100);
+        verify(store).listOfferings(actor, null, false, expectedOffset, 100, false);
+        verify(store).listDemands(actor, null, false, expectedOffset, 100, false);
+    }
+
+    @Test
+    void ownCatalogFiltersBeforePaginationAndCountAndNeverGrantsWriteToMembers() {
+        ActorScope owner=enterpriseAdmin(ENTERPRISE_A), other=enterpriseAdmin(ENTERPRISE_B);
+        for (ActorScope actor:List.of(owner,other)) {
+            for (int i=0;i<3;i++) {
+                var offering=service.createOffering(new OfferingUpsertRequest("产品"+i,"PRODUCT",null,List.of(),List.of(),"MEMBERS"),actor);
+                var submitted=service.submitOffering(offering.id(),offering.version(),actor);
+                service.reviewOffering(offering.id(),submitted.version(),new ReviewDecisionRequest(true,null),associationReviewer());
+                var demand=service.createDemand(new DemandUpsertRequest("需求"+i,"说明",List.of(),List.of(),"MEMBERS",null,null,null),actor);
+                var pending=service.submitDemand(demand.id(),demand.version(),actor);
+                service.reviewDemand(demand.id(),pending.version(),new ReviewDecisionRequest(true,null),associationReviewer());
+            }
+        }
+        var member=new ActorScope(UUID.randomUUID(),"member","member",ASSOCIATION_ID,ENTERPRISE_A,Set.of("ENTERPRISE_MEMBER"),Set.of());
+        assertEquals(6,service.offerings(owner,null,false,0,20).total());
+        for(ActorScope actor:List.of(owner,member)) {
+            var offerings=service.offerings(actor,null,false,1,2,true);
+            var demands=service.demands(actor,null,false,1,2,true);
+            assertEquals(3,offerings.total());assertEquals(1,offerings.items().size());
+            assertEquals(3,demands.total());assertEquals(1,demands.items().size());
+            assertTrue(offerings.items().stream().allMatch(i->ENTERPRISE_A.equals(i.enterpriseId())));
+            assertTrue(demands.items().stream().allMatch(i->ENTERPRISE_A.equals(i.enterpriseId())));
+            if(actor==member) {
+                assertTrue(offerings.items().getFirst().allowedActions().isEmpty());
+                assertTrue(demands.items().getFirst().allowedActions().isEmpty());
+            }
+        }
+        assertThrows(ForbiddenException.class,()->service.offerings(systemAdmin(),null,false,0,20,true));
+        assertThrows(ForbiddenException.class,()->service.demands(associationReviewer(),null,false,0,20,true));
     }
 
     @Test

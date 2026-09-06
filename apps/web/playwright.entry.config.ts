@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/ui',
-  testMatch: ['entry-routing.spec.ts', 'enterprise-onboarding.spec.ts'],
+  testMatch: ['entry-routing.spec.ts', 'enterprise-onboarding.spec.ts', 'enterprise-self-service.spec.ts'],
   outputDir: '../../test-results/entry-routing',
   workers: 1,
   timeout: 30000,

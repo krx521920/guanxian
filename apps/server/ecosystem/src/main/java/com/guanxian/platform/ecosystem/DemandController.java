@@ -39,8 +39,9 @@ public class DemandController {
             @RequestParam(defaultValue = "false") boolean includeDeleted,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "false") boolean ownOnly,
             Authentication authentication) {
-        return ApiResponse.ok(service.demands(actor(authentication), query, includeDeleted, page, size));
+        return ApiResponse.ok(service.demands(actor(authentication), query, includeDeleted, page, size, ownOnly));
     }
 
     @GetMapping("/{id}")

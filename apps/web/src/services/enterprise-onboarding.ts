@@ -6,7 +6,9 @@ export interface EnterpriseInvitation {
   status: 'ISSUED' | 'CLAIMED' | 'APPROVED' | 'REJECTED' | 'REVOKED' | 'EXPIRED'
   version: number; createdAt: string; expiresAt: string; claimantName: string | null
   claimantSubject?: string | null; claimedAt: string | null; reviewNote: string | null; accountId: string | null
+  targetRole?: 'ENTERPRISE_ADMIN' | 'ENTERPRISE_MEMBER'
 }
+export const invitationRoleLabel = (item: EnterpriseInvitation) => item.targetRole === 'ENTERPRISE_MEMBER' ? '普通成员只读权限' : '企业负责人维护权限'
 export const invitationStatus: Record<EnterpriseInvitation['status'], string> = {
   ISSUED: '待负责人确认', CLAIMED: '待管理员核验', APPROVED: '已开通', REJECTED: '已退回', REVOKED: '已撤销', EXPIRED: '已过期',
 }

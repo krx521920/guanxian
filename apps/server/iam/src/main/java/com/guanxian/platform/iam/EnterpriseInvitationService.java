@@ -29,6 +29,17 @@ import static com.guanxian.platform.iam.EnterpriseInvitations.*;
 @Service
 @ConditionalOnProperty(name = "guanxian.security.mode", havingValue = "jwt", matchIfMissing = true)
 class EnterpriseInvitationService {
+    // If an account was provisioned through this workflow, stale grants cannot be reused
+    // by a request whose authentication was resolved before a concurrent binding update.
+    static final String CURRENT_OWNER_GRANT = """
+            AND (NOT EXISTS (SELECT 1 FROM enterprise_owner_grant g WHERE g.account_id=u.id)
+              OR EXISTS (SELECT 1 FROM enterprise_owner_grant g JOIN enterprise_owner_invitation approved ON approved.id=g.invitation_id
+                 WHERE g.account_id=u.id AND g.role_code='ENTERPRISE_ADMIN' AND approved.target_role=g.role_code
+                   AND g.binding_version=u.version AND g.external_subject=u.external_subject
+                   AND g.enterprise_id=u.enterprise_id AND g.association_id=u.association_id
+                   AND approved.status='APPROVED' AND approved.account_id=u.id AND approved.claim_subject=u.external_subject
+                   AND approved.enterprise_id=g.enterprise_id AND approved.association_id=g.association_id))
+            """;
     private static final String SELECT = """
             SELECT i.*, e.name AS enterprise_name, a.name AS association_name
               FROM enterprise_owner_invitation i
@@ -79,6 +90,23 @@ class EnterpriseInvitationService {
     @Transactional
     Issued create(Create request, ActorScope actor) {
         requireAdmin(actor);
+        return issue(request, actor, "ENTERPRISE_ADMIN", null);
+    }
+
+    @Transactional
+    Issued createMember(String username, ActorScope actor) {
+        requireTeamOwner(actor);
+        // Lock the enterprise before accounts, consistently with the existing review flow.
+        requireEnterprise(actor.enterpriseId(), actor.associationId(), actor.enterpriseId(), true);
+        long issuerVersion = currentIssuerVersion(actor);
+        if (count("SELECT COUNT(*) FROM user_account WHERE lower(username)=:username",
+                params("username", normalizedUsername(username))) > 0) {
+            throw new ConflictException("该账号已有平台绑定，请联系系统管理员核验，团队邀请不会覆盖已有身份");
+        }
+        return issue(new Create(actor.enterpriseId(), username), actor, "ENTERPRISE_MEMBER", issuerVersion);
+    }
+
+    private Issued issue(Create request, ActorScope actor, String role, Long issuerVersion) {
         requireEnterprise(request.enterpriseId(), actor.associationId(), actor.enterpriseId(), true);
         String username = normalizedUsername(request.username());
         var p = scope(actor).addValue("enterpriseId", request.enterpriseId()).addValue("username", username)
@@ -92,15 +120,19 @@ class EnterpriseInvitationService {
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         UUID id = UUID.randomUUID();
         p.addValue("id", id).addValue("hash", hash(token)).addValue("actor", actor.subject())
+                .addValue("role", role).addValue("issuerId", issuerVersion == null ? null : actor.userId())
+                .addValue("issuerVersion", issuerVersion)
                 .addValue("expires", time(clock.instant().plus(Duration.ofHours(72))));
         jdbc.update("""
                 INSERT INTO enterprise_owner_invitation
-                  (id, association_id, enterprise_id, invited_username, token_hash, status, created_by_subject, created_at, expires_at)
-                VALUES (:id, :associationId, :enterpriseId, :username, :hash, 'ISSUED', :actor, :now, :expires)
+                  (id, association_id, enterprise_id, invited_username, token_hash, status, created_by_subject, created_at, expires_at,
+                   target_role, issuer_account_id, issuer_binding_version)
+                VALUES (:id, :associationId, :enterpriseId, :username, :hash, 'ISSUED', :actor, :now, :expires,
+                   :role, :issuerId, :issuerVersion)
                 """, p);
         View value = byId(id, true);
         audit(actor.subject(), actor.username(), actor.userId(), actor.associationId(), value,
-                "ENTERPRISE_INVITATION_CREATE", Map.of("invitedUsername", username));
+                "ENTERPRISE_INVITATION_CREATE", Map.of("invitedUsername", username, "targetRole", role));
         return new Issued(value, token);
     }
 
@@ -109,6 +141,7 @@ class EnterpriseInvitationService {
         View value = byToken(token, false);
         requireRecipient(value, self);
         requireUsable(value);
+        requireTeamIssuer(value);
         requireEnterprise(value.enterpriseId(), invitationAssociation(value.id()), null, false);
         return value;
     }
@@ -125,6 +158,11 @@ class EnterpriseInvitationService {
         View value = byId(initial.id(), false);
         requireRecipient(value, self);
         requireUsable(value);
+        requireTeamIssuer(value);
+        if ("ENTERPRISE_MEMBER".equals(value.targetRole())) {
+            if (ActorScopes.roles(authentication).contains("ENTERPRISE_ADMIN")) throw denied();
+            requireNewTeamAccount(self);
+        }
         requireAccountCompatible(self, associationId, value.enterpriseId(), false);
         if ("CLAIMED".equals(value.status()) && self.subject().equals(claimSubject(value.id()))) return value;
         if (!"ISSUED".equals(value.status())) throw new ConflictException("该邀请已经被确认或关闭");
@@ -155,14 +193,16 @@ class EnterpriseInvitationService {
         UUID accountId = null;
         if ("APPROVE".equals(request.decision())) {
             requireUsable(value);
+            requireTeamIssuer(value);
             var identity = new Identity(subject, jdbc.queryForObject("SELECT claim_username FROM enterprise_owner_invitation WHERE id=:id", params("id", id), String.class), value.claimantName());
+            if ("ENTERPRISE_MEMBER".equals(value.targetRole())) requireNewTeamAccount(identity);
             Account existing = requireAccountCompatible(identity, actor.associationId(), value.enterpriseId(), true);
             accountId = existing == null ? UUID.randomUUID() : existing.id();
             long nextVersion = existing == null ? 0 : existing.version() + 1;
             var p = scope(actor).addValue("id", accountId).addValue("enterpriseId", value.enterpriseId())
-                    .addValue("subject", identity.subject()).addValue("username", identity.username())
+                    .addValue("subject", identity.subject()).addValue("username", normalizedUsername(identity.username()))
                     .addValue("displayName", identity.displayName()).addValue("version", nextVersion)
-                    .addValue("invitationId", id).addValue("now", time(clock.instant()));
+                    .addValue("invitationId", id).addValue("role", value.targetRole()).addValue("now", time(clock.instant()));
             try {
                 if (existing == null) {
                     jdbc.update("""
@@ -175,7 +215,7 @@ class EnterpriseInvitationService {
                 jdbc.update("DELETE FROM enterprise_owner_grant WHERE account_id=:id", p);
                 jdbc.update("""
                         INSERT INTO enterprise_owner_grant (account_id, invitation_id, external_subject, association_id, enterprise_id, binding_version, role_code, granted_at)
-                        VALUES (:id, :invitationId, :subject, :associationId, :enterpriseId, :version, 'ENTERPRISE_ADMIN', :now)
+                        VALUES (:id, :invitationId, :subject, :associationId, :enterpriseId, :version, :role, :now)
                         """, p);
             } catch (DataIntegrityViolationException exception) {
                 throw new ConflictException("该统一账号已被绑定，请重新核对，不能覆盖已有归属");
@@ -257,7 +297,63 @@ class EnterpriseInvitationService {
                 rs.getString("association_name"), rs.getString("invited_username"), status, rs.getLong("version"),
                 rs.getTimestamp("created_at").toInstant(), expires, rs.getString("claim_display_name"),
                 admin ? rs.getString("claim_subject") : null, rs.getTimestamp("claimed_at") == null ? null : rs.getTimestamp("claimed_at").toInstant(),
-                rs.getString("review_note"), rs.getObject("account_id", UUID.class));
+                rs.getString("review_note"), rs.getObject("account_id", UUID.class), rs.getString("target_role"));
+    }
+
+    Page teamInvitations(ActorScope actor, int page) {
+        requireTeamOwner(actor);
+        int safePage = Math.max(0, Math.min(page, 100000));
+        var p = scope(actor).addValue("offset", (long) safePage * 20);
+        String condition = " WHERE i.association_id=:associationId AND i.enterprise_id=:enterpriseId AND i.target_role='ENTERPRISE_MEMBER'";
+        return new Page(jdbc.query(SELECT + condition + " ORDER BY i.created_at DESC, i.id LIMIT 20 OFFSET :offset", p,
+                (rs, row) -> view(rs, false)), count("SELECT COUNT(*) FROM enterprise_owner_invitation i" + condition, p), safePage, 20);
+    }
+
+    @Transactional
+    View revokeMember(UUID id, long version, ActorScope actor) {
+        requireTeamOwner(actor);
+        View value = scopedLocked(id, actor);
+        if (!"ENTERPRISE_MEMBER".equals(value.targetRole())) throw denied();
+        requireVersion(value, version);
+        if (Set.of("APPROVED", "REJECTED", "REVOKED").contains(value.status())) throw new ConflictException("邀请已关闭，请刷新列表");
+        currentIssuerVersion(actor);
+        jdbc.update("UPDATE enterprise_owner_invitation SET status='REVOKED', version=version+1, reviewed_by_subject=:actor, reviewed_at=:now WHERE id=:id",
+                params("id", id).addValue("actor", actor.subject()).addValue("now", time(clock.instant())));
+        View result = byId(id, false);
+        audit(actor.subject(), actor.username(), actor.userId(), actor.associationId(), result, "ENTERPRISE_TEAM_INVITATION_REVOKE", Map.of());
+        return result;
+    }
+
+    static void requireTeamOwner(ActorScope actor) {
+        if (actor == null || actor.userId() == null || actor.associationId() == null || actor.enterpriseId() == null
+                || !actor.isEnterpriseAdmin() || !Set.of("ENTERPRISE_ADMIN", "ENTERPRISE_MEMBER").containsAll(actor.roles())) throw denied();
+    }
+
+    private long currentIssuerVersion(ActorScope actor) {
+        var versions = jdbc.queryForList("""
+                SELECT u.version FROM user_account u WHERE u.id=:id AND u.external_subject=:subject AND u.status='ACTIVE'
+                  AND u.association_id=:associationId AND u.enterprise_id=:enterpriseId
+                  AND NOT EXISTS (SELECT 1 FROM revoked_identity_subject WHERE external_subject=:subject)
+                """ + CURRENT_OWNER_GRANT + " FOR UPDATE", scope(actor).addValue("id", actor.userId()).addValue("subject", actor.subject()), Long.class);
+        if (versions.size() != 1) throw denied();
+        return versions.getFirst();
+    }
+
+    private void requireNewTeamAccount(Identity self) {
+        if (count("SELECT COUNT(*) FROM user_account WHERE external_subject=:subject OR lower(username)=:username",
+                params("subject", self.subject()).addValue("username", normalizedUsername(self.username()))) > 0)
+            throw new ConflictException("该账号已有绑定，不能通过团队邀请变更权限或企业归属");
+    }
+
+    private void requireTeamIssuer(View value) {
+        if (!"ENTERPRISE_MEMBER".equals(value.targetRole())) return;
+        if (jdbc.queryForList("""
+                SELECT u.id FROM enterprise_owner_invitation i JOIN user_account u ON u.id=i.issuer_account_id
+                 WHERE i.id=:id AND u.external_subject=i.created_by_subject AND u.status='ACTIVE'
+                   AND u.version=i.issuer_binding_version AND u.enterprise_id=i.enterprise_id AND u.association_id=i.association_id
+                   AND NOT EXISTS (SELECT 1 FROM revoked_identity_subject r WHERE r.external_subject=u.external_subject)
+                """ + CURRENT_OWNER_GRANT + " FOR UPDATE", params("id", value.id()), UUID.class).size() != 1)
+            throw new ConflictException("邀请人的企业授权已变化，请重新申请邀请");
     }
     private void requireEnterprise(UUID enterpriseId, UUID associationId, UUID selectedEnterprise, boolean lock) {
         if (selectedEnterprise != null && !selectedEnterprise.equals(enterpriseId)) throw denied();

@@ -53,16 +53,23 @@ public class EcosystemCatalogService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public EcosystemPage<OfferingView> offerings(
             ActorScope actor, String query, boolean includeDeleted, int page, int size) {
+        return offerings(actor, query, includeDeleted, page, size, false);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public EcosystemPage<OfferingView> offerings(
+            ActorScope actor, String query, boolean includeDeleted, int page, int size, boolean ownOnly) {
+        if (ownOnly) requireOwnReadScope(actor);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && canReadDeleted(actor);
         return new EcosystemPage<>(
-                store.listOfferings(actor, query, allowedDeleted, offset, safeSize).stream()
+                store.listOfferings(actor, query, allowedDeleted, offset, safeSize, ownOnly).stream()
                         .map(item -> authorizedOffering(item, actor))
                         .flatMap(Optional::stream)
                         .toList(),
-                store.countOfferings(actor, query, allowedDeleted),
+                store.countOfferings(actor, query, allowedDeleted, ownOnly),
                 safePage,
                 safeSize);
     }
@@ -169,16 +176,23 @@ public class EcosystemCatalogService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public EcosystemPage<DemandView> demands(
             ActorScope actor, String query, boolean includeDeleted, int page, int size) {
+        return demands(actor, query, includeDeleted, page, size, false);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public EcosystemPage<DemandView> demands(
+            ActorScope actor, String query, boolean includeDeleted, int page, int size, boolean ownOnly) {
+        if (ownOnly) requireOwnReadScope(actor);
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         long offset = (long) safePage * safeSize;
         boolean allowedDeleted = includeDeleted && canReadDeleted(actor);
         return new EcosystemPage<>(
-                store.listDemands(actor, query, allowedDeleted, offset, safeSize).stream()
+                store.listDemands(actor, query, allowedDeleted, offset, safeSize, ownOnly).stream()
                         .map(item -> authorizedDemand(item, actor))
                         .flatMap(Optional::stream)
                         .toList(),
-                store.countDemands(actor, query, allowedDeleted),
+                store.countDemands(actor, query, allowedDeleted, ownOnly),
                 safePage,
                 safeSize);
     }
@@ -535,6 +549,14 @@ public class EcosystemCatalogService {
 
     private static boolean visible(Set<String> fields, String field) {
         return fields.contains(field);
+    }
+
+    private static void requireOwnReadScope(ActorScope actor) {
+        if (actor == null || actor.enterpriseId() == null || actor.associationId() == null
+                || actor.isSystemAdmin() || actor.isAssociationStaff()
+                || (!actor.roles().contains("ENTERPRISE_ADMIN") && !actor.roles().contains("ENTERPRISE_MEMBER"))) {
+            throw new ForbiddenException("ENTERPRISE_SCOPE_REQUIRED", "我的供需仅适用于已绑定的企业身份");
+        }
     }
 
     private static void requireState(String actual, Set<String> expected, String message) {

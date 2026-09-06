@@ -35,8 +35,9 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<OfferingView> listOfferings(
-            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit, boolean ownOnly) {
         return offerings.values().stream()
+                .filter(item -> !ownOnly || item.value().enterpriseId().equals(actor.enterpriseId()))
                 .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
                 .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredOffering::value)
@@ -50,8 +51,9 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
-    public long countOfferings(ActorScope actor, String query, boolean includeDeleted) {
+    public long countOfferings(ActorScope actor, String query, boolean includeDeleted, boolean ownOnly) {
         return offerings.values().stream()
+                .filter(item -> !ownOnly || item.value().enterpriseId().equals(actor.enterpriseId()))
                 .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
                 .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredOffering::value)
@@ -154,8 +156,9 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<DemandView> listDemands(
-            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit, boolean ownOnly) {
         return demands.values().stream()
+                .filter(item -> !ownOnly || item.value().enterpriseId().equals(actor.enterpriseId()))
                 .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
                 .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredDemand::value)
@@ -169,8 +172,9 @@ class InMemoryEcosystemCatalogStore implements EcosystemCatalogStore {
     }
 
     @Override
-    public long countDemands(ActorScope actor, String query, boolean includeDeleted) {
+    public long countDemands(ActorScope actor, String query, boolean includeDeleted, boolean ownOnly) {
         return demands.values().stream()
+                .filter(item -> !ownOnly || item.value().enterpriseId().equals(actor.enterpriseId()))
                 .filter(item -> canReadEnterpriseHistory(actor, item.value().enterpriseId()))
                 .filter(item -> canReadDeletion(actor, item.value().enterpriseId(), item.deleted(), includeDeleted))
                 .map(StoredDemand::value)

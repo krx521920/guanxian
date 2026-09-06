@@ -33,6 +33,19 @@ class EnterpriseInvitationPostgresTest {
         assertEquals("APPROVED",approved.status());
         assertTrue(new EnterpriseOwnerAuthorities(named).isOwner(owner().getToken()));
         assertEquals(ENTERPRISE,jdbc.queryForObject("SELECT enterprise_id FROM user_account WHERE id=?",java.util.UUID.class,approved.accountId()));
+        var ownerActor=new com.guanxian.platform.shared.security.ActorScope(approved.accountId(),"owner-subject","owner.user",ASSOCIATION,ENTERPRISE,java.util.Set.of("ENTERPRISE_ADMIN"),java.util.Set.of());
+        var memberIdentity=new org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken(jwt("team-subject","team.user"),java.util.List.of(),"team.user");
+        var memberInvite=tx.execute(s->service.createMember("team.user",ownerActor));
+        var memberClaim=tx.execute(s->service.claim(new Claim(memberInvite.token(),true),memberIdentity));
+        var memberApproval=tx.execute(s->service.review(memberClaim.id(),memberClaim.version(),new Review("APPROVE","普通成员隔离核验"),admin()));
+        var grants=new EnterpriseOwnerAuthorities(named);
+        assertFalse(grants.isOwner(memberIdentity.getToken()));assertTrue(grants.isMember(memberIdentity.getToken()));
+        var team=new EnterpriseTeamService(named,new ObjectMapper());
+        assertEquals(1,team.members(ownerActor,0).total());
+        tx.executeWithoutResult(s->team.disable(memberApproval.accountId(),0,"测试停用",ownerActor));
+        assertFalse(grants.isMember(memberIdentity.getToken()));
+        assertEquals("INACTIVE",team.members(ownerActor,0).items().getFirst().status());
+        assertEquals(1,jdbc.queryForObject("SELECT count(*) FROM audit_log WHERE action='ENTERPRISE_TEAM_MEMBER_DISABLE'",Integer.class));
         jdbc.update("UPDATE user_account SET version=version+1 WHERE id=?",approved.accountId());
         assertFalse(new EnterpriseOwnerAuthorities(named).isOwner(owner().getToken()));
     }

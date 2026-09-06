@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import PageHeader from '../components/PageHeader.vue'
 import { useAuth } from '../services/auth'
 import { platformApi } from '../services/platform-api'
-import { invitationApi, invitationStatus, type EnterpriseInvitation } from '../services/enterprise-onboarding'
+import { invitationApi, invitationStatus, invitationRoleLabel, type EnterpriseInvitation } from '../services/enterprise-onboarding'
 import type { MemberEnterprise } from '../types/domain'
 
 const auth = useAuth()
@@ -58,7 +58,7 @@ async function review(decision: 'APPROVE' | 'REJECT') {
   await run(async () => {
     await invitationApi.review(target, decision, note.value.trim())
     reviewItem.value = null; note.value = ''; verified.value = false
-    message.value = decision === 'APPROVE' ? '负责人已绑定已有企业，可刷新权限进入自己的工作台。' : '申请已退回。'
+    message.value = decision === 'APPROVE' ? '账号已按邀请权限绑定已有企业，可刷新身份进入工作台。' : '申请已退回。'
     await load()
   })
 }
@@ -93,17 +93,17 @@ onMounted(() => { if (scopeReady.value && !auth.isDemoMode) void run(load) })
         <div class="invite-heading"><h2>邀请与待核验申请</h2><button class="text-button" :disabled="busy" @click="run(load)">刷新</button></div>
         <p v-if="busy" role="status">正在处理…</p><p v-else-if="!items.length">当前范围暂无邀请。</p>
         <article v-for="item in items" :key="item.id" class="invite-row">
-          <div><h3>{{ item.enterpriseName }}</h3><p>指定账号：{{ item.username }} · {{ invitationStatus[item.status] }}</p><p>有效期至 {{ new Date(item.expiresAt).toLocaleString() }}</p><p v-if="item.reviewNote">核验反馈：{{ item.reviewNote }}</p></div>
+          <div><h3>{{ item.enterpriseName }}</h3><p>指定账号：{{ item.username }} · {{ invitationStatus[item.status] }}</p><p>申请权限：{{ invitationRoleLabel(item) }}</p><p>有效期至 {{ new Date(item.expiresAt).toLocaleString() }}</p><p v-if="item.reviewNote">核验反馈：{{ item.reviewNote }}</p></div>
           <div class="invite-actions"><button v-if="item.status === 'CLAIMED' && canReview" class="primary-button" :disabled="busy" @click="openReview(item)">核验绑定</button><button v-if="['ISSUED','CLAIMED','EXPIRED'].includes(item.status)" class="secondary-button" :disabled="busy" @click="revoke(item)">撤销邀请</button></div>
         </article>
         <div class="invite-actions"><button class="secondary-button" :disabled="busy || page === 0" @click="turnPage(-1)">上一页</button><span>第 {{ page + 1 }} 页 · 共 {{ total }} 条</span><button class="secondary-button" :disabled="busy || lastPage" @click="turnPage(1)">下一页</button></div>
       </section>
       <section v-if="reviewItem" ref="reviewPanel" tabindex="-1" class="panel invite-panel invite-review" aria-labelledby="invite-review-title">
-        <h2 id="invite-review-title">核验负责人并开通权限</h2><p><strong>{{ reviewItem.enterpriseName }}</strong> · {{ reviewItem.username }} · {{ reviewItem.claimantName }}</p>
+        <h2 id="invite-review-title">{{ reviewItem.targetRole === 'ENTERPRISE_MEMBER' ? '核验普通成员并开通只读权限' : '核验负责人并开通权限' }}</h2><p><strong>{{ reviewItem.enterpriseName }}</strong> · {{ reviewItem.username }} · {{ reviewItem.claimantName }}</p>
         <p>已登录的统一身份：<code>{{ reviewItem.claimantSubject }}</code></p>
-        <p>请通过协会留存的联系方式核验授权关系，不要仅凭邀请链接或姓名判断。批准后授予本企业维护权限，不授予协会或平台管理权限。</p>
+        <p>请通过协会留存的联系方式核验授权关系，不要仅凭邀请链接或姓名判断。批准后仅授予：<strong>{{ invitationRoleLabel(reviewItem) }}</strong>，不授予协会或平台管理权限。</p>
         <label>核验依据 / 退回原因<textarea v-model="note" maxlength="1000" rows="3" required placeholder="记录核验渠道和结论，勿填写证件号码或密码" /></label>
-        <label class="invite-check"><input v-model="verified" type="checkbox" />我已通过可信渠道确认此账号是该企业授权负责人。</label>
+        <label class="invite-check"><input v-model="verified" type="checkbox" />{{ reviewItem.targetRole === 'ENTERPRISE_MEMBER' ? '我已通过可信渠道确认此账号获准加入该企业团队，仅开通普通成员只读权限。' : '我已通过可信渠道确认此账号是该企业授权负责人。' }}</label>
         <div class="invite-actions"><button class="primary-button" :disabled="busy || !verified || !note.trim()" @click="review('APPROVE')">批准绑定</button><button class="secondary-button" :disabled="busy || !note.trim()" @click="review('REJECT')">退回申请</button><button class="text-button" :disabled="busy" @click="reviewItem = null">取消</button></div>
       </section>
     </template>

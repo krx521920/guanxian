@@ -35,6 +35,7 @@ class EnterpriseInvitationHttpTest {
     @Configuration @EnableAutoConfiguration
     @Import({SecurityConfig.class,EnterpriseOwnerAuthorities.class,EnterpriseInvitationService.class,
             EnterpriseInvitationController.class,EnterpriseOnboardingController.class,DatabaseActorScopeResolver.class,
+            EnterpriseTeamController.class,EnterpriseTeamService.class,
             CurrentUserController.class,MyEnterpriseController.class,GlobalExceptionHandler.class})
     static class App {
         @Bean DataSource dataSource() throws Exception {
@@ -47,8 +48,46 @@ class EnterpriseInvitationHttpTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
+    @Autowired EnterpriseInvitationService invitations;
     @MockitoBean JwtDecoder decoder;
     @MockitoBean MemberService members;
+
+    @Test void teamEndpointsEnforceRealBearerScopeVersionAndReadOnlyMemberGrant() throws Exception {
+        var invitation=invitations.create(new EnterpriseInvitations.Create(ENTERPRISE,"owner.user"),admin());
+        var claimed=invitations.claim(new EnterpriseInvitations.Claim(invitation.token(),true),owner());
+        invitations.review(claimed.id(),claimed.version(),new EnterpriseInvitations.Review("APPROVE","真实 HTTP 测试前置核验"),admin());
+        String base="/api/v1/my-enterprise/team";
+        mvc.perform(get(base+"/members")).andExpect(status().isUnauthorized());
+        mvc.perform(get(base+"/members").header("Authorization","Bearer admin")).andExpect(status().isForbidden());
+        var issued=mvc.perform(post(base+"/invitations").header("Authorization","Bearer owner")
+                        .header("X-Guanxian-Enterprise-Id",FOREIGN_ENTERPRISE).contentType("application/json")
+                        .content("{\"username\":\"team.user\",\"role\":\"SYSTEM_ADMIN\",\"enterpriseId\":\""+FOREIGN_ENTERPRISE+"\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.invitation.enterpriseId").value(ENTERPRISE.toString()))
+                .andExpect(jsonPath("$.data.invitation.targetRole").value("ENTERPRISE_MEMBER")).andReturn();
+        var data=mapper.readTree(issued.getResponse().getContentAsString()).path("data");
+        String token=data.path("token").asText(),id=data.path("invitation").path("id").asText();
+        when(decoder.decode("team")).thenReturn(jwt("team-subject","team.user"));
+        mvc.perform(post("/api/v1/onboarding/claim").header("Authorization","Bearer team").contentType("application/json")
+                .content("{\"token\":\""+token+"\",\"confirmed\":true}")).andExpect(status().isOk());
+        var approved=mvc.perform(put("/api/v1/enterprise-invitations/"+id+"/review").header("Authorization","Bearer admin")
+                .header("X-Guanxian-Association-Id",ASSOCIATION).header("If-Match","\"1\"").contentType("application/json")
+                .content("{\"decision\":\"APPROVE\",\"note\":\"核验普通成员权限\"}")).andExpect(status().isOk()).andReturn();
+        String memberId=mapper.readTree(approved.getResponse().getContentAsString()).path("data").path("accountId").asText();
+        mvc.perform(get("/api/v1/users/me").header("Authorization","Bearer team")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.roles[0]").value("ENTERPRISE_MEMBER"));
+        mvc.perform(get(base+"/members").header("Authorization","Bearer team")).andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/my-enterprise").header("Authorization","Bearer team").contentType("application/json").content("{\"name\":\"越权\",\"category\":\"测试\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(put(base+"/members/"+memberId+"/disable").header("Authorization","Bearer owner").contentType("application/json").content("{\"note\":\"离职\"}"))
+                .andExpect(status().isPreconditionRequired());
+        mvc.perform(put(base+"/members/"+memberId+"/disable").header("Authorization","Bearer owner").header("If-Match","\"9\"").contentType("application/json").content("{\"note\":\"离职\"}"))
+                .andExpect(status().isPreconditionFailed());
+        mvc.perform(put(base+"/members/"+memberId+"/disable").header("Authorization","Bearer owner").header("If-Match","\"0\"").contentType("application/json").content("{\"note\":\"离职\"}"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
+        mvc.perform(get("/api/v1/users/me").header("Authorization","Bearer team")).andExpect(status().isForbidden());
+        mvc.perform(get(base+"/members").header("Authorization","Bearer owner")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].status").value("INACTIVE")).andExpect(jsonPath("$.data.items[0].externalSubject").doesNotExist());
+    }
     @BeforeEach void setup() {
         jdbc.update("DELETE FROM enterprise_owner_grant"); jdbc.update("DELETE FROM enterprise_owner_invitation");
         jdbc.update("DELETE FROM user_account"); jdbc.update("DELETE FROM revoked_identity_subject"); jdbc.update("DELETE FROM audit_log");

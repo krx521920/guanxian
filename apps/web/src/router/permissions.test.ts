@@ -11,7 +11,10 @@ describe('protected route permissions', () => {
       '/ecosystem',
       '/ecosystem/overview',
       '/enterprise',
+      '/enterprise/catalog',
+      '/enterprise/cooperation',
       '/enterprise/profile',
+      '/enterprise/team',
       '/federation',
       '/matching',
       '/members',
@@ -31,6 +34,8 @@ describe('protected route permissions', () => {
   it('separates association and enterprise workspaces while sharing ecosystem pages', () => {
     expect(protectedRouteRoles['/association']).not.toContain('ENTERPRISE_MEMBER')
     expect(protectedRouteRoles['/enterprise']).not.toContain('ASSOCIATION_OPERATOR')
+    expect(protectedRouteRoles['/enterprise/team']).toEqual(['ENTERPRISE_ADMIN'])
+    expect(protectedRouteRoles['/enterprise/catalog']).toEqual(['ENTERPRISE_ADMIN', 'ENTERPRISE_MEMBER'])
     expect(protectedRouteRoles['/members']).toEqual([...ROLES])
     expect(protectedRouteRoles['/members/edit']).toContain('ENTERPRISE_ADMIN')
     expect(protectedRouteRoles['/members/edit']).not.toContain('ENTERPRISE_MEMBER')

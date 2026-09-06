@@ -62,22 +62,24 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<OfferingView> listOfferings(
-            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit, boolean ownOnly) {
         MapSqlParameterSource params = commonParams(actor, query)
                 .addValue("offset", offset)
                 .addValue("limit", limit);
         return jdbc.query(OFFERING_SELECT + whereClause(
                         "p", "ACTIVE", actor, query, includeDeleted, params)
+                        + (ownOnly ? " AND p.enterprise_id=:enterpriseId" : "")
                         + " ORDER BY p.updated_at DESC, p.id LIMIT :limit OFFSET :offset",
                 params, offeringMapper);
     }
 
     @Override
-    public long countOfferings(ActorScope actor, String query, boolean includeDeleted) {
+    public long countOfferings(ActorScope actor, String query, boolean includeDeleted, boolean ownOnly) {
         MapSqlParameterSource params = commonParams(actor, query);
         Long total = jdbc.queryForObject(
                 "SELECT count(*) FROM product_service p JOIN enterprise e ON e.id=p.enterprise_id "
-                        + whereClause("p", "ACTIVE", actor, query, includeDeleted, params),
+                        + whereClause("p", "ACTIVE", actor, query, includeDeleted, params)
+                        + (ownOnly ? " AND p.enterprise_id=:enterpriseId" : ""),
                 params, Long.class);
         return total == null ? 0 : total;
     }
@@ -198,22 +200,24 @@ class PostgresEcosystemCatalogStore implements EcosystemCatalogStore {
 
     @Override
     public List<DemandView> listDemands(
-            ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+            ActorScope actor, String query, boolean includeDeleted, long offset, int limit, boolean ownOnly) {
         MapSqlParameterSource params = commonParams(actor, query)
                 .addValue("offset", offset)
                 .addValue("limit", limit);
         return jdbc.query(DEMAND_SELECT + whereClause(
                         "d", "OPEN", actor, query, includeDeleted, params)
+                        + (ownOnly ? " AND d.enterprise_id=:enterpriseId" : "")
                         + " ORDER BY d.updated_at DESC, d.id LIMIT :limit OFFSET :offset",
                 params, demandMapper);
     }
 
     @Override
-    public long countDemands(ActorScope actor, String query, boolean includeDeleted) {
+    public long countDemands(ActorScope actor, String query, boolean includeDeleted, boolean ownOnly) {
         MapSqlParameterSource params = commonParams(actor, query);
         Long total = jdbc.queryForObject(
                 "SELECT count(*) FROM cooperation_demand d JOIN enterprise e ON e.id=d.enterprise_id "
-                        + whereClause("d", "OPEN", actor, query, includeDeleted, params),
+                        + whereClause("d", "OPEN", actor, query, includeDeleted, params)
+                        + (ownOnly ? " AND d.enterprise_id=:enterpriseId" : ""),
                 params, Long.class);
         return total == null ? 0 : total;
     }
