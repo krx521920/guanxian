@@ -135,7 +135,6 @@ test('administrator review distinguishes ordinary member rights from owner right
     await expect(member.locator('.enterprise-identity-note')).toContainText('只读身份')
   } finally {await context.close()}
 })
-
 test('administrator invites, owner confirms, human approval opens my enterprise and review submission',async({page,browser},info)=>{
   const state=await fixture(page,'SYSTEM_ADMIN')
   await page.goto('/operations/invitations')

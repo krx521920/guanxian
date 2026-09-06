@@ -21,6 +21,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlatformAssistantServiceTest {
     @Test
+    void outputPreferencesAndPinnedGoalReachInferenceButNotRawConversationText() {
+        Fixture fixture = fixture(true);
+        var original = question(fixture.associationId, "actor-1", UUID.randomUUID());
+        fixture.service.chat(new PlatformAssistantService.AssistantQuestion(
+                original.access(), original.conversationId(), original.message(), original.maxCitations(),
+                original.pageTitle(), original.pagePath(), original.requestId(),
+                "BRIEF", "只用虚构数据给客户演示，不做真实导入"));
+        var inference = fixture.request.get();
+        assertTrue(inference.prompt().contains("通常一至三句话"));
+        assertTrue(inference.prompt().contains("只用虚构数据给客户演示，不做真实导入"));
+        assertTrue(inference.prompt().contains("历史会话中的数字和引用不代表本轮证据"));
+        assertEquals(original.message(), inference.userMessage());
+    }
+
+    @Test
     void disabledAgentKeepsLocalGroundedFallbackAndConversationId() {
         Fixture fixture = fixture(false);
         UUID conversationId = UUID.randomUUID();
@@ -56,7 +71,7 @@ class PlatformAssistantServiceTest {
         var events = fixture.service.stream(
                 question(fixture.associationId, "actor-1", conversationId)).collectList().block();
 
-        assertEquals(List.of("start", "delta", "complete"),
+        assertEquals(List.of("start", "status", "delta", "complete"),
                 events.stream().map(PlatformAssistantService.AssistantStreamEvent::type).toList());
         assertEquals("请在会员企业页面选择批量导入。[1]", events.getLast().answer().answer());
         assertTrue(events.getLast().answer().modelConnected());
@@ -76,7 +91,23 @@ class PlatformAssistantServiceTest {
                 PlatformAssistantService.conversationKey(anotherAssociation));
     }
 
+    @Test
+    void successfulToolReceiptsSurviveProviderFailureWithoutACompletionEvent() {
+        Fixture fixture = fixture(true, true);
+        var events = new java.util.concurrent.CopyOnWriteArrayList<PlatformAssistantService.AssistantStreamEvent>();
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> fixture.service.stream(
+                question(fixture.associationId, "actor-1", UUID.randomUUID())).doOnNext(events::add).blockLast());
+        assertEquals(List.of("start", "status", "status"), events.stream().map(PlatformAssistantService.AssistantStreamEvent::type).toList());
+        assertEquals(1, events.getLast().businessResults().size());
+        assertEquals("OK", events.getLast().businessResults().getFirst().status());
+        assertTrue(events.stream().noneMatch(event -> event.answer() != null));
+    }
+
     private static Fixture fixture(boolean agentEnabled) {
+        return fixture(agentEnabled, false);
+    }
+
+    private static Fixture fixture(boolean agentEnabled, boolean failAfterQuery) {
         RagProperties properties = new RagProperties();
         properties.setChunkSizeChars(200);
         properties.setChunkOverlapChars(20);
@@ -101,6 +132,14 @@ class PlatformAssistantServiceTest {
             public boolean enabled() { return agentEnabled; }
             public String providerName() { return "spring-ai-test"; }
             public BigDecimal estimateCost(int inputTokens, int outputTokens) { return BigDecimal.ZERO; }
+            @Override public reactor.core.publisher.Flux<StreamChunk> stream(CompletionRequest value) {
+                if (!failAfterQuery) return AssistantChatClient.super.stream(value);
+                return reactor.core.publisher.Flux.defer(() -> {
+                    value.businessResults().add(AssistantBusinessResults.Result.create("MEMBERS", "OK", "会员企业查询",
+                            associationId, java.util.Map.of("关键词", "未筛选"), 0, List.of()));
+                    return reactor.core.publisher.Flux.error(new IllegalStateException("fixture provider failure"));
+                });
+            }
             public Completion complete(CompletionRequest value) {
                 request.set(value);
                 return new Completion("请在会员企业页面选择批量导入。[1]", "test-model",

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { assistantErrorMessage, assistantModeLabel, safeCitationUrl } from './chat-assistant'
+import { assistantErrorMessage, assistantModeLabel, assistantPhaseLabel, safeCitationUrl, shouldSendAssistantMessage } from './chat-assistant'
 
 describe('chat assistant safety helpers', () => {
+  it('never submits composition Enter, IME key 229 or Shift+Enter', () => {
+    const normal = { key: 'Enter', shiftKey: false, isComposing: false, keyCode: 13 }
+    expect(shouldSendAssistantMessage(normal)).toBe(true)
+    expect(shouldSendAssistantMessage({ ...normal, isComposing: true })).toBe(false)
+    expect(shouldSendAssistantMessage({ ...normal, keyCode: 229 })).toBe(false)
+    expect(shouldSendAssistantMessage({ ...normal, shiftKey: true })).toBe(false)
+    expect(assistantPhaseLabel('GENERATING')).not.toContain('正在检索')
+    expect(assistantModeLabel('UNRECOGNIZED')).toBe('模式待确认')
+  })
   it('only exposes HTTP(S) citation links', () => {
     expect(safeCitationUrl('https://example.org/policy?id=1')).toBe('https://example.org/policy?id=1')
     expect(safeCitationUrl('http://example.org/source')).toBe('http://example.org/source')

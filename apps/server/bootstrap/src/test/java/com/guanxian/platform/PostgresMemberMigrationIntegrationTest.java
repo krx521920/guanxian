@@ -68,8 +68,8 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        // Baseline 0 + V1..V23 + V25..V28. The unreleased personal-model V24 is not part of this release.
-        org.junit.jupiter.api.Assertions.assertEquals(28, migrationCount);
+        // Baseline 0 + V1..V23 + V25..V29. Personal models now upgrade in order after account provisioning.
+        org.junit.jupiter.api.Assertions.assertEquals(29, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals(2, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success AND version IN ('25','26')", Integer.class));
         org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(

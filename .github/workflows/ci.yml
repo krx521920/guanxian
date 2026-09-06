@@ -141,7 +141,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest', 'PostgresEcosystemSystemContextIntegrationTest', 'ManagedEnterpriseAccountsPostgresTest'):
+          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest', 'PostgresEcosystemSystemContextIntegrationTest', 'ManagedEnterpriseAccountsPostgresTest', 'PersonalModelPostgresTest'):
               reports = list(Path('bootstrap/target/surefire-reports').glob(f'TEST-*{name}.xml'))
               assert len(reports) == 1, f'Missing real database report: {name}'
               suite = ET.parse(reports[0]).getroot()
@@ -269,6 +269,9 @@ jobs:
       - name: Verify public entry and profile review UI contracts
         working-directory: apps/web
         run: npx playwright test --config playwright.entry.config.ts
+      - name: Verify personal models and verifiable assistant UI contracts
+        working-directory: apps/web
+        run: npx playwright test --config playwright.personal-model.config.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -276,6 +279,7 @@ jobs:
           path: |
             test-results/browser-e2e/
             test-results/entry-routing/
+            test-results/personal-model-ui/
           if-no-files-found: warn
           retention-days: 14
       - name: Stop isolated browser E2E stack

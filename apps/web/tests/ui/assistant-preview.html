@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>管线 Agent · 本地交互预览</title></head>
+<body><div id="app"></div><script type="module">
+import { createApp, h } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import AppShell from '../../src/layouts/AppShell.vue'
+import { useAuth } from '../../src/services/auth'
+import { installPreviewTransport } from './assistant-preview-mocks.ts'
+import '../../src/styles/main.css'
+installPreviewTransport()
+useAuth().loginDemo('ASSOCIATION_OPERATOR')
+window.__guanxianPreview.switchRole = () => useAuth().loginDemo('ENTERPRISE_ADMIN')
+const Preview = { render: () => h('section', { class: 'card', style: 'padding:24px;max-width:740px;margin:24px' }, [
+  h('h1', 'Chat Agent 本地交互预览'),
+  h('p', '此页全部使用模拟接口，不连接生产数据或真实大模型。回答内容为固定测试文字，不能据此评判模型智能。'),
+  h('p', '左下角：模型接入在聊天上方。请勿输入真实密钥；演示密钥仅接受 preview-demo-key。配置仅在页面内存中存在，刷新即清空。'),
+  h('p', '打开聊天 → 回答设置，可选择简洁、标准、详细，并固定任务目标。'),
+  h('p', '可以提问“测试断流”“测试长回答”“测试停止”体验保留半段回答、停止、重新回答和自主滚动。'),
+  h('p', '业务结果预览：提问“查询监测企业”查看卡片，选两家打开对比表；提问“推荐企业”查看逐项条件依据。均为虚构测试数据。'),
+  h('p', '选中卡片后可点“追问这家”或“追问所选企业”，输入框会标出对象；发送后重新核对。每份结果还可复制带查询时间和范围的快照。'),
+]) }
+const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/members', component: AppShell, meta: { title: '本地交互预览' }, children: [{ path: '', component: Preview }] }] })
+await router.push('/members')
+createApp({ render: () => h(RouterView) }).use(router).mount('#app')
+</script></body></html>

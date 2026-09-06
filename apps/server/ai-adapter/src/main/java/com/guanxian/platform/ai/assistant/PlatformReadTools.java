@@ -29,6 +29,7 @@ public class PlatformReadTools implements AssistantToolProvider {
             name = "current_page_help",
             description = "读取当前管线智联页面的用途和操作提示。仅用于页面导航与使用说明，不执行任何写操作。")
     public String currentPageHelp(ToolContext toolContext) {
+        AssistantToolBudget.consume(toolContext);
         String path = contextValue(toolContext, PAGE_PATH, "/");
         String title = contextValue(toolContext, PAGE_TITLE, "当前页面");
         String route = PAGE_GUIDES.keySet().stream()

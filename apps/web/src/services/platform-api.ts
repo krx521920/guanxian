@@ -1,6 +1,6 @@
 import type {
   AssistantChatAnswer,
-  AssistantStreamEvent,
+  AssistantStreamStatus,
   AccessBinding, AccessBindingPage,
   AccessBindingPayload,
   AssociationAccessRequest,
@@ -60,6 +60,7 @@ import type {
   VersionedMember,
 } from '../types/domain'
 import { ApiRequestError, request, requestBlob, requestEventStream } from './http'
+import { assistantStreamConsumer } from './assistant-stream'
 
 const strongEtag = /^"(0|[1-9][0-9]*)"$/
 const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/
@@ -291,9 +292,12 @@ export const platformApi = {
     signal?: AbortSignal,
     maxCitations = 5,
     associationId?: string,
+    onStatus?: (status: AssistantStreamStatus) => void,
+    preferences?: { responseDetail: 'AUTO' | 'BRIEF' | 'STANDARD' | 'DETAILED'; taskGoal: string; selectedEnterpriseIds?: string[] },
+    onBusinessResults?: (results: import('./assistant-business-results').BusinessResult[]) => void,
   ): Promise<AssistantChatAnswer> => {
-    let completedAnswer: AssistantChatAnswer | null = null
-    await requestEventStream<AssistantStreamEvent>(
+    const consumer = assistantStreamConsumer(conversationId, onDelta, onStatus, onBusinessResults, preferences?.selectedEnterpriseIds)
+    await requestEventStream<unknown>(
       '/assistant/chat/stream',
       {
         method: 'POST',
@@ -305,31 +309,13 @@ export const platformApi = {
           pagePath,
           maxCitations,
           associationId: associationId || null,
+          ...preferences,
         }),
       },
-      async (event) => {
-        if (event.type === 'delta' && event.delta) await onDelta(event.delta)
-        if (event.type === 'complete' && event.answer) completedAnswer = event.answer
-        if (event.type === 'error') {
-          throw new ApiRequestError(
-            event.error?.message || '智能助手暂时不可用，请稍后重试',
-            `assistant-stream:${conversationId}`,
-            undefined,
-            event.error?.code || 'ASSISTANT_STREAM_FAILED',
-          )
-        }
-      },
+      consumer.accept,
       120000,
     )
-    if (!completedAnswer) {
-      throw new ApiRequestError(
-        '智能助手未返回完整回答',
-        `assistant-stream:${conversationId}`,
-        undefined,
-        'INCOMPLETE_ASSISTANT_STREAM',
-      )
-    }
-    return completedAnswer
+    return consumer.result()
   },
 
   offerings: (query = '', includeDeleted = false, page = 0, size = 20, ownOnly = false) => request<EcosystemPage<Offering>>(`/offerings?query=${encodeURIComponent(query)}&includeDeleted=${includeDeleted}&page=${page}&size=${size}${ownOnly ? '&ownOnly=true' : ''}`),

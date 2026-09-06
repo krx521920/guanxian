@@ -6,6 +6,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public interface AssistantChatClient {
+    /** Resolve once per request, using verified identity rather than thread-local servlet state. */
+    default AssistantChatClient forAccess(AssistantAccessContext access) { return this; }
+
     boolean enabled();
 
     String providerName();
@@ -28,7 +31,15 @@ public interface AssistantChatClient {
             String conversationKey,
             String prompt,
             String pageTitle,
-            String pagePath) {
+            String pagePath,
+            String userMessage,
+            AssistantBusinessResults businessResults) {
+        public CompletionRequest(AssistantAccessContext access, String conversationKey, String prompt, String pageTitle, String pagePath, String userMessage) {
+            this(access, conversationKey, prompt, pageTitle, pagePath, userMessage, new AssistantBusinessResults());
+        }
+        public CompletionRequest(AssistantAccessContext access, String conversationKey, String prompt, String pageTitle, String pagePath) {
+            this(access, conversationKey, prompt, pageTitle, pagePath, prompt);
+        }
     }
 
     record Completion(

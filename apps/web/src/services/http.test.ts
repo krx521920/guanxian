@@ -592,6 +592,49 @@ describe('request', () => {
     expect(new Headers(init.headers).get('Accept')).toBe('text/event-stream')
   })
 
+  it('cancels the body after a terminal event without waiting for EOF', async () => {
+    const cancel = vi.fn()
+    const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('data: {"type":"complete"}\n\n')) }, cancel })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })))
+    const { requestEventStream } = await loadRequest()
+    await requestEventStream('/assistant/chat/stream', {}, () => true)
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('cancels on oversized unterminated frames before parsing their data', async () => {
+    const cancel = vi.fn()
+    const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode('data: ' + 'x'.repeat(262145))) }, cancel })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })))
+    const { requestEventStream } = await loadRequest()
+    const event = vi.fn()
+    await expect(requestEventStream('/assistant/chat/stream', {}, event)).rejects.toMatchObject({ code: 'EVENT_STREAM_LIMIT' })
+    expect(event).not.toHaveBeenCalled()
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('unblocks and cancels an idle body on caller abort without a transport error', async () => {
+    const cancel = vi.fn()
+    const body = new ReadableStream({ cancel })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })))
+    const { requestEventStream } = await loadRequest()
+    const controller = new AbortController()
+    const pending = requestEventStream('/assistant/chat/stream', { signal: controller.signal }, vi.fn())
+    await Promise.resolve()
+    controller.abort(new DOMException('stopped', 'AbortError'))
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('decodes split UTF-8 bytes and multiline CRLF SSE data', async () => {
+    const bytes = new TextEncoder().encode(': keepalive\r\ndata: {"text":\r\ndata: "中文😀"}\r\n\r\n')
+    const body = new ReadableStream({ start(controller) { for (const byte of bytes) controller.enqueue(Uint8Array.of(byte)); controller.close() } })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { headers: { 'Content-Type': 'text/event-stream' } })))
+    const { requestEventStream } = await loadRequest()
+    const event = vi.fn()
+    await requestEventStream('/assistant/chat/stream', {}, event)
+    expect(event).toHaveBeenCalledExactlyOnceWith({ text: '中文😀' })
+  })
+
   it('rejects malformed event data without exposing the raw payload', async () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -601,7 +644,7 @@ describe('request', () => {
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, {
       status: 200,
-      headers: { 'X-Request-Id': 'stream-request-2' },
+      headers: { 'Content-Type': 'text/event-stream', 'X-Request-Id': 'stream-request-2' },
     })))
     const { requestEventStream } = await loadRequest()
 
@@ -623,7 +666,7 @@ describe('request', () => {
         streamController = undefined
       },
     })
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200 })))
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })))
     const { requestEventStream } = await loadRequest()
     const cancellation = new DOMException('用户取消流式回答', 'AbortError')
 

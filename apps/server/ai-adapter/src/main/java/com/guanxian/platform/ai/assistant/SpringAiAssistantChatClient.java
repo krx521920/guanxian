@@ -67,7 +67,10 @@ public class SpringAiAssistantChatClient implements AssistantChatClient {
         }
         long started = System.nanoTime();
         ChatResponse response = chatClient.prompt()
-                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey()))
+                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey())
+                        .param(AssistantMemoryAdvisor.USER_TEXT, request.userMessage())
+                        .param(AssistantMemoryAdvisor.INPUT_LIMIT, ragProperties.getMaxInputTokens())
+                        .param(AssistantMemoryAdvisor.OUTPUT_LIMIT, ragProperties.getMaxOutputTokens()))
                 .user(request.prompt())
                 .tools(toolObjects)
                 .toolContext(toolContext(request))
@@ -76,6 +79,7 @@ public class SpringAiAssistantChatClient implements AssistantChatClient {
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             throw new IllegalStateException("Spring AI provider returned an empty response");
         }
+        AssistantOutputBuffer.verifyFinish(response);
         String content = response.getResult().getOutput().getText();
         if (content == null || content.isBlank()) {
             throw new IllegalStateException("Spring AI provider returned an empty answer");
@@ -104,16 +108,24 @@ public class SpringAiAssistantChatClient implements AssistantChatClient {
         }
         long started = System.nanoTime();
         return chatClient.prompt()
-                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey()))
+                .advisors(advisor -> advisor.param(ChatMemory.CONVERSATION_ID, request.conversationKey())
+                        .param(AssistantMemoryAdvisor.USER_TEXT, request.userMessage())
+                        .param(AssistantMemoryAdvisor.INPUT_LIMIT, ragProperties.getMaxInputTokens())
+                        .param(AssistantMemoryAdvisor.OUTPUT_LIMIT, ragProperties.getMaxOutputTokens()))
                 .user(request.prompt())
                 .tools(toolObjects)
                 .toolContext(toolContext(request))
                 .stream()
                 .chatResponse()
+                .timeout(providerProperties.getRequestTimeout())
+                .takeUntilOther(reactor.core.publisher.Mono.delay(Duration.ofSeconds(120))
+                        .flatMap(ignored -> reactor.core.publisher.Mono.error(
+                                new IllegalStateException("Assistant stream exceeded total time limit"))))
                 .map(response -> streamChunk(response, started));
     }
 
     private StreamChunk streamChunk(ChatResponse response, long started) {
+        AssistantOutputBuffer.verifyFinish(response);
         String content = response == null || response.getResult() == null || response.getResult().getOutput() == null
                 ? ""
                 : response.getResult().getOutput().getText();
@@ -143,6 +155,8 @@ public class SpringAiAssistantChatClient implements AssistantChatClient {
         return Map.of(
                 PlatformReadTools.PAGE_PATH, request.pagePath(),
                 PlatformReadTools.PAGE_TITLE, request.pageTitle(),
+                AssistantToolBudget.CONTEXT_KEY, new AssistantToolBudget(request.businessResults().snapshot().size()),
+                AssistantBusinessResults.CONTEXT_KEY, request.businessResults(),
                 AssistantAccessContext.TOOL_CONTEXT_KEY, request.access());
     }
 }

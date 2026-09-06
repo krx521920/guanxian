@@ -1,6 +1,7 @@
 package com.guanxian.platform.bootstrap;
 
 import com.guanxian.platform.ai.assistant.AssistantAccessContext;
+import com.guanxian.platform.ai.assistant.AssistantBusinessResults;
 import com.guanxian.platform.ai.assistant.AssistantLocalQueryProvider;
 import com.guanxian.platform.ai.assistant.AssistantToolProvider;
 import com.guanxian.platform.collaboration.CollaborationService;
@@ -60,10 +61,12 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
             @ToolParam(description = "查询关键词；不需要筛选时留空", required = false) String keyword,
             ToolContext toolContext) {
         AssistantAccessContext access = access(toolContext);
+        return query(toolContext, "MEMBERS", filters("关键词", normalizeQuery(keyword)), () -> {
         if (!access.hasAuthority("MEMBER_READ")) return denied("MEMBER_READ");
         List<MemberProfile> visible = memberService.findAll(normalizeQuery(keyword), null, false, access.actor());
         List<MemberSummary> items = visible.stream().limit(RESULT_LIMIT).map(AssistantBusinessQueryTools::member).toList();
         return ok(visible.size(), items);
+        });
     }
 
     @Tool(
@@ -73,9 +76,11 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
             @ToolParam(description = "查询关键词；不需要筛选时留空", required = false) String keyword,
             ToolContext toolContext) {
         AssistantAccessContext access = access(toolContext);
+        return query(toolContext, "OFFERINGS", filters("关键词", normalizeQuery(keyword)), () -> {
         if (!access.hasAuthority("MEMBER_READ")) return denied("MEMBER_READ");
         var page = catalogService.offerings(access.actor(), normalizeQuery(keyword), false, 0, RESULT_LIMIT);
         return ok(page.total(), page.items().stream().map(AssistantBusinessQueryTools::offering).toList());
+        });
     }
 
     @Tool(
@@ -85,9 +90,11 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
             @ToolParam(description = "查询关键词；不需要筛选时留空", required = false) String keyword,
             ToolContext toolContext) {
         AssistantAccessContext access = access(toolContext);
+        return query(toolContext, "DEMANDS", filters("关键词", normalizeQuery(keyword)), () -> {
         if (!access.hasAuthority("MEMBER_READ")) return denied("MEMBER_READ");
         var page = catalogService.demands(access.actor(), normalizeQuery(keyword), false, 0, RESULT_LIMIT);
         return ok(page.total(), page.items().stream().map(AssistantBusinessQueryTools::demand).toList());
+        });
     }
 
     @Tool(
@@ -98,9 +105,11 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
             String state,
             ToolContext toolContext) {
         AssistantAccessContext access = access(toolContext);
+        return query(toolContext, "MATCHES", filters("状态", normalizeState(state)), () -> {
         if (!access.hasAuthority("MATCH_REQUEST")) return denied("MATCH_REQUEST");
         var page = matchService.persistedReadOnly(access.actor(), 0, RESULT_LIMIT, normalizeState(state));
         return ok(page.total(), page.items().stream().map(AssistantBusinessQueryTools::match).toList());
+        });
     }
 
     @Tool(
@@ -111,10 +120,12 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
             @ToolParam(description = "可选英文阶段，例如 OPEN、IN_PROGRESS、COMPLETED", required = false) String stage,
             ToolContext toolContext) {
         AssistantAccessContext access = access(toolContext);
+        return query(toolContext, "COLLABORATIONS", Map.of("关键词", display(normalizeQuery(keyword)), "阶段", display(normalizeState(stage))), () -> {
         if (!access.hasAuthority("COLLABORATION_READ")) return denied("COLLABORATION_READ");
         var page = collaborationService.page(
                 access.actor(), normalizeQuery(keyword), normalizeState(stage), false, 0, RESULT_LIMIT);
         return ok(page.total(), page.items().stream().map(AssistantBusinessQueryTools::collaboration).toList());
+        });
     }
 
     @Override
@@ -122,16 +133,143 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
         return this;
     }
 
+    @Tool(name = "compare_member_enterprises", description = "重新查询并对比已明确的2至4家会员企业。ID须来自用户明确选择或本轮真实查询，不得编造；不返回联系人等敏感字段。")
+    public ToolResult compareMemberEnterprises(@ToolParam(description = "2至4个不同的企业ID") List<UUID> enterpriseIds, ToolContext context) {
+        var access = access(context);
+        return query(context, "COMPARISON", Map.of("对比范围", "指定企业，逐家重新校验权限"), () -> {
+            if (!access.hasAuthority("MEMBER_READ")) return denied("MEMBER_READ");
+            validateIds(enterpriseIds, 2);
+            return ok(enterpriseIds.size(), enterpriseIds.stream().map(id -> member(memberService.get(id, access.actor()))).toList());
+        });
+    }
+
+    public record FitCriterion(
+            @ToolParam(description = "字段：category或status是精确相等；capabilities、products、services只做登记文字匹配") String field,
+            @ToolParam(description = "明确的筛选值，最多80字符；status使用ACTIVE、PENDING_REVIEW等原始状态") String value) {}
+
+    @Tool(name = "explain_member_fit", description = "对1至4家明确的候选企业按用户要求逐项只读核对。只判断已登记字段，不做外部核实，不生成正式匹配记录或成功概率；文字未提及不等于没有能力。")
+    public ToolResult explainMemberFit(@ToolParam(description = "真实候选企业ID，1至4个") List<UUID> enterpriseIds,
+                                      @ToolParam(description = "用户明确要求的1至8项条件，不得自行增添硬性条件") List<FitCriterion> criteria,
+                                      ToolContext context) {
+        return memberFit(enterpriseIds, criteria, context, false);
+    }
+
+    /** Explicit user form, not exposed as an additional model tool. Uses the same scoped rules. */
+    public AssistantBusinessResults.Result checkMemberFit(List<UUID> ids, List<FitCriterion> criteria, AssistantAccessContext access) {
+        var journal = new AssistantBusinessResults();
+        var context = new ToolContext(Map.of(AssistantAccessContext.TOOL_CONTEXT_KEY, access,
+                AssistantBusinessResults.CONTEXT_KEY, journal));
+        memberFit(ids, criteria, context, true);
+        return journal.snapshot().getFirst();
+    }
+
+    private ToolResult memberFit(List<UUID> enterpriseIds, List<FitCriterion> criteria, ToolContext context, boolean manual) {
+        var access = access(context);
+        return query(context, manual ? "MEMBER_FIT_CHECK" : "RECOMMENDATIONS",
+                Map.of("依据", "指定候选企业当前档案；条件详见逐项核对", "条件来源", manual ? "用户手动确认" : "模型工具参数，需核对"), () -> {
+            if (!access.hasAuthority("MEMBER_READ")) return denied("MEMBER_READ");
+            validateIds(enterpriseIds, 1);
+            if (criteria == null || criteria.isEmpty() || criteria.size() > 8) throw new IllegalArgumentException("1至8项条件 required");
+            for (var criterion : criteria) {
+                if (criterion == null || criterion.field() == null || !List.of("category", "status", "capabilities", "products", "services").contains(criterion.field())
+                        || criterion.value() == null || criterion.value().isBlank() || criterion.value().length() > 80) throw new IllegalArgumentException("invalid criterion");
+            }
+            var items = enterpriseIds.stream().map(id -> {
+                var entry = item(member(memberService.get(id, access.actor())));
+                return new AssistantBusinessResults.Item(entry.id(), entry.name(), entry.target(), entry.fields(),
+                        criteria.stream().map(criterion -> evaluate(criterion, entry.fields())).toList());
+            }).toList();
+            return ok(items.size(), items);
+        });
+    }
+
+    static AssistantBusinessResults.Evidence evaluate(FitCriterion criterion, Map<String, String> fields) {
+        String observed = fields.getOrDefault(criterion.field(), "");
+        boolean exact = List.of("category", "status").contains(criterion.field());
+        // Free text is not verified capability evidence. Negation makes literal matches inconclusive.
+        boolean uncertain = !exact && java.util.regex.Pattern.compile("不|未|没有|暂无|无此|不能|not |no |without ", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(observed).find();
+        boolean match = !uncertain && !observed.isBlank() && (exact ? observed.equalsIgnoreCase(criterion.value().trim())
+                : observed.toLowerCase(Locale.ROOT).contains(criterion.value().trim().toLowerCase(Locale.ROOT)));
+        String state = match ? "MATCHED" : exact && !observed.isBlank() ? "UNMET" : "INSUFFICIENT";
+        return new AssistantBusinessResults.Evidence(criterion.value().trim(), state, criterion.field(), observed,
+                match ? "当前登记字段支持此条件，尚需人工核实实际履约能力" : "UNMET".equals(state)
+                        ? "当前登记值与指定值不同" : "当前资料未提供明确支持，不能据此认定企业没有此能力");
+    }
+
+    private static void validateIds(List<UUID> ids, int min) {
+        if (ids == null || ids.size() < min || ids.size() > 4 || ids.stream().anyMatch(java.util.Objects::isNull) || ids.stream().distinct().count() != ids.size())
+            throw new IllegalArgumentException("invalid enterprise selection");
+    }
+
+    private static Map<String, String> filters(String key, String value) { return Map.of(key, value == null ? "未筛选" : value); }
+
+    private static ToolResult query(ToolContext context, String kind, Map<String, String> filters, java.util.function.Supplier<ToolResult> supplier) {
+        ToolResult result;
+        try { result = supplier.get(); }
+        catch (com.guanxian.platform.shared.error.ForbiddenException exception) { result = new ToolResult("FORBIDDEN", "当前身份没有权限查询所选资料", 0, List.of()); }
+        catch (com.guanxian.platform.shared.error.NotFoundException exception) { result = new ToolResult("UNAVAILABLE", "所选资料不存在或已不可用，请重新选择", 0, List.of()); }
+        catch (IllegalArgumentException exception) { result = new ToolResult("INVALID", "查询条件无效，请明确选择范围和条件", 0, List.of()); }
+        catch (RuntimeException exception) { result = new ToolResult("FAILED", "业务查询失败，不能当作没有数据", 0, List.of()); }
+        var access = (AssistantAccessContext) context.getContext().get(AssistantAccessContext.TOOL_CONTEXT_KEY);
+        var items = result.items().stream().map(AssistantBusinessQueryTools::item).toList();
+        String label = switch (kind) { case "MEMBERS" -> "会员企业查询"; case "SELECTED_MEMBERS" -> "所选企业本轮核对"; case "COMPARISON" -> "企业对比"; case "RECOMMENDATIONS" -> "候选企业条件核对"; case "MEMBER_FIT_CHECK" -> "手动条件核对（未调用模型）";
+            case "OFFERINGS" -> "产品服务查询"; case "DEMANDS" -> "合作需求查询"; case "MATCHES" -> "已有生态匹配记录"; default -> "协作事项查询"; };
+        AssistantBusinessResults.record(context, AssistantBusinessResults.Result.create(kind, result.status(), label,
+                access.actor().associationId(), filters, result.total(), items));
+        return result;
+    }
+
+    private static Map<String, String> fields(Object... pairs) {
+        Map<String, String> fields = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) fields.put((String) pairs[i], AssistantBusinessResults.text(pairs[i + 1]));
+        return fields;
+    }
+
+    private static AssistantBusinessResults.Item item(Object value) {
+        if (value instanceof AssistantBusinessResults.Item item) return item;
+        if (value instanceof MemberSummary v) return new AssistantBusinessResults.Item(v.id(), AssistantBusinessResults.text(v.name()), "MEMBER",
+                fields("category", v.category(), "capabilities", String.join("、", v.capabilities()), "products", String.join("、", v.products()),
+                        "services", String.join("、", v.services()), "status", v.status(), "updatedAt", v.updatedAt()), List.of());
+        if (value instanceof OfferingSummary v) return new AssistantBusinessResults.Item(v.id(), AssistantBusinessResults.text(v.name()), "NONE",
+                fields("企业", v.enterpriseName(), "说明", v.description(), "场景", String.join("、", v.scenarios()), "状态", v.status(), "更新时间", v.updatedAt()), List.of());
+        if (value instanceof DemandSummary v) return new AssistantBusinessResults.Item(v.id(), AssistantBusinessResults.text(v.title()), "NONE",
+                fields("企业", v.enterpriseName(), "说明", v.description(), "所需能力", String.join("、", v.requiredCapabilities()), "状态", v.status(), "更新时间", v.updatedAt()), List.of());
+        if (value instanceof MatchSummary v) return new AssistantBusinessResults.Item(v.id(), AssistantBusinessResults.text(v.demandTitle()), "NONE",
+                fields("需求企业", v.demandCompany(), "候选企业", v.supplierCompany(), "规则分数（非成功概率）", v.score(), "已有记录理由", String.join("；", v.reasons()), "状态", v.state(), "更新时间", v.updatedAt()), List.of());
+        if (value instanceof CollaborationSummary v) return new AssistantBusinessResults.Item(v.id(), AssistantBusinessResults.text(v.title()), "NONE",
+                fields("阶段", v.stage(), "优先级", v.priority(), "下一步", v.nextAction(), "截止日期", v.dueDate(), "更新时间", v.updatedAt()), List.of());
+        throw new IllegalArgumentException("unsupported business result");
+    }
+
     /**
      * Handles only high-confidence read-only intents. Ambiguous questions deliberately fall back to
      * the grounded knowledge path instead of pretending that a deterministic router is a model.
      */
     @Override
+    public Optional<LocalQueryResult> selected(AssistantAccessContext access, List<UUID> enterpriseIds) {
+        var ids = com.guanxian.platform.ai.assistant.AssistantEnterpriseSelection.validate(enterpriseIds);
+        if (ids.isEmpty()) return Optional.empty();
+        var journal = new AssistantBusinessResults();
+        var context = new ToolContext(Map.of(AssistantBusinessResults.CONTEXT_KEY, journal,
+                AssistantAccessContext.TOOL_CONTEXT_KEY, access));
+        ToolResult result = query(context, "SELECTED_MEMBERS", Map.of("选择范围", "用户明确选中的 " + ids.size() + " 家企业，每轮重新核验"), () -> {
+            if (!access.hasAuthority("MEMBER_READ")) return denied("MEMBER_READ");
+            return ok(ids.size(), ids.stream().map(id -> member(memberService.get(id, access.actor()))).toList());
+        });
+        String answer = "OK".equals(result.status())
+                ? "本轮已重新核对所选 " + ids.size() + " 家企业。当前未调用模型，只展示已登记资料，不进行自由问答推理。"
+                  + (ids.size() > 1 ? "可打开对比表查看逐项差异。" : "可查看企业卡片和最新详情。")
+                : result.message() + "。本轮未调用模型，也未沿用旧企业资料；请移除不可用对象或重新选择。";
+        return Optional.of(new LocalQueryResult(answer, LOCAL_MODE, journal.snapshot()));
+    }
+
+    @Override
     public Optional<LocalQueryResult> answer(LocalQueryRequest request) {
         QueryKind kind = queryKind(request.message(), request.pagePath());
         if (kind == null) return Optional.empty();
 
-        ToolContext context = new ToolContext(Map.of(
+        var journal = new AssistantBusinessResults();
+        ToolContext context = new ToolContext(Map.of(AssistantBusinessResults.CONTEXT_KEY, journal,
                 AssistantAccessContext.TOOL_CONTEXT_KEY, request.access()));
         String keyword = extractKeyword(request.message(), kind);
         String answer = switch (kind) {
@@ -142,10 +280,11 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
             case COLLABORATIONS -> formatCollaborations(searchCollaborationItems(
                     keyword, extractCollaborationStage(request.message()), context), keyword);
         };
-        return Optional.of(new LocalQueryResult(answer, LOCAL_MODE));
+        return Optional.of(new LocalQueryResult(answer, LOCAL_MODE, journal.snapshot()));
     }
 
     private static AssistantAccessContext access(ToolContext toolContext) {
+        com.guanxian.platform.ai.assistant.AssistantToolBudget.consume(toolContext);
         Object value = toolContext == null || toolContext.getContext() == null
                 ? null
                 : toolContext.getContext().get(AssistantAccessContext.TOOL_CONTEXT_KEY);
