@@ -8,7 +8,7 @@ type FixtureRole='SYSTEM_ADMIN'|'ENTERPRISE_ADMIN'|'ENTERPRISE_MEMBER'|'pending'
 function scenario() {
   return {
     invitation: { id:'30000000-0000-4000-8000-000000000001', enterpriseId, enterpriseName:'虚构·企业接入验证公司', associationName:'虚构·验证协会',
-      username:'owner.user', status:'ISSUED', version:0, expiresAt:'2099-09-08T12:00:00Z', createdAt:'2026-09-05T12:00:00Z',
+      username:'owner.user', status:'ISSUED', version:0, targetRole:'ENTERPRISE_ADMIN' as 'ENTERPRISE_ADMIN'|'ENTERPRISE_MEMBER', expiresAt:'2099-09-08T12:00:00Z', createdAt:'2026-09-05T12:00:00Z',
       claimantName:null as string|null, claimantSubject:null as string|null, reviewNote:null as string|null },
     created:false, conflict:false, writes:[] as unknown[], requests:[] as string[], errors:[] as string[],
     workflow:null as ProfileWorkflow|null,
@@ -31,7 +31,7 @@ async function fixture(page:Page, role?:FixtureRole, state= scenario()) {
     state.requests.push(path)
     const ok=(data:unknown,headers:Record<string,string>={})=>route.fulfill({json:{code:'OK',data},headers})
     const fail=(status:number,message:string)=>route.fulfill({status,json:{code:'FIXTURE_DENIED',message}})
-    const effective=role==='pending'&&state.invitation.status==='APPROVED'?'ENTERPRISE_ADMIN':role
+    const effective=role==='pending'&&state.invitation.status==='APPROVED'?state.invitation.targetRole:role
     if(path==='/api/v1/public/enterprises') {
       expect(request.headers()['authorization']).toBeUndefined()
       return ok(state.workflow?.published?[state.workflow.publication]:[])
@@ -103,6 +103,38 @@ async function fixture(page:Page, role?:FixtureRole, state= scenario()) {
   })
   return state
 }
+
+test('member invitation explicitly requests read-only rights and cannot open a workspace before review',async({page})=>{
+  const state=await fixture(page,'pending');state.invitation.targetRole='ENTERPRISE_MEMBER'
+  await page.goto('/join#invite='+token)
+  await expect(page.getByText(/开通权限：仅本企业普通成员只读权限/)).toBeVisible()
+  await page.getByRole('checkbox',{name:'我已获该企业授权加入团队，确认申请普通成员只读权限。'}).check()
+  await page.getByRole('button',{name:'确认并提交绑定申请'}).click()
+  expect(state.invitation.status).toBe('CLAIMED')
+  await page.goto('/enterprise/team')
+  await expect(page).toHaveURL(/\/join$/)
+  expect(state.requests.some(path=>path.includes('/team/'))).toBe(false)
+})
+
+test('administrator review distinguishes ordinary member rights from owner rights',async({page,browser})=>{
+  const state=await fixture(page,'SYSTEM_ADMIN');state.created=true
+  Object.assign(state.invitation,{status:'CLAIMED',version:1,targetRole:'ENTERPRISE_MEMBER'})
+  await page.goto('/operations/invitations')
+  await page.getByRole('button',{name:'核验绑定'}).click()
+  await expect(page.getByRole('heading',{name:'核验普通成员并开通只读权限'})).toBeVisible()
+  await page.getByLabel('核验依据 / 退回原因').fill('已核验团队加入授权，仅授予只读')
+  await page.getByRole('checkbox',{name:'我已通过可信渠道确认此账号获准加入该企业团队，仅开通普通成员只读权限。'}).check()
+  await page.getByRole('button',{name:'批准绑定'}).click()
+  await expect(page.getByRole('status')).toContainText('账号已按邀请权限绑定')
+  const context=await browser.newContext({baseURL:'http://127.0.0.1:18188',locale:'zh-CN'})
+  try {
+    const member=await context.newPage();await fixture(member,'pending',state)
+    await member.goto('/enterprise')
+    await expect(member.getByRole('heading',{name:'企业工作台',exact:true})).toBeVisible()
+    await expect(member.getByRole('link',{name:'企业团队',exact:true})).toHaveCount(0)
+    await expect(member.locator('.enterprise-identity-note')).toContainText('只读身份')
+  } finally {await context.close()}
+})
 
 test('administrator invites, owner confirms, human approval opens my enterprise and review submission',async({page,browser},info)=>{
   const state=await fixture(page,'SYSTEM_ADMIN')

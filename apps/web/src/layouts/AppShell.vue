@@ -385,6 +385,12 @@ async function logout() {
   if (auth.isDemoMode) await router.push('/login')
 }
 
+async function changePassword() {
+  profileOpen.value = false
+  try { await auth.changePassword(route.fullPath) }
+  catch { window.alert('无法打开修改密码页面，请稍后重试或联系系统管理员。') }
+}
+
 onMounted(() => {
   applyUiPreferences(document.documentElement, readUiPreferences(localStorage))
   window.addEventListener('pointerdown', closeOverlays)
@@ -543,6 +549,7 @@ onBeforeUnmount(() => {
                 </select>
               </template>
               <button class="preferences-button" type="button" @click="openSettings">界面设置</button>
+              <button v-if="!auth.isDemoMode" type="button" @click="changePassword">修改密码</button>
               <RouterLink class="public-portal-link" to="/public" @click="profileOpen = false">浏览公开页面</RouterLink>
               <button type="button" @click="logout">退出登录</button>
             </div>

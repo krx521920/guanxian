@@ -34,7 +34,12 @@ onMounted(load)
     </PageHeader>
     <p class="enterprise-identity-note" role="note">当前绑定企业：<strong>{{ auth.user.value?.organization }}</strong> · {{ auth.user.value ? roleLabels[auth.user.value.role] : '' }}<span>{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '仅可维护本企业资料，其他企业资料按授权查看。' : '当前为企业只读身份，企业主档由企业管理员维护。' }}</span></p>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
-    <template v-else-if="data">
+    <section class="enterprise-shortcuts" aria-label="企业自助服务">
+      <RouterLink class="panel" to="/enterprise/catalog"><strong>我的供需</strong><span>产品、服务与需求 · 草稿和审核进度</span></RouterLink>
+      <RouterLink class="panel" to="/enterprise/cooperation"><strong>我的合作</strong><span>合作机会、邀请应答与协作进展</span></RouterLink>
+      <RouterLink v-if="auth.user.value?.role === 'ENTERPRISE_ADMIN'" class="panel" to="/enterprise/team"><strong>企业团队</strong><span>邀请普通成员、跟踪开通与停用权限</span></RouterLink>
+    </section>
+    <template v-if="data && !loading && !error">
       <section class="profile-completeness panel">
         <div class="completeness-ring" :style="{ '--progress': `${data.completeness * 3.6}deg` }"><div><strong>{{ data.completeness }}%</strong><span>资料完整度</span></div></div>
         <div><h2>{{ profileTitle }}</h2><p>完整度由服务端依据当前可见企业字段计算；页面不会推断尚缺材料的具体数量。</p><RouterLink class="text-button" :to="profileRoute">{{ auth.user.value?.role === 'ENTERPRISE_ADMIN' ? '维护企业资料' : '查看我的企业' }} →</RouterLink></div>
@@ -67,4 +72,5 @@ onMounted(load)
 <style scoped>
 .enterprise-identity-note { padding: 14px 18px; margin: 0 0 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--muted); font-size: 13px; line-height: 1.8; }
 .enterprise-identity-note strong { color: var(--ink); }.enterprise-identity-note span { display: block; }
+.enterprise-shortcuts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px}.enterprise-shortcuts a{display:grid;gap:10px;padding:22px;text-decoration:none;color:var(--ink)}.enterprise-shortcuts a:focus-visible{outline:3px solid var(--primary,#28726b)}.enterprise-shortcuts span{color:var(--muted);font-size:13px;line-height:1.7}
 </style>

@@ -31,12 +31,13 @@ async function login() {
   loading.value = true
   localError.value = null
   try {
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect
+      : entry.value === 'enterprise' ? '/enterprise/profile' : '/'
     if (auth.isDemoMode) {
       auth.loginDemo(selectedRole.value)
-      await router.replace(postLoginDestination(router, auth.user.value!, route.query.redirect))
+      await router.replace(postLoginDestination(router, auth.user.value!, redirect))
       return
     }
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     await auth.login(redirect)
   } catch {
     localError.value = '无法发起身份认证，请联系系统管理员检查 OIDC 配置。'

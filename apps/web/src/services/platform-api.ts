@@ -332,7 +332,7 @@ export const platformApi = {
     return completedAnswer
   },
 
-  offerings: (query = '', includeDeleted = false, page = 0, size = 20) => request<EcosystemPage<Offering>>(`/offerings?query=${encodeURIComponent(query)}&includeDeleted=${includeDeleted}&page=${page}&size=${size}`),
+  offerings: (query = '', includeDeleted = false, page = 0, size = 20, ownOnly = false) => request<EcosystemPage<Offering>>(`/offerings?query=${encodeURIComponent(query)}&includeDeleted=${includeDeleted}&page=${page}&size=${size}${ownOnly ? '&ownOnly=true' : ''}`),
   createOffering: (payload: OfferingUpsertPayload) => request<Offering>('/offerings', { method: 'POST', body: JSON.stringify(payload) }),
   updateOffering: (item: Offering, payload: OfferingUpsertPayload) => request<Offering>(`/offerings/${encodeURIComponent(item.id)}`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify(payload) }),
   transitionOffering: (item: Offering, action: 'submit' | 'disable') => request<Offering>(`/offerings/${encodeURIComponent(item.id)}/${action}`, { method: 'POST', headers: { 'If-Match': etag(item.version) } }),
@@ -340,7 +340,7 @@ export const platformApi = {
   deleteOffering: (item: Offering) => request<Offering>(`/offerings/${encodeURIComponent(item.id)}`, { method: 'DELETE', headers: { 'If-Match': etag(item.version) } }),
   restoreOffering: (item: Offering) => request<Offering>(`/offerings/${encodeURIComponent(item.id)}/restore`, { method: 'POST', headers: { 'If-Match': etag(item.version) } }),
   reviewOffering: (item: Offering, approved: boolean, comment = '') => request<Offering>(`/offerings/${encodeURIComponent(item.id)}/review`, { method: 'POST', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify({ approved, comment: comment.trim() || null }) }),
-  demands: (query = '', includeDeleted = false, page = 0, size = 20) => request<EcosystemPage<Demand>>(`/demands?query=${encodeURIComponent(query)}&includeDeleted=${includeDeleted}&page=${page}&size=${size}`),
+  demands: (query = '', includeDeleted = false, page = 0, size = 20, ownOnly = false) => request<EcosystemPage<Demand>>(`/demands?query=${encodeURIComponent(query)}&includeDeleted=${includeDeleted}&page=${page}&size=${size}${ownOnly ? '&ownOnly=true' : ''}`),
   createDemand: (payload: DemandUpsertPayload) => request<Demand>('/demands', { method: 'POST', body: JSON.stringify(payload) }),
   updateDemand: (item: Demand, payload: DemandUpsertPayload) => request<Demand>(`/demands/${encodeURIComponent(item.id)}`, { method: 'PUT', headers: { 'If-Match': etag(item.version) }, body: JSON.stringify(payload) }),
   transitionDemand: (item: Demand, action: 'submit' | 'disable') => request<Demand>(`/demands/${encodeURIComponent(item.id)}/${action}`, { method: 'POST', headers: { 'If-Match': etag(item.version) } }),

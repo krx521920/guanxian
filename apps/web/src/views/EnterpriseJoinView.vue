@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '../services/auth'
 import { workspaceForUser } from '../router/access'
-import { captureInvitation, clearInvitation, invitationApi, invitationStatus, type EnterpriseInvitation } from '../services/enterprise-onboarding'
+import { captureInvitation, clearInvitation, invitationApi, invitationStatus, invitationRoleLabel, type EnterpriseInvitation } from '../services/enterprise-onboarding'
 
 const auth = useAuth(), router = useRouter()
 const token = ref(captureInvitation(window.location.hash))
@@ -27,7 +27,7 @@ async function claim() {
   try {
     await invitationApi.claim(token.value)
     clearInvitation(); token.value = ''; preview.value = null
-    message.value = '申请已提交。管理员核验通过后，您才可维护该企业资料。'
+    message.value = '申请已提交。系统管理员核验通过后，才会开通邀请中注明的企业权限。'
   } catch (e) { error.value = e instanceof Error ? e.message : '提交失败' }
   finally { busy.value = false }
   if (!error.value) await load()
@@ -53,8 +53,8 @@ onMounted(load)
   <main class="join-page">
     <nav><RouterLink to="/public">← 返回公开平台</RouterLink><span>管线智联 · 企业服务</span></nav>
     <section class="join-card">
-      <p class="eyebrow">企业负责人接入</p><h1>连接账号与您的企业</h1>
-      <p>沿用协会已建档的企业资料，不重复创建企业。确认申请后，由系统管理员核验负责人身份。</p>
+      <p class="eyebrow">企业账号接入</p><h1>连接账号与您的企业</h1>
+      <p>沿用协会已建档的企业资料，不重复创建企业。确认申请后，由系统管理员核验身份与邀请权限。</p>
       <ol class="join-steps"><li>统一账号登录</li><li>确认邀请</li><li>管理员核验</li><li>维护我的企业</li></ol>
       <p v-if="error" role="alert" class="join-error">{{ error }}</p>
       <p v-if="message" role="status" class="join-note">{{ message }}</p>
@@ -68,13 +68,14 @@ onMounted(load)
         <p v-if="busy" role="status">正在核验…</p>
         <form v-if="preview" @submit.prevent="claim">
           <h2>{{ preview.enterpriseName }}</h2><p>{{ preview.associationName }} · 指定账号 {{ preview.username }}</p>
-          <p>邀请有效期至 {{ new Date(preview.expiresAt).toLocaleString() }}。开通权限：仅本企业负责人维护权限。</p>
-          <label class="join-confirm"><input v-model="confirmed" type="checkbox" required />我已获授权代表这家企业，确认提交负责人绑定申请。</label>
+          <p>邀请有效期至 {{ new Date(preview.expiresAt).toLocaleString() }}。开通权限：仅本企业{{ invitationRoleLabel(preview) }}。</p>
+          <label class="join-confirm"><input v-model="confirmed" type="checkbox" required />{{ preview.targetRole === 'ENTERPRISE_MEMBER' ? '我已获该企业授权加入团队，确认申请普通成员只读权限。' : '我已获授权代表这家企业，确认提交负责人绑定申请。' }}</label>
           <button class="primary-button" :disabled="busy || !confirmed">{{ preview.status === 'CLAIMED' ? '已确认，等待审核' : '确认并提交绑定申请' }}</button>
         </form>
         <p v-else-if="!busy && !mine.length">当前没有绑定申请。请向协会索取指定给您账号的负责人邀请链接。</p>
         <article v-for="item in mine" :key="item.id" class="join-application">
           <h2>{{ item.enterpriseName }}</h2><span class="tag">{{ invitationStatus[item.status] }}</span>
+          <p>申请权限：{{ invitationRoleLabel(item) }}</p>
           <p v-if="item.reviewNote">核验反馈：{{ item.reviewNote }}</p>
           <p v-if="item.status === 'APPROVED'">已完成绑定，点击下方重新检查权限并进入工作台。</p>
         </article>

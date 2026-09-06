@@ -22,7 +22,7 @@ final class EnterpriseInvitations {
     record Identity(String subject, String username, String displayName) { }
     record View(UUID id, UUID enterpriseId, String enterpriseName, String associationName, String username,
                 String status, long version, Instant createdAt, Instant expiresAt, String claimantName,
-                String claimantSubject, Instant claimedAt, String reviewNote, UUID accountId) { }
+                String claimantSubject, Instant claimedAt, String reviewNote, UUID accountId, String targetRole) { }
     record Issued(View invitation, String token) {
         @Override public String toString() { return "IssuedInvitation[id=" + invitation.id() + ", token=redacted]"; }
     }

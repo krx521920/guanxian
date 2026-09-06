@@ -22,6 +22,7 @@ import { apiActionMessage, displayBusinessStatus, formatDateTime, nullableText, 
 
 const auth = useAuth()
 const route = useRoute()
+const ownOnly = computed(() => route.path === '/enterprise/catalog')
 const tab = ref<'offerings' | 'demands'>('offerings')
 const offerings = ref<Offering[]>([])
 const demands = ref<Demand[]>([])
@@ -96,8 +97,8 @@ async function load() {
   loading.value = true; error.value = null
   try {
     const [offeringResult, demandResult] = await Promise.all([
-      platformApi.offerings(keyword.value.trim(), showDeleted.value, offeringPage.value, pageSize.value),
-      platformApi.demands(keyword.value.trim(), showDeleted.value, demandPage.value, pageSize.value),
+      platformApi.offerings(keyword.value.trim(), showDeleted.value, offeringPage.value, pageSize.value, ownOnly.value),
+      platformApi.demands(keyword.value.trim(), showDeleted.value, demandPage.value, pageSize.value, ownOnly.value),
     ])
     if (sequence !== loadSequence) return
     offerings.value = offeringResult.items; offeringTotal.value = offeringResult.total; offeringPage.value = offeringResult.page
@@ -325,10 +326,11 @@ onMounted(async () => {
 
 <template>
   <div>
-    <PageHeader eyebrow="ECOSYSTEM CATALOG" title="产业生态资产" description="产品、服务与需求独立建档，经审核后进入生态匹配">
+    <PageHeader eyebrow="ECOSYSTEM CATALOG" :title="ownOnly ? '我的供需' : '产业生态资产'" :description="ownOnly ? `${auth.user.value?.organization} · 仅展示本企业的产品、服务和需求` : '产品、服务与需求独立建档，经审核后进入生态匹配'">
       <button v-if="canOwnWrite" class="secondary-button" type="button" @click="openCreate('offerings')">+ 新建产品/服务</button>
       <button v-if="canOwnWrite" class="primary-button" type="button" @click="openCreate('demands')">+ 发布需求</button>
     </PageHeader>
+    <p v-if="ownOnly" class="panel self-service-note">{{ canOwnWrite ? '负责人可保存草稿、提交审核、下架产品或关闭需求；审核由协会负责。' : '当前为普通成员，只能查看，不能修改、提交或审核。' }}供需不会自动出现在游客公开端。<RouterLink class="text-button" to="/ecosystem">浏览授权范围内的供需 →</RouterLink></p>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
     <section class="panel filter-panel">
       <div class="segmented"><button :class="{ active: tab === 'offerings' }" @click="tab = 'offerings'">产品与服务（{{ offeringTotal }}）</button><button :class="{ active: tab === 'demands' }" @click="tab = 'demands'">合作需求（{{ demandTotal }}）</button></div>
@@ -396,3 +398,7 @@ onMounted(async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.self-service-note{padding:18px 22px;line-height:1.9;margin-bottom:20px;color:var(--muted)}.self-service-note a{display:block}
+</style>

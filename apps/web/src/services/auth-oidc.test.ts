@@ -151,6 +151,22 @@ afterEach(() => {
 })
 
 describe('OIDC authentication', () => {
+  it('changes password only through a fresh PKCE identity-provider action and keeps a safe return path', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'test-token', expired: false } })
+    await oidc.auth.initialize()
+    await oidc.auth.changePassword('/enterprise/profile')
+    expect(oidc.signinRedirect).toHaveBeenCalledWith({
+      state: { returnTo: '/enterprise/profile' }, prompt: 'login', max_age: 0,
+      extraQueryParams: { kc_action: 'UPDATE_PASSWORD' },
+    })
+    await oidc.auth.changePassword('https://attacker.invalid')
+    expect(oidc.signinRedirect).toHaveBeenLastCalledWith(expect.objectContaining({ state: { returnTo: '/' } }))
+  })
+  it('cannot start password actions without a verified signed-in account', async () => {
+    const oidc = await loadOidc()
+    await expect(oidc.auth.changePassword()).rejects.toThrow('请使用真实账号登录后修改密码')
+    expect(oidc.signinRedirect).not.toHaveBeenCalled()
+  })
   it('chooses a stable workspace from verified roles, not their order or token claims', async () => {
     const oidc = await loadOidc({
       user: { access_token: 'test-token', expired: false, profile: { roles: ['SYSTEM_ADMIN'] } },

@@ -7,9 +7,15 @@ import java.util.Optional;
 import java.util.UUID;
 
 interface EcosystemCatalogStore {
-    List<OfferingView> listOfferings(ActorScope actor, String query, boolean includeDeleted, long offset, int limit);
+    default List<OfferingView> listOfferings(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+        return listOfferings(actor, query, includeDeleted, offset, limit, false);
+    }
+    List<OfferingView> listOfferings(ActorScope actor, String query, boolean includeDeleted, long offset, int limit, boolean ownOnly);
 
-    long countOfferings(ActorScope actor, String query, boolean includeDeleted);
+    default long countOfferings(ActorScope actor, String query, boolean includeDeleted) {
+        return countOfferings(actor, query, includeDeleted, false);
+    }
+    long countOfferings(ActorScope actor, String query, boolean includeDeleted, boolean ownOnly);
 
     Optional<OfferingView> findOffering(UUID id, ActorScope actor, boolean includeDeleted);
 
@@ -25,9 +31,15 @@ interface EcosystemCatalogStore {
 
     Optional<OfferingView> restoreOffering(UUID id, long expectedVersion, ActorScope actor);
 
-    List<DemandView> listDemands(ActorScope actor, String query, boolean includeDeleted, long offset, int limit);
+    default List<DemandView> listDemands(ActorScope actor, String query, boolean includeDeleted, long offset, int limit) {
+        return listDemands(actor, query, includeDeleted, offset, limit, false);
+    }
+    List<DemandView> listDemands(ActorScope actor, String query, boolean includeDeleted, long offset, int limit, boolean ownOnly);
 
-    long countDemands(ActorScope actor, String query, boolean includeDeleted);
+    default long countDemands(ActorScope actor, String query, boolean includeDeleted) {
+        return countDemands(actor, query, includeDeleted, false);
+    }
+    long countDemands(ActorScope actor, String query, boolean includeDeleted, boolean ownOnly);
 
     Optional<DemandView> findDemand(UUID id, ActorScope actor, boolean includeDeleted);
 

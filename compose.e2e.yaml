@@ -25,6 +25,22 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # Disposable CI realm only. Never mount this test profile or fixture secret in production.
+  keycloak-account-config:
+    profiles: ["app"]
+    image: quay.io/keycloak/keycloak:26.7.1
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config --server http://keycloak:8080 --realm master --user ci-admin --password ci-only-keycloak-password
+        /opt/keycloak/bin/kcadm.sh update users/profile --config /tmp/kcadm.config -r guanxian-ci -f /setup/account-user-profile.json
+    volumes:
+      - ./tests/identity/account-user-profile.fixture.json:/setup/account-user-profile.json:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: "no"
+
   server:
     environment:
       SPRING_PROFILES_ACTIVE: e2e
@@ -32,9 +48,17 @@ services:
       GUANXIAN_JWT_JWK_SET_URI: http://keycloak:8080/realms/guanxian-ci/protocol/openid-connect/certs
       GUANXIAN_STORAGE_ENDPOINT: http://minio:9000
       GUANXIAN_STORAGE_REDIS_URL: redis://redis:6379
+      GUANXIAN_ACCOUNTS_ENABLED: "true"
+      GUANXIAN_ACCOUNTS_REALM_URL: http://keycloak:8080/realms/guanxian-ci
+      GUANXIAN_ACCOUNTS_CLIENT_ID: guanxian-account-provisioner
+      GUANXIAN_ACCOUNTS_CLIENT_SECRET_FILE: /run/secrets/account-provisioner
+    volumes:
+      - ./tests/identity/account-provisioner-secret.fixture:/run/secrets/account-provisioner:ro
     depends_on:
       keycloak:
         condition: service_healthy
+      keycloak-account-config:
+        condition: service_completed_successfully
 
   e2e-seed:
     profiles: ["app"]

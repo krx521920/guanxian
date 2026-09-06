@@ -1,0 +1,9 @@
+{
+  "attributes": [
+    { "name": "username", "required": { "roles": ["admin", "user"] }, "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] }, "validations": { "length": { "min": 3, "max": 255 } } },
+    { "name": "email", "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] }, "validations": { "email": {} } },
+    { "name": "firstName", "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] } },
+    { "name": "lastName", "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] } },
+    { "name": "guanxianProvisioningId", "multivalued": false, "permissions": { "view": ["admin"], "edit": ["admin"] }, "validations": { "length": { "min": 36, "max": 36 } } }
+  ]
+}

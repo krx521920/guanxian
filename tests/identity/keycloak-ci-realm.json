@@ -15,6 +15,16 @@
   },
   "clients": [
     {
+      "clientId": "guanxian-account-provisioner",
+      "name": "CI-only enterprise account service",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "ci-only-provisioner-secret-not-for-production",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
       "clientId": "guanxian-web",
       "name": "Guanxian browser CI client",
       "enabled": true,
@@ -38,6 +48,12 @@
     }
   ],
   "users": [
+    {
+      "username": "service-account-guanxian-account-provisioner",
+      "enabled": true,
+      "serviceAccountClientId": "guanxian-account-provisioner",
+      "clientRoles": { "realm-management": ["manage-users", "view-users", "query-users"] }
+    },
     {
       "id": "10000000-0000-4000-8000-000000000001",
       "username": "ci-association-admin",

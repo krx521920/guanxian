@@ -87,6 +87,29 @@ class PostgresEcosystemSystemContextIntegrationTest {
     EcosystemWorkflowStore workflowStore;
 
     @Test
+    void ownOnlyCatalogUsesBoundEnterpriseInBothSqlPageAndCount() {
+        seedScopes();
+        for (UUID enterprise : List.of(ENTERPRISE_A1, ENTERPRISE_A2)) {
+            var operator=system(ASSOCIATION_A,enterprise);
+            for (int i=0;i<3;i++) {
+                openDemand(FIXTURE_PREFIX+"-自助需求"+i,operator);
+                activateOffering(FIXTURE_PREFIX+"-自助产品"+i,operator);
+            }
+        }
+        var member=new ActorScope(UUID.randomUUID(),"readonly","readonly",ASSOCIATION_A,ENTERPRISE_A1,Set.of("ENTERPRISE_MEMBER"),Set.of());
+        assertEquals(6,catalog.offerings(member,FIXTURE_PREFIX,false,0,20).total());
+        var products=catalog.offerings(member,FIXTURE_PREFIX,false,1,2,true);
+        var demands=catalog.demands(member,FIXTURE_PREFIX,false,1,2,true);
+        assertEquals(3,products.total());assertEquals(1,products.items().size());
+        assertEquals(3,demands.total());assertEquals(1,demands.items().size());
+        assertEquals(ENTERPRISE_A1,products.items().getFirst().enterpriseId());
+        assertEquals(ENTERPRISE_A1,demands.items().getFirst().enterpriseId());
+        assertTrue(products.items().getFirst().allowedActions().isEmpty());
+        assertTrue(demands.items().getFirst().allowedActions().isEmpty());
+        assertThrows(ForbiddenException.class,()->catalog.demands(system(ASSOCIATION_A,ENTERPRISE_A1),null,false,0,20,true));
+    }
+
+    @Test
     void postgresEnforcesSystemContextAcrossCatalogMatchesAndWorkflowAndPersistsTimes() {
         seedScopes();
         ActorScope global = system(null, null);

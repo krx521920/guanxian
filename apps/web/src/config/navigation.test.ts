@@ -34,14 +34,21 @@ describe('role navigation', () => {
 
   it.each(enterpriseRoles)('shows the scoped member directory but not association administration to %s', (role) => {
     const paths = navigationForRole(role).map((item) => item.to)
-    expect(paths).toEqual(expect.arrayContaining(['/enterprise', '/policies', '/matching', '/collaborations']))
+    expect(paths).toEqual(expect.arrayContaining(['/enterprise', '/policies', '/enterprise/catalog', '/enterprise/cooperation']))
+    expect(paths.includes('/enterprise/team')).toBe(role === 'ENTERPRISE_ADMIN')
     expect(paths).not.toContain('/association')
     expect(paths).toContain('/members')
   })
 
-  it.each([...associationRoles, ...enterpriseRoles])('shows shared ecosystem navigation to %s', (role) => {
+  it.each(associationRoles)('shows association ecosystem navigation to %s', (role) => {
     const paths = navigationForRole(role).map((item) => item.to)
     expect(paths).toEqual(expect.arrayContaining(['/policies', '/ecosystem/overview', '/ecosystem', '/matching', '/collaborations', '/attachments']))
+  })
+
+  it.each(enterpriseRoles)('avoids duplicate business entry points for %s', role => {
+    const paths = navigationForRole(role).map(item => item.to)
+    expect(paths).toEqual(expect.arrayContaining(['/enterprise/catalog', '/enterprise/cooperation', '/ecosystem/overview', '/attachments']))
+    for (const duplicate of ['/ecosystem', '/matching', '/collaborations']) expect(paths).not.toContain(duplicate)
   })
 
   it('limits observers to member and policy read-only entry points', () => {
@@ -91,6 +98,9 @@ describe('role navigation', () => {
       { label: '协会工作台', to: '/association', icon: 'dashboard', badge: undefined },
       { label: '企业工作台', to: '/enterprise', icon: 'dashboard', badge: undefined },
       { label: '我的企业', to: '/enterprise/profile', icon: 'enterprise', badge: undefined },
+      { label: '我的供需', to: '/enterprise/catalog', icon: 'ecosystem', badge: undefined },
+      { label: '我的合作', to: '/enterprise/cooperation', icon: 'match', badge: undefined },
+      { label: '企业团队', to: '/enterprise/team', icon: 'task', badge: undefined },
       { label: '会员企业', to: '/members', icon: 'enterprise', badge: undefined },
       { label: '政策标准', to: '/policies', icon: 'policy', badge: undefined },
       { label: '生态全景', to: '/ecosystem/overview', icon: 'ecosystem', badge: undefined },

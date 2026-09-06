@@ -6,7 +6,8 @@ const props = withDefaults(defineProps<{
   size: number
   total: number
   disabled?: boolean
-}>(), { disabled: false })
+  fixedSize?: boolean
+}>(), { disabled: false, fixedSize: false })
 
 const emit = defineEmits<{
   change: [page: number]
@@ -22,7 +23,7 @@ const end = computed(() => Math.min(props.total, (props.page + 1) * props.size))
 <template>
   <nav class="pagination-bar" aria-label="分页">
     <span>第 {{ start }}–{{ end }} 条，共 {{ total }} 条</span>
-    <label>
+    <label v-if="!fixedSize">
       每页
       <select :value="size" :disabled="disabled" @change="emit('resize', Number(($event.target as HTMLSelectElement).value))">
         <option :value="10">10</option><option :value="20">20</option><option :value="50">50</option><option :value="100">100</option>

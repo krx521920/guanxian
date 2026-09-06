@@ -116,6 +116,6 @@ try {
 } catch {
   Write-Warning 'E2E stack startup failed. Current service state follows.'
   & docker @composeArguments 'ps' '--all'
-  & docker @composeArguments 'logs' '--no-color' '--tail' '120' 'keycloak' 'server' 'e2e-seed' 'web'
+  & docker @composeArguments 'logs' '--no-color' '--tail' '120' 'keycloak' 'keycloak-account-config' 'server' 'e2e-seed' 'web'
   throw
 }
