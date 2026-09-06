@@ -1,5 +1,4 @@
 {
-  "unmanagedAttributePolicy": "DISABLED",
   "attributes": [
     { "name": "username", "required": { "roles": ["admin", "user"] }, "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] }, "validations": { "length": { "min": 3, "max": 255 } } },
     { "name": "email", "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] }, "validations": { "email": {} } },
