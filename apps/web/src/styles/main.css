@@ -226,7 +226,11 @@ button:focus-visible, .primary-button:focus-visible, .secondary-button:focus-vis
 .lp-cert { margin-top: 24px; padding: 11px 24px; border: 1px solid #d9e1ec; border-radius: 8px; background: rgba(255, 255, 255, .65); backdrop-filter: blur(6px); display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 0 22px; color: #546278; font-size: 10.5px; letter-spacing: .04em; animation: lg-rise .35s .06s ease both; }
 .lp-cert-segment { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .lp-cert-segment svg { color: #8194a8; flex: 0 0 auto; }
-.lp-cert-live { color: #3b5270; font-weight: 500; }
+.lp-cert-live { color: #3b5270; font-weight: 500; transition: color .2s ease; }
+.lp-health-unhealthy { color: var(--warning); }
+.lp-health-checking { color: #7b8798; }
+.lp-dot-warn { background: var(--warning) !important; }
+.lp-dot-checking { background: #b0bac7 !important; animation: lg-breathe 1s ease-in-out infinite !important; }
 .lp-cert-sep { width: 1px; height: 12px; background: #d2dae5; flex: 0 0 auto; }
 .lp-footer { margin-top: auto; padding-top: 30px; color: #98a3b2; font-size: 10px; letter-spacing: .06em; text-align: center; line-height: 1.9; }
 

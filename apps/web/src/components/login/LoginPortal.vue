@@ -1,5 +1,33 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import LoginCard from './LoginCard.vue'
+
+type HealthState = 'checking' | 'healthy' | 'unhealthy'
+
+const health = ref<{ state: HealthState; message: string }>({
+  state: 'checking',
+  message: '正在检测系统状态…',
+})
+
+onMounted(async () => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  try {
+    const res = await fetch('/api/v1/health', { signal: controller.signal })
+    clearTimeout(timer)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const body = await res.json()
+    if (body?.data?.status === 'UP') {
+      health.value = { state: 'healthy', message: '系统正常运行' }
+    } else {
+      health.value = { state: 'unhealthy', message: `服务状态：${body?.data?.status || '未知'}` }
+    }
+  } catch (e) {
+    clearTimeout(timer)
+    const reason = e instanceof Error && e.name === 'AbortError' ? '检测超时' : '服务不可达'
+    health.value = { state: 'unhealthy', message: reason }
+  }
+})
 </script>
 
 <template>
@@ -28,8 +56,10 @@ import LoginCard from './LoginCard.vue'
 
       <LoginCard />
 
-      <div class="lp-cert" role="status">
-        <span class="lp-cert-segment lp-cert-live"><i class="status-dot lg-pulse" aria-hidden="true" />系统正常运行</span>
+      <div class="lp-cert" role="status" :aria-label="`系统状态：${health.message}`">
+        <span class="lp-cert-segment lp-cert-live" :class="`lp-health-${health.state}`">
+          <i class="status-dot" :class="{ 'lg-pulse': health.state === 'healthy', 'lp-dot-warn': health.state === 'unhealthy', 'lp-dot-checking': health.state === 'checking' }" aria-hidden="true" />{{ health.message }}
+        </span>
         <i class="lp-cert-sep" aria-hidden="true" />
         <span class="lp-cert-segment">数据来源随模块标注</span>
         <i class="lp-cert-sep" aria-hidden="true" />
