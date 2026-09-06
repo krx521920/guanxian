@@ -206,6 +206,6 @@ test('both account entry buttons start the same authorization-code flow without 
     expect(target.searchParams.has('role')).toBe(false)
     const stateKey = 'oidc.' + target.searchParams.get('state')
     const state = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), stateKey)
-    expect(state.data.returnTo).toBe(entry === 'enterprise' ? '/my-enterprise' : '/')
+    expect(state.data.returnTo).toBe(entry === 'enterprise' ? '/enterprise/profile' : '/')
   }
 })

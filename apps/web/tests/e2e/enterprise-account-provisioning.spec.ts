@@ -10,6 +10,10 @@ test('真实认证：管理员直接开户、首次改密、我的企业、自�
   expect(tokenResponse.status()).toBe(200)
   const adminToken = (await tokenResponse.json()).access_token
   const headers = { Authorization: `Bearer ${adminToken}`, 'X-Guanxian-Association-Id': '00000000-0000-0000-0000-000000000106' }
+  // A realm role alone is insufficient: the disposable SQL seed must also bind this actor.
+  const adminIdentity = await request.get('/api/v1/users/me', { headers })
+  expect(adminIdentity.status()).toBe(200)
+  expect((await adminIdentity.json()).data.roles).toEqual(['SYSTEM_ADMIN'])
   const username = 'ci_owner_' + randomUUID().replaceAll('-', '')
   const createdEnterprise = await request.post('/api/v1/members', { headers, data: {
     name: 'CI虚构开户企业-' + username, category: '技术服务', unifiedSocialCreditCode: null,
@@ -38,7 +42,7 @@ test('真实认证：管理员直接开户、首次改密、我的企业、自�
     const page = await ownerContext.newPage()
     await login(page, username, account.temporaryPassword)
     await changeRequiredPassword(page, 'Ci-Only!OwnerChosenPassword2026')
-    await expect(page).toHaveURL(/\/my-enterprise$/)
+    await expect(page).toHaveURL(/\/enterprise\/profile$/)
     await expect(page.getByRole('heading', { name: '我的企业', exact: true })).toBeVisible()
     const identity = await sessionApi(page, '/users/me')
     expect(identity.status).toBe(200); expect(identity.data.enterpriseId).toBe(enterprise.id)
@@ -53,7 +57,7 @@ test('真实认证：管理员直接开户、首次改密、我的企业、自�
     await page.locator('#password').fill('Ci-Only!OwnerChosenPassword2026')
     await page.locator('#kc-login').click()
     await changeRequiredPassword(page, 'Ci-Only!OwnerUpdatedPassword2026')
-    await expect(page).toHaveURL(/\/my-enterprise$/)
+    await expect(page).toHaveURL(/\/enterprise\/profile$/)
     expect((await sessionApi(page, '/my-enterprise')).status).toBe(200)
 
     const reset = await request.post(path + '/reset-password', {
@@ -67,7 +71,7 @@ test('真实认证：管理员直接开户、首次改密、我的企业、自�
     const replacement = await replacementContext.newPage()
     await login(replacement, username, resetResult.temporaryPassword)
     await changeRequiredPassword(replacement, 'Ci-Only!RecoveredOwnerPassword2026')
-    await expect(replacement).toHaveURL(/\/my-enterprise$/)
+    await expect(replacement).toHaveURL(/\/enterprise\/profile$/)
     expect((await sessionApi(replacement, '/my-enterprise')).data.profile.id).toBe(enterprise.id)
   } finally { await Promise.all([ownerContext.close(), replacementContext.close()]) }
 })

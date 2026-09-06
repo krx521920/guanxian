@@ -68,6 +68,9 @@ ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE', deleted_at = NULL,
 INSERT INTO user_account (
   id, association_id, enterprise_id, external_subject, username, display_name, email, status)
 VALUES
+  ('20000000-0000-4000-8000-000000000002', NULL, NULL,
+   '10000000-0000-4000-8000-000000000002', 'ci-load-admin', 'CI 系统管理员',
+   'ci-load-admin@invalid.example', 'ACTIVE'),
   ('20000000-0000-4000-8000-000000000001', '00000000-0000-0000-0000-000000000106', NULL,
    '10000000-0000-4000-8000-000000000001', 'ci-association-admin', 'CI 协会管理员',
    'ci-association-admin@invalid.example', 'ACTIVE'),
@@ -91,6 +94,7 @@ ON CONFLICT (id) DO UPDATE SET
 
 INSERT INTO user_role (user_id, role_code)
 VALUES
+  ('20000000-0000-4000-8000-000000000002', 'SYSTEM_ADMIN'),
   ('20000000-0000-4000-8000-000000000001', 'ASSOCIATION_ADMIN'),
   ('20000000-0000-4000-8000-000000000003', 'ENTERPRISE_ADMIN'),
   ('20000000-0000-4000-8000-000000000004', 'ENTERPRISE_MEMBER'),
