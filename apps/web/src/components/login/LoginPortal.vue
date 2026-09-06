@@ -28,10 +28,14 @@ import LoginCard from './LoginCard.vue'
 
       <LoginCard />
 
-      <div class="lp-status">
-        <span><i class="status-dot lg-pulse" aria-hidden="true" />系统运行正常</span>
-        <i class="lp-status-sep" aria-hidden="true" />
-        <span>数据均标注来源与更新时间 · 登录后可见各模块实时数据</span>
+      <div class="lp-cert" role="status">
+        <span class="lp-cert-segment lp-cert-live"><i class="status-dot lg-pulse" aria-hidden="true" />系统正常运行</span>
+        <i class="lp-cert-sep" aria-hidden="true" />
+        <span class="lp-cert-segment">数据来源随模块标注</span>
+        <i class="lp-cert-sep" aria-hidden="true" />
+        <span class="lp-cert-segment"><svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="3.5" y="7" width="9" height="6.5" rx="1.4" /><path d="M5.8 7V5.2a2.2 2.2 0 0 1 4.4 0V7" /></svg>操作留痕可审计</span>
+        <i class="lp-cert-sep" aria-hidden="true" />
+        <span class="lp-cert-segment">主办：北京地下管线协会</span>
       </div>
 
       <footer class="lp-footer">
