@@ -1,7 +1,7 @@
 import type { UserRole } from '../types/domain'
 import { allRoles, associationRoles, enterpriseRoles } from './roles'
 
-export type NavIcon = 'dashboard' | 'ecosystem' | 'enterprise' | 'policy' | 'match' | 'task'
+export type NavIcon = 'dashboard' | 'ecosystem' | 'enterprise' | 'policy' | 'match' | 'task' | 'tender'
 
 export interface NavItem {
   label: string
@@ -18,6 +18,7 @@ export const navigation: NavItem[] = [
   { label: '政策标准', to: '/policies', icon: 'policy', roles: allRoles },
   { label: '产品与需求', to: '/ecosystem', icon: 'ecosystem', roles: allRoles },
   { label: '生态匹配', to: '/matching', icon: 'match', roles: allRoles },
+  { label: '招标信息', to: '/tenders', icon: 'tender', roles: allRoles },
   { label: '协作事项', to: '/collaborations', icon: 'task', roles: allRoles },
   { label: '资料附件', to: '/attachments', icon: 'enterprise', roles: allRoles },
   { label: '友好协会', to: '/federation', icon: 'match', roles: associationRoles },

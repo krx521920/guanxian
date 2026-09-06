@@ -10,7 +10,13 @@ import { useAuth } from '../services/auth'
 
 const auth = useAuth()
 const { data, loading, error, load } = useAsyncResource(platformApi.enterpriseDashboard)
-onMounted(load)
+const { data: tenders, loading: tendersLoading, error: tendersError, load: loadTenders } = useAsyncResource(() => platformApi.tendersMine(0, 3))
+onMounted(() => { void load(); void loadTenders() })
+
+function tenderStatus(value: string): string {
+  return value === 'ACTIVE' ? '正在招标' : '已截止'
+}
+const moneyText = (value: number | null | undefined) => (value == null ? '—' : `${new Intl.NumberFormat('zh-CN').format(Math.round(value / 10000))} 万元`)
 </script>
 
 <template>
@@ -28,6 +34,26 @@ onMounted(load)
 
       <section class="metrics-grid enterprise-metrics"><MetricCard v-for="(metric, index) in data.metrics" :key="metric.label" :metric="metric" :icon="['品', '机', '协', '策'][index]" /></section>
 
+      <section class="panel tender-panel">
+        <div class="panel-header"><div><h2>为您匹配的招标机会</h2><p>协会主动推送与系统按企业能力自动匹配的招标公告</p></div><RouterLink to="/tenders" class="text-button">招标信息中心 →</RouterLink></div>
+        <AsyncResourceState v-if="tendersLoading || tendersError" :loading="tendersLoading" :error="tendersError" @retry="loadTenders" />
+        <template v-else-if="tenders">
+          <div v-if="tenders.items.length" class="tender-compact" v-for="item in tenders.items" :key="item.id">
+            <div class="tender-main">
+              <div>
+                <span class="tag">{{ item.category }}</span>
+                <StatusBadge :value="tenderStatus(item.status)" />
+                <span v-if="item.pushedToMe" class="pushed-chip">协会已推送</span>
+              </div>
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.purchaser }} · {{ item.region }} · 截止 {{ item.deadline }}</p>
+            </div>
+            <div class="tender-budget"><strong>{{ moneyText(item.budget) }}</strong><span>预算</span></div>
+          </div>
+          <div v-else class="notification-state"><b>暂无匹配的招标信息</b><span>完善产品与服务资料后，系统将自动为您匹配相关招标。</span></div>
+        </template>
+      </section>
+
       <section class="content-grid enterprise-grid">
         <article class="panel">
           <div class="panel-header"><div><h2>为您推荐的商机</h2><p>根据企业能力与场景偏好智能筛选</p></div><RouterLink to="/matching" class="text-button">查看更多 →</RouterLink></div>
@@ -44,3 +70,7 @@ onMounted(load)
     </template>
   </div>
 </template>
+
+<style scoped>
+.tender-panel { margin-bottom: 18px; }
+</style>

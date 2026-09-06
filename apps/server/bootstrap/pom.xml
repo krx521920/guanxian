@@ -9,6 +9,7 @@
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>iam</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>member</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>policy</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>com.guanxian.platform</groupId><artifactId>tender</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>ai-adapter</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>ecosystem</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>com.guanxian.platform</groupId><artifactId>collaboration</artifactId><version>${project.version}</version></dependency>

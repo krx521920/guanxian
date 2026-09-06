@@ -17,7 +17,7 @@ class ArchitectureBoundaryTest {
     void businessModulesDoNotDependOnBootstrap() {
         noClasses()
                 .that().resideInAnyPackage(
-                        "..iam..", "..member..", "..policy..", "..ai..", "..ecosystem..", "..collaboration..")
+                        "..iam..", "..member..", "..policy..", "..tender..", "..ai..", "..ecosystem..", "..collaboration..")
                 .should().dependOnClassesThat().resideInAnyPackage("..bootstrap..")
                 .because("bootstrap composes modules and must never become a business dependency")
                 .check(PRODUCTION_CLASSES);

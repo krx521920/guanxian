@@ -2,6 +2,7 @@ package com.guanxian.platform.member.internal;
 
 import com.guanxian.platform.member.api.MemberDirectory;
 import com.guanxian.platform.member.api.MemberProfile;
+import com.guanxian.platform.member.web.MemberDistributionView;
 import com.guanxian.platform.member.web.MemberReviewRequest;
 import com.guanxian.platform.member.web.MemberUpsertRequest;
 import com.guanxian.platform.shared.error.ConflictException;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -56,16 +58,16 @@ public class MemberService implements MemberDirectory {
         UUID associationId = repository.defaultAssociationId();
         insertSeed(DEMO_PRIMARY_ENTERPRISE_ID, associationId, new MemberUpsertRequest(
                 "京城管网科技有限公司", "91110000DEMO00001", "智慧管网",
-                "北京市海淀区", "张工", "13800000001", "提供地下管线监测与数字化平台服务",
+                "北京市海淀区", "海淀区", "张工", "13800000001", "提供地下管线监测与数字化平台服务",
                 List.of("管线监测", "泄漏预警", "数字孪生"),
                 List.of("智能监测终端", "管网数字孪生平台"),
-                List.of("寻找燃气及供热场景合作方"), "ACTIVE"));
+                List.of("寻找燃气及供热场景合作方"), "MEMBERS", "ACTIVE", null));
         insertSeed(DEMO_SECONDARY_ENTERPRISE_ID, associationId, new MemberUpsertRequest(
                 "北方阀门制造有限公司", "91110000DEMO00002", "装备制造",
-                "北京市大兴区", "李经理", "13800000002", "生产供水、燃气和热力管网阀门",
+                "北京市大兴区", "大兴区", "李经理", "13800000002", "生产供水、燃气和热力管网阀门",
                 List.of("阀门制造", "带压维护"),
                 List.of("燃气球阀", "供水蝶阀"),
-                List.of("对接管线施工及运营单位"), "ACTIVE"));
+                List.of("对接管线施工及运营单位"), "MEMBERS", "ACTIVE", null));
     }
 
     @Override
@@ -107,6 +109,51 @@ public class MemberService implements MemberDirectory {
     List<MemberProfile> findAll(String query) {
         return findAll(query, SYSTEM_ACTOR);
     }
+
+    public MemberDistributionView distribution(ActorScope actor) {
+        List<MemberProfile> members = findAll(null, null, false, actor);
+        long total = members.size();
+        Map<String, Long> districtCounts = new LinkedHashMap<>();
+        Map<String, Long> categoryCounts = new LinkedHashMap<>();
+        Map<String, Long> productCounts = new LinkedHashMap<>();
+        for (MemberProfile member : members) {
+            merge(districtCounts, member.district());
+            merge(categoryCounts, member.category());
+            for (String product : member.products()) {
+                merge(productCounts, product);
+            }
+        }
+        List<MemberDistributionView.DistrictStat> districts = districtCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .map(entry -> new MemberDistributionView.DistrictStat(
+                        entry.getKey(), entry.getValue(), percent(entry.getValue(), total)))
+                .toList();
+        List<MemberDistributionView.NamedCount> products = productCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .limit(10)
+                .map(entry -> new MemberDistributionView.NamedCount(entry.getKey(), entry.getValue()))
+                .toList();
+        List<MemberDistributionView.DistrictStat> categories = categoryCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .map(entry -> new MemberDistributionView.DistrictStat(
+                        entry.getKey(), entry.getValue(), percent(entry.getValue(), total)))
+                .toList();
+        return new MemberDistributionView(total, districts, products, categories);
+    }
+
+    private static void merge(Map<String, Long> counts, String value) {
+        if (value != null && !value.isBlank()) {
+            counts.merge(value.trim(), 1L, Long::sum);
+        }
+    }
+
+    private static double percent(long count, long total) {
+        return total == 0 ? 0.0 : Math.round(count * 1000.0 / total) / 10.0;
+    }
+
     @Override
     public Optional<MemberProfile> findById(UUID id, ActorScope actor) {
         return findById(id, actor, false);
@@ -241,7 +288,7 @@ public class MemberService implements MemberDirectory {
         Instant now = Instant.now();
         MemberProfile deleted = new MemberProfile(
                 existing.id(), existing.associationId(), existing.name(), existing.unifiedSocialCreditCode(),
-                existing.category(), existing.address(), existing.contactName(), existing.contactPhone(),
+                existing.category(), existing.address(), existing.district(), existing.contactName(), existing.contactPhone(),
                 existing.introduction(), existing.capabilities(), existing.products(), existing.cooperationNeeds(),
                 existing.visibility(), "DELETED", nextVersion(existing), existing.createdAt(), now,
                 now, actor.subject(), existing.status());
@@ -271,7 +318,7 @@ public class MemberService implements MemberDirectory {
         String restoredStatus = normalizeStatus(existing.statusBeforeDelete(), "DISABLED");
         MemberProfile restored = new MemberProfile(
                 existing.id(), existing.associationId(), existing.name(), existing.unifiedSocialCreditCode(),
-                existing.category(), existing.address(), existing.contactName(), existing.contactPhone(),
+                existing.category(), existing.address(), existing.district(), existing.contactName(), existing.contactPhone(),
                 existing.introduction(), existing.capabilities(), existing.products(), existing.cooperationNeeds(),
                 existing.visibility(), restoredStatus, nextVersion(existing), existing.createdAt(), now,
                 null, null, null);
@@ -325,8 +372,8 @@ public class MemberService implements MemberDirectory {
             long version, Instant createdAt, Instant updatedAt) {
         return new MemberProfile(
                 id, associationId, request.name().trim(), normalizeCreditCode(request.unifiedSocialCreditCode()),
-                request.category().trim(), trimToNull(request.address()), trimToNull(request.contactName()),
-                trimToNull(request.contactPhone()), trimToNull(request.introduction()),
+                request.category().trim(), trimToNull(request.address()), trimToNull(request.district()),
+                trimToNull(request.contactName()), trimToNull(request.contactPhone()), trimToNull(request.introduction()),
                 immutable(request.capabilities()), immutable(request.products()), immutable(request.cooperationNeeds()),
                 visibility, status, version, createdAt, updatedAt, null, null, null);
     }
@@ -337,7 +384,7 @@ public class MemberService implements MemberDirectory {
         }
         return new MemberProfile(
                 member.id(), member.associationId(), member.name(), member.unifiedSocialCreditCode(),
-                member.category(), member.address(), member.contactName(), member.contactPhone(),
+                member.category(), member.address(), member.district(), member.contactName(), member.contactPhone(),
                 member.introduction(), member.capabilities(), member.products(), member.cooperationNeeds(),
                 member.visibility(), status, member.version() + 1, member.createdAt(), updatedAt,
                 member.deletedAt(), member.deletedBySubject(), member.statusBeforeDelete());

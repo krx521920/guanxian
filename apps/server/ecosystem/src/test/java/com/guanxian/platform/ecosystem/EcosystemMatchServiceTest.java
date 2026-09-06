@@ -104,7 +104,7 @@ class EcosystemMatchServiceTest {
         Instant now = Instant.now();
         return new MemberProfile(
                 id, ASSOCIATION_ID, name, null, "制造",
-                "北京市", null, null, name + "简介", capabilities, products,
+                "北京市", null, null, null, name + "简介", capabilities, products,
                 List.of(), "MEMBERS", "ACTIVE", 0, now, now, null, null, null);
     }
 

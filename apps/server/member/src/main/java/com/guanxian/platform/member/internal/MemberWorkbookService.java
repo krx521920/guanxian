@@ -134,9 +134,9 @@ class MemberWorkbookService {
                 String needs = value(row, columns.get("合作需求（用；分隔）"), "合作需求", formatter, errors);
                 String visibility = value(row, columns.get("可见范围"), "可见范围", formatter, errors);
                 MemberUpsertRequest request = new MemberUpsertRequest(
-                        name, nullIfBlank(creditCode), category, nullIfBlank(address), nullIfBlank(contactName),
-                        nullIfBlank(contactPhone), nullIfBlank(introduction), split(capabilities), split(products),
-                        split(needs), nullIfBlank(visibility), null, null);
+                        name, nullIfBlank(creditCode), category, nullIfBlank(address), null,
+                        nullIfBlank(contactName), nullIfBlank(contactPhone), nullIfBlank(introduction),
+                        split(capabilities), split(products), split(needs), nullIfBlank(visibility), null, null);
                 rows.add(new ParsedRow(index + 1, request, errors));
             }
             if (rows.isEmpty()) {

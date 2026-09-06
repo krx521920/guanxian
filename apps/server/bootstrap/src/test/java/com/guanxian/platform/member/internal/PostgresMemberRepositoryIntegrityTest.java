@@ -61,7 +61,7 @@ class PostgresMemberRepositoryIntegrityTest {
         Instant now = Instant.parse("2026-08-21T00:00:00Z");
         return new MemberProfile(
                 UUID.randomUUID(), UUID.fromString("00000000-0000-0000-0000-000000000106"),
-                "约束验收企业", "91110000TEST23505X", "技术服务单位", null, null, null, null,
+                "约束验收企业", "91110000TEST23505X", "技术服务单位", null, null, null, null, null,
                 List.of(), List.of(), List.of(), "MEMBERS", "ACTIVE", 0, now, now, null, null, null);
     }
 }

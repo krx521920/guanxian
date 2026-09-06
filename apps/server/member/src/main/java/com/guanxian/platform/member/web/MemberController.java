@@ -72,6 +72,12 @@ public class MemberController {
         return ApiResponse.ok(new MemberPage(items, visible.size(), safePage, safeSize));
     }
 
+    @GetMapping("/distribution")
+    @PreAuthorize("hasAuthority('MEMBER_READ')")
+    ApiResponse<MemberDistributionView> distribution(Authentication authentication) {
+        return ApiResponse.ok(memberService.distribution(actorScopeResolver.resolve(authentication)));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('MEMBER_READ')")
     ResponseEntity<ApiResponse<MemberProfile>> get(

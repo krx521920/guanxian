@@ -25,7 +25,7 @@ class PostgresMemberRepository implements MemberRepository {
     private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {
     };
     private static final String SELECT_FIELDS = """
-            SELECT id, association_id, name, unified_social_credit_code, category, address,
+            SELECT id, association_id, name, unified_social_credit_code, category, address, district,
                    contact_name, contact_phone, description, capabilities, products,
                    cooperation_needs, visibility, status, version, created_at, updated_at,
                    deleted_at, deleted_by_subject, status_before_delete
@@ -73,11 +73,11 @@ class PostgresMemberRepository implements MemberRepository {
                 INSERT INTO enterprise (
                     id, association_id, unified_social_credit_code, name, short_name,
                     description, enterprise_roles, service_scenarios, visibility, status,
-                    version, created_at, updated_at, category, address, contact_name,
+                    version, created_at, updated_at, category, address, district, contact_name,
                     contact_phone, capabilities, products, cooperation_needs)
                 VALUES (:id, :associationId, :creditCode, :name, NULL,
                     :introduction, '[]'::jsonb, '[]'::jsonb, :visibility, :status,
-                    :version, :createdAt, :updatedAt, :category, :address, :contactName,
+                    :version, :createdAt, :updatedAt, :category, :address, :district, :contactName,
                     :contactPhone, CAST(:capabilities AS jsonb), CAST(:products AS jsonb),
                     CAST(:cooperationNeeds AS jsonb))
                 """;
@@ -101,6 +101,7 @@ class PostgresMemberRepository implements MemberRepository {
                     updated_at = :updatedAt,
                     category = :category,
                     address = :address,
+                    district = :district,
                     contact_name = :contactName,
                     contact_phone = :contactPhone,
                     capabilities = CAST(:capabilities AS jsonb),
@@ -132,6 +133,7 @@ class PostgresMemberRepository implements MemberRepository {
                 .addValue("updatedAt", Timestamp.from(member.updatedAt()))
                 .addValue("category", member.category())
                 .addValue("address", member.address())
+                .addValue("district", member.district())
                 .addValue("contactName", member.contactName())
                 .addValue("contactPhone", member.contactPhone())
                 .addValue("capabilities", writeList(member.capabilities()))
@@ -150,6 +152,7 @@ class PostgresMemberRepository implements MemberRepository {
                 resultSet.getString("unified_social_credit_code"),
                 resultSet.getString("category"),
                 resultSet.getString("address"),
+                resultSet.getString("district"),
                 resultSet.getString("contact_name"),
                 resultSet.getString("contact_phone"),
                 resultSet.getString("description"),

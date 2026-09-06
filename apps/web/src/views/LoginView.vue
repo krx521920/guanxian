@@ -56,9 +56,9 @@ async function login() {
     <section class="login-panel">
       <form class="login-card" @submit.prevent="login">
         <div class="mobile-brand"><div class="brand-mark"><span /><span /><span /></div><strong>管线智联</strong></div>
-        <span class="eyebrow">{{ auth.isDemoMode ? 'LOCAL DEMO' : 'SECURE ACCESS' }}</span>
-        <h2>欢迎使用管理协作平台</h2>
-        <p>{{ auth.isDemoMode ? '请选择本地测试身份' : '使用统一身份认证安全登录' }}</p>
+        <span class="eyebrow">{{ auth.isDemoMode ? 'LOCAL ACCESS' : 'SECURE ACCESS' }}</span>
+        <h2>欢迎使用管线智联</h2>
+        <p>{{ auth.isDemoMode ? '请选择登录身份进入平台' : '使用统一身份认证安全登录' }}</p>
 
         <div v-if="auth.isDemoMode" class="role-options">
           <label v-for="role in ROLES" :key="role" :class="{ selected: selectedRole === role }">
@@ -73,9 +73,9 @@ async function login() {
         </div>
         <p v-if="localError || auth.error.value" class="form-error">{{ localError || auth.error.value }}</p>
         <button class="primary-button login-submit" type="submit" :disabled="loading">
-          {{ loading ? '正在跳转…' : auth.isDemoMode ? '进入本地测试环境' : '统一身份登录' }} <span>→</span>
+          {{ loading ? '正在进入…' : auth.isDemoMode ? '进入平台' : '统一身份登录' }} <span>→</span>
         </button>
-        <div v-if="auth.isDemoMode" class="demo-tip"><b>仅限本地/测试</b> 生产构建不会启用身份切换。</div>
+        <div v-if="auth.isDemoMode" class="demo-tip"><b>本地访问</b> 生产环境将启用统一身份认证。</div>
       </form>
     </section>
   </main>

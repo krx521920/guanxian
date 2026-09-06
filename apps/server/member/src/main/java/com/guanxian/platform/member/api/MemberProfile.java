@@ -11,6 +11,7 @@ public record MemberProfile(
         String unifiedSocialCreditCode,
         String category,
         String address,
+        String district,
         String contactName,
         String contactPhone,
         String introduction,

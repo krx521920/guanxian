@@ -436,3 +436,20 @@ button:disabled, .primary-button:disabled, .secondary-button:disabled { opacity:
 @media (max-width: 720px) {
   .pagination-bar { justify-content: center; flex-wrap: wrap; }
 }
+
+/* 招标信息与会员分布共用 */
+.pushed-chip { display: inline-flex; padding: 3px 8px; border-radius: 11px; color: #1d6e63; background: #e2f3ef; font-size: 10px; font-weight: 600; }
+.deadline-near { color: #b42318 !important; font-weight: 600; }
+.tender-compact { padding: 14px 20px; display: flex; gap: 12px; align-items: center; }.tender-compact + .tender-compact { border-top: 1px solid #edf0f4; }
+.tender-compact .tender-main { min-width: 0; flex: 1; }
+.tender-compact .tender-main > div { display: flex; gap: 7px; align-items: center; }
+.tender-compact .tender-main h3 { margin: 5px 0 3px; font-size: 12px; color: #2d3a4e; }
+.tender-compact .tender-main p { margin: 0; color: #8a96a5; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tender-budget { flex: 0 0 auto; text-align: right; }.tender-budget strong { color: #2d3a4e; font-size: 13px; }.tender-budget span { display: block; color: #8a96a5; font-size: 9px; margin-top: 2px; }
+.district-bars { padding: 6px 4px; display: grid; gap: 10px; }
+.district-row { display: grid; grid-template-columns: 64px 1fr 44px; gap: 12px; align-items: center; }
+.district-row > span { color: #536074; font-size: 12px; white-space: nowrap; }
+.district-row .progress-track { margin: 0; }
+.district-row strong { color: #2d3a4e; font-size: 12px; text-align: right; }
+.product-tags { padding: 14px 2px 4px; display: flex; flex-wrap: wrap; gap: 8px; }
+.product-tags .tag { font-size: 10px; padding: 5px 10px; }

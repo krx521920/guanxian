@@ -511,3 +511,73 @@ export interface EnterpriseDashboardData {
   matches: EcosystemMatch[]
   todo: Collaboration[]
 }
+
+// 招标信息（管线智联·服贸会新增模块）
+export interface Tender {
+  id: string
+  associationId: string
+  title: string
+  purchaser: string
+  agency: string | null
+  region: string
+  category: string
+  keywords: string[]
+  budget: number
+  publishDate: string
+  deadline: string
+  source: string
+  sourceUrl: string | null
+  status: 'ACTIVE' | 'CLOSED'
+  version: number
+  createdAt: string
+  updatedAt: string
+  pushCount?: number
+  pushedToMe?: boolean
+  relevance?: number
+}
+
+export interface TenderUpsertPayload {
+  title: string
+  purchaser: string
+  agency: string | null
+  region: string
+  category: string
+  keywords: string[]
+  budget: number
+  publishDate: string
+  deadline: string | null
+  source: string
+  sourceUrl: string | null
+  status: string
+}
+
+export interface TenderPush {
+  id: string
+  tenderId: string
+  tenderTitle: string
+  enterpriseId: string
+  enterpriseName: string
+  pushedBySubject: string
+  pushedAt: string
+  status: string
+  version: number
+}
+
+// 会员分布统计（协会工作台可视化）
+export interface DistributionBucket {
+  name: string
+  count: number
+  percent: number
+}
+
+export interface ProductBucket {
+  name: string
+  count: number
+}
+
+export interface MemberDistribution {
+  total: number
+  districts: DistributionBucket[]
+  products: ProductBucket[]
+  categories: DistributionBucket[]
+}

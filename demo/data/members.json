@@ -1,0 +1,3873 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京精锐阀门科技有限公司",
+    "shortName": "精锐阀门",
+    "unifiedSocialCreditCode": "91110114MA0100000A",
+    "category": "设备供应商",
+    "role": "阀门制造供应商",
+    "address": "北京市海淀区中关村街道中关村大街100号",
+    "district": "海淀区",
+    "contactName": "王建",
+    "contactPhone": "13331489484",
+    "introduction": "面向市政管网提供燃气电动阀门与调压设备，具备阀门远程控制与压力试验能力。",
+    "capabilities": [
+      "智能阀门研发制造",
+      "阀门远程控制",
+      "阀门压力试验"
+    ],
+    "products": [
+      "智能燃气阀门",
+      "电动蝶阀",
+      "调压阀",
+      "智能阀门井盖"
+    ],
+    "scenes": [
+      "燃气",
+      "热力",
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 89,
+    "version": 1,
+    "createdAt": "2026-06-05T10:00:00+08:00",
+    "updatedAt": "2026-08-09T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京京龙阀门科技有限公司",
+    "shortName": "京龙阀门",
+    "unifiedSocialCreditCode": "91110114MA0100000H",
+    "category": "设备供应商",
+    "role": "阀门制造供应商",
+    "address": "北京市房山区良乡地区良乡中路101号",
+    "district": "房山区",
+    "contactName": "李建",
+    "contactPhone": "13321909315",
+    "introduction": "专注智能阀门研发制造，产品服务城市燃气热力管网，提供选型安装与维保全周期支持。",
+    "capabilities": [
+      "智能阀门研发制造",
+      "阀门远程控制",
+      "燃气阀门维保"
+    ],
+    "products": [
+      "智能燃气阀门",
+      "电动蝶阀",
+      "调压阀",
+      "智能阀门井盖"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "寻找燃气管道施工单位合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 83,
+    "version": 1,
+    "createdAt": "2026-06-16T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000003",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京华瑞阀门科技有限公司",
+    "shortName": "华瑞阀门",
+    "unifiedSocialCreditCode": "91110114MA0100000Q",
+    "category": "设备供应商",
+    "role": "阀门制造供应商",
+    "address": "北京市东城区东四街道东四北大街102号",
+    "district": "东城区",
+    "contactName": "张建",
+    "contactPhone": "13352991165",
+    "introduction": "面向市政管网提供燃气电动阀门与调压设备，具备阀门远程控制与压力试验能力。",
+    "capabilities": [
+      "智能阀门研发制造",
+      "阀门远程控制",
+      "燃气阀门维保",
+      "阀门压力试验"
+    ],
+    "products": [
+      "智能燃气阀门",
+      "电动蝶阀",
+      "调压阀",
+      "智能阀门井盖"
+    ],
+    "scenes": [
+      "燃气",
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "拓展市政供热项目渠道",
+      "寻找燃气管道施工单位合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 71,
+    "version": 1,
+    "createdAt": "2026-07-20T10:00:00+08:00",
+    "updatedAt": "2026-08-26T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000004",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京金岳阀门科技有限公司",
+    "shortName": "金岳阀门",
+    "unifiedSocialCreditCode": "91110114MA0100000X",
+    "category": "设备供应商",
+    "role": "阀门制造供应商",
+    "address": "北京市昌平区回龙观街道龙泽园路103号",
+    "district": "昌平区",
+    "contactName": "刘建",
+    "contactPhone": "13430145196",
+    "introduction": "专注智能阀门研发制造，产品服务城市燃气热力管网，提供选型安装与维保全周期支持。",
+    "capabilities": [
+      "智能阀门研发制造",
+      "阀门远程控制"
+    ],
+    "products": [
+      "智能燃气阀门",
+      "电动蝶阀",
+      "调压阀",
+      "智能阀门井盖"
+    ],
+    "scenes": [
+      "燃气",
+      "供水",
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "寻找燃气管道施工单位合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 87,
+    "version": 1,
+    "createdAt": "2026-05-05T10:00:00+08:00",
+    "updatedAt": "2026-08-20T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000005",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京瑞泽阀门科技有限公司",
+    "shortName": "瑞泽阀门",
+    "unifiedSocialCreditCode": "91110114MA01000015",
+    "category": "设备供应商",
+    "role": "阀门制造供应商",
+    "address": "北京市大兴区兴丰街道兴丰大街104号",
+    "district": "大兴区",
+    "contactName": "陈建",
+    "contactPhone": "13226543013",
+    "introduction": "面向市政管网提供燃气电动阀门与调压设备，具备阀门远程控制与压力试验能力。",
+    "capabilities": [
+      "智能阀门研发制造",
+      "阀门远程控制",
+      "阀门压力试验"
+    ],
+    "products": [
+      "智能燃气阀门",
+      "电动蝶阀",
+      "调压阀",
+      "智能阀门井盖"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "拓展市政供热项目渠道"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 31,
+    "version": 1,
+    "createdAt": "2026-05-15T10:00:00+08:00",
+    "updatedAt": "2026-08-08T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000006",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京恒顺管业有限公司",
+    "shortName": "恒顺管业",
+    "unifiedSocialCreditCode": "91110114MA0100001C",
+    "category": "材料供应商",
+    "role": "管材生产供应商",
+    "address": "北京市东城区东四街道朝阳门内大街105号",
+    "district": "东城区",
+    "contactName": "杨建",
+    "contactPhone": "13244607549",
+    "introduction": "专业生产PE与球墨铸铁等各类市政管材，产品广泛应用于供水排水燃气工程。",
+    "capabilities": [
+      "PE管材生产",
+      "球墨铸铁管供应",
+      "大口径钢管制造"
+    ],
+    "products": [
+      "PE管材",
+      "球墨铸铁管",
+      "钢塑复合管",
+      "PVC-U排水管"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "对接供水管网改造项目",
+      "寻找排水管网工程分包"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 88,
+    "version": 1,
+    "createdAt": "2026-06-27T10:00:00+08:00",
+    "updatedAt": "2026-08-27T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000007",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京宏泰管业有限公司",
+    "shortName": "宏泰管业",
+    "unifiedSocialCreditCode": "91110114MA0100001K",
+    "category": "材料供应商",
+    "role": "管材生产供应商",
+    "address": "北京市大兴区兴丰街道黄村西大街106号",
+    "district": "大兴区",
+    "contactName": "赵建",
+    "contactPhone": "13534961931",
+    "introduction": "深耕市政管材领域，提供大口径钢管与钢塑复合管供应及配套防腐处理服务。",
+    "capabilities": [
+      "PE管材生产",
+      "球墨铸铁管供应",
+      "管材防腐处理",
+      "大口径钢管制造"
+    ],
+    "products": [
+      "PE管材",
+      "球墨铸铁管",
+      "钢塑复合管",
+      "PVC-U排水管"
+    ],
+    "scenes": [
+      "排水",
+      "供水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "对接供水管网改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 88,
+    "version": 1,
+    "createdAt": "2026-07-04T10:00:00+08:00",
+    "updatedAt": "2026-08-22T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000008",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京泰源管业有限公司",
+    "shortName": "泰源管业",
+    "unifiedSocialCreditCode": "91110114MA0100001S",
+    "category": "材料供应商",
+    "role": "管材生产供应商",
+    "address": "北京市大兴区清源街道清源路107号",
+    "district": "大兴区",
+    "contactName": "黄建",
+    "contactPhone": "13415444560",
+    "introduction": "专业生产PE与球墨铸铁等各类市政管材，产品广泛应用于供水排水燃气工程。",
+    "capabilities": [
+      "PE管材生产",
+      "球墨铸铁管供应",
+      "大口径钢管制造"
+    ],
+    "products": [
+      "PE管材",
+      "球墨铸铁管",
+      "钢塑复合管",
+      "PVC-U排水管"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "寻找排水管网工程分包"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 89,
+    "version": 1,
+    "createdAt": "2026-06-18T10:00:00+08:00",
+    "updatedAt": "2026-08-03T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000009",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京精研管业有限公司",
+    "shortName": "精研管业",
+    "unifiedSocialCreditCode": "91110114MA01000020",
+    "category": "材料供应商",
+    "role": "管材生产供应商",
+    "address": "北京市丰台区方庄街道方庄路108号",
+    "district": "丰台区",
+    "contactName": "周建",
+    "contactPhone": "13825353440",
+    "introduction": "深耕市政管材领域，提供大口径钢管与钢塑复合管供应及配套防腐处理服务。",
+    "capabilities": [
+      "PE管材生产",
+      "球墨铸铁管供应",
+      "大口径钢管制造"
+    ],
+    "products": [
+      "PE管材",
+      "球墨铸铁管",
+      "钢塑复合管",
+      "PVC-U排水管"
+    ],
+    "scenes": [
+      "供水",
+      "排水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找排水管网工程分包",
+      "对接供水管网改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 88,
+    "version": 1,
+    "createdAt": "2026-07-04T10:00:00+08:00",
+    "updatedAt": "2026-08-08T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000010",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京博源管业有限公司",
+    "shortName": "博源管业",
+    "unifiedSocialCreditCode": "91110114MA01000027",
+    "category": "材料供应商",
+    "role": "管材生产供应商",
+    "address": "北京市石景山区鲁谷街道鲁谷路109号",
+    "district": "石景山区",
+    "contactName": "吴建",
+    "contactPhone": "13602461022",
+    "introduction": "专业生产PE与球墨铸铁等各类市政管材，产品广泛应用于供水排水燃气工程。",
+    "capabilities": [
+      "PE管材生产",
+      "球墨铸铁管供应"
+    ],
+    "products": [
+      "PE管材",
+      "球墨铸铁管",
+      "钢塑复合管",
+      "PVC-U排水管"
+    ],
+    "scenes": [
+      "供水",
+      "燃气",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "对接供水管网改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-05-04T10:00:00+08:00",
+    "updatedAt": "2026-08-01T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000011",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京龙川管业有限公司",
+    "shortName": "龙川管业",
+    "unifiedSocialCreditCode": "91110114MA0100002E",
+    "category": "材料供应商",
+    "role": "管材生产供应商",
+    "address": "北京市海淀区中关村街道海淀路110号",
+    "district": "海淀区",
+    "contactName": "徐建",
+    "contactPhone": "13642142506",
+    "introduction": "深耕市政管材领域，提供大口径钢管与钢塑复合管供应及配套防腐处理服务。",
+    "capabilities": [
+      "PE管材生产",
+      "球墨铸铁管供应"
+    ],
+    "products": [
+      "PE管材",
+      "球墨铸铁管",
+      "钢塑复合管",
+      "PVC-U排水管"
+    ],
+    "scenes": [
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 95,
+    "version": 1,
+    "createdAt": "2026-07-13T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000012",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京嘉源管线探测科技有限公司",
+    "shortName": "嘉源探测",
+    "unifiedSocialCreditCode": "91110114MA0100002M",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市房山区拱辰街道拱辰大街111号",
+    "district": "房山区",
+    "contactName": "孙建",
+    "contactPhone": "13644228127",
+    "introduction": "从事地下管线探测与普查，提供管线定位、竣工测量与地下障碍物探查服务。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查",
+      "管线测量报告"
+    ],
+    "scenes": [
+      "电力",
+      "供水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找综合管廊测绘合作",
+      "承接市政管网普查项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 80,
+    "version": 1,
+    "createdAt": "2026-05-03T10:00:00+08:00",
+    "updatedAt": "2026-08-28T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000013",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京天泽管线探测科技有限公司",
+    "shortName": "天泽探测",
+    "unifiedSocialCreditCode": "91110114MA0100002U",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市昌平区回龙观街道育知东路112号",
+    "district": "昌平区",
+    "contactName": "马建",
+    "contactPhone": "13817444161",
+    "introduction": "专注城市地下管网普查测绘，为管线建设与运维提供精准空间数据支撑。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位",
+      "地下障碍物探查",
+      "管线竣工测量"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查",
+      "管线测量报告"
+    ],
+    "scenes": [
+      "燃气",
+      "电力"
+    ],
+    "cooperationNeeds": [
+      "寻找综合管廊测绘合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-07-01T10:00:00+08:00",
+    "updatedAt": "2026-08-01T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000014",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京益通管线探测科技有限公司",
+    "shortName": "益通探测",
+    "unifiedSocialCreditCode": "91110114MA01000032",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市顺义区胜利街道站前街113号",
+    "district": "顺义区",
+    "contactName": "朱建",
+    "contactPhone": "13960427324",
+    "introduction": "从事地下管线探测与普查，提供管线定位、竣工测量与地下障碍物探查服务。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位",
+      "地下障碍物探查",
+      "管线竣工测量"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查",
+      "管线测量报告"
+    ],
+    "scenes": [
+      "电力",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "承接市政管网普查项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 98,
+    "version": 1,
+    "createdAt": "2026-07-10T10:00:00+08:00",
+    "updatedAt": "2026-08-18T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000015",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京联泰管线探测科技有限公司",
+    "shortName": "联泰探测",
+    "unifiedSocialCreditCode": "91110114MA01000039",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市房山区城关街道房山东大街114号",
+    "district": "房山区",
+    "contactName": "胡建",
+    "contactPhone": "13502780152",
+    "introduction": "专注城市地下管网普查测绘，为管线建设与运维提供精准空间数据支撑。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位",
+      "管线竣工测量",
+      "地下障碍物探查"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查",
+      "管线测量报告"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找综合管廊测绘合作",
+      "承接市政管网普查项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 85,
+    "version": 1,
+    "createdAt": "2026-07-23T10:00:00+08:00",
+    "updatedAt": "2026-08-19T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000016",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京凯旋管线探测科技有限公司",
+    "shortName": "凯旋探测",
+    "unifiedSocialCreditCode": "91110114MA0100003G",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市海淀区学院路街道学院路115号",
+    "district": "海淀区",
+    "contactName": "郭建",
+    "contactPhone": "13753913904",
+    "introduction": "从事地下管线探测与普查，提供管线定位、竣工测量与地下障碍物探查服务。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位",
+      "管线竣工测量"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查",
+      "管线测量报告"
+    ],
+    "scenes": [
+      "燃气",
+      "排水",
+      "电力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 91,
+    "version": 1,
+    "createdAt": "2026-07-13T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000017",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京明辉管线探测科技有限公司",
+    "shortName": "明辉探测",
+    "unifiedSocialCreditCode": "91110114MA0100003P",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市丰台区方庄街道芳城路116号",
+    "district": "丰台区",
+    "contactName": "何建",
+    "contactPhone": "13066947434",
+    "introduction": "专注城市地下管网普查测绘，为管线建设与运维提供精准空间数据支撑。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位",
+      "地下障碍物探查",
+      "管线竣工测量"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查",
+      "管线测量报告"
+    ],
+    "scenes": [
+      "燃气",
+      "电力"
+    ],
+    "cooperationNeeds": [
+      "寻找综合管廊测绘合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 76,
+    "version": 1,
+    "createdAt": "2026-05-14T10:00:00+08:00",
+    "updatedAt": "2026-08-10T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000018",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京蓝海管线探测科技有限公司",
+    "shortName": "蓝海探测",
+    "unifiedSocialCreditCode": "91110114MA0100003W",
+    "category": "技术服务商",
+    "role": "管线探测服务商",
+    "address": "北京市通州区梨园镇九棵树东路117号",
+    "district": "通州区",
+    "contactName": "高建",
+    "contactPhone": "13997796703",
+    "introduction": "从事地下管线探测与普查，提供管线定位、竣工测量与地下障碍物探查服务。",
+    "capabilities": [
+      "地下管线探测",
+      "管道定位",
+      "管线竣工测量"
+    ],
+    "products": [
+      "管线探测服务",
+      "地下管网普查"
+    ],
+    "scenes": [
+      "电力",
+      "排水",
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "承接市政管网普查项目",
+      "寻找综合管廊测绘合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 46,
+    "version": 1,
+    "createdAt": "2026-05-09T10:00:00+08:00",
+    "updatedAt": "2026-08-14T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000019",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京厚土测绘科技有限公司",
+    "shortName": "厚土测绘",
+    "unifiedSocialCreditCode": "91110114MA01000044",
+    "category": "技术服务商",
+    "role": "测绘地理信息服务商",
+    "address": "北京市丰台区卢沟桥街道卢沟桥路118号",
+    "district": "丰台区",
+    "contactName": "林建",
+    "contactPhone": "13248121187",
+    "introduction": "专注测绘地理信息领域，为市政道路与综合管廊提供高精度测量与三维建模。",
+    "capabilities": [
+      "工程测量",
+      "地籍测绘",
+      "地下空间测绘"
+    ],
+    "products": [
+      "测绘服务",
+      "三维建模",
+      "地理信息数据处理"
+    ],
+    "scenes": [
+      "综合管廊"
+    ],
+    "cooperationNeeds": [
+      "承接城市地下空间测绘项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 80,
+    "version": 1,
+    "createdAt": "2026-07-05T10:00:00+08:00",
+    "updatedAt": "2026-08-02T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000020",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京长河测绘科技有限公司",
+    "shortName": "长河测绘",
+    "unifiedSocialCreditCode": "91110114MA0100004B",
+    "category": "技术服务商",
+    "role": "测绘地理信息服务商",
+    "address": "北京市顺义区胜利街道光明南街119号",
+    "district": "顺义区",
+    "contactName": "罗建",
+    "contactPhone": "13901129924",
+    "introduction": "提供工程测量与地籍测绘服务，擅长三维激光扫描与城市地下空间测绘。",
+    "capabilities": [
+      "工程测量",
+      "地籍测绘",
+      "三维激光扫描"
+    ],
+    "products": [
+      "测绘服务",
+      "三维建模",
+      "地理信息数据处理"
+    ],
+    "scenes": [
+      "电力",
+      "综合管廊",
+      "道路"
+    ],
+    "cooperationNeeds": [
+      "承接城市地下空间测绘项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 85,
+    "version": 1,
+    "createdAt": "2026-07-25T10:00:00+08:00",
+    "updatedAt": "2026-08-22T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000021",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京华辰测绘科技有限公司",
+    "shortName": "华辰测绘",
+    "unifiedSocialCreditCode": "91110114MA0100004J",
+    "category": "技术服务商",
+    "role": "测绘地理信息服务商",
+    "address": "北京市昌平区回龙观街道回南北路120号",
+    "district": "昌平区",
+    "contactName": "郑建",
+    "contactPhone": "13900501865",
+    "introduction": "专注测绘地理信息领域，为市政道路与综合管廊提供高精度测量与三维建模。",
+    "capabilities": [
+      "工程测量",
+      "地籍测绘",
+      "地下空间测绘",
+      "三维激光扫描"
+    ],
+    "products": [
+      "测绘服务",
+      "三维建模",
+      "地理信息数据处理"
+    ],
+    "scenes": [
+      "电力"
+    ],
+    "cooperationNeeds": [
+      "承接城市地下空间测绘项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 93,
+    "version": 1,
+    "createdAt": "2026-06-28T10:00:00+08:00",
+    "updatedAt": "2026-08-15T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000022",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京金鼎测绘科技有限公司",
+    "shortName": "金鼎测绘",
+    "unifiedSocialCreditCode": "91110114MA0100004R",
+    "category": "技术服务商",
+    "role": "测绘地理信息服务商",
+    "address": "北京市海淀区学院路街道成府路121号",
+    "district": "海淀区",
+    "contactName": "梁建",
+    "contactPhone": "13785744937",
+    "introduction": "提供工程测量与地籍测绘服务，擅长三维激光扫描与城市地下空间测绘。",
+    "capabilities": [
+      "工程测量",
+      "地籍测绘",
+      "三维激光扫描"
+    ],
+    "products": [
+      "测绘服务",
+      "三维建模",
+      "地理信息数据处理"
+    ],
+    "scenes": [
+      "综合管廊",
+      "电力",
+      "道路"
+    ],
+    "cooperationNeeds": [
+      "承接城市地下空间测绘项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 83,
+    "version": 1,
+    "createdAt": "2026-06-15T10:00:00+08:00",
+    "updatedAt": "2026-08-13T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000023",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京银海测绘科技有限公司",
+    "shortName": "银海测绘",
+    "unifiedSocialCreditCode": "91110114MA0100004Y",
+    "category": "技术服务商",
+    "role": "测绘地理信息服务商",
+    "address": "北京市丰台区卢沟桥街道丰台北路122号",
+    "district": "丰台区",
+    "contactName": "谢建",
+    "contactPhone": "13608740735",
+    "introduction": "专注测绘地理信息领域，为市政道路与综合管廊提供高精度测量与三维建模。",
+    "capabilities": [
+      "工程测量",
+      "地籍测绘"
+    ],
+    "products": [
+      "测绘服务",
+      "三维建模",
+      "地理信息数据处理"
+    ],
+    "scenes": [
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 31,
+    "version": 1,
+    "createdAt": "2026-07-06T10:00:00+08:00",
+    "updatedAt": "2026-08-13T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000024",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京中岳检测科技有限公司",
+    "shortName": "中岳检测",
+    "unifiedSocialCreditCode": "91110114MA01000056",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市怀柔区龙山街道南大街123号",
+    "district": "怀柔区",
+    "contactName": "宋建",
+    "contactPhone": "13816660318",
+    "introduction": "提供管道CCTV检测与腐蚀评估，开展供水漏水与燃气泄漏检测并出具健康评估报告。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 87,
+    "version": 1,
+    "createdAt": "2026-06-10T10:00:00+08:00",
+    "updatedAt": "2026-08-10T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000025",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京远航检测科技有限公司",
+    "shortName": "远航检测",
+    "unifiedSocialCreditCode": "91110114MA0100005D",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市朝阳区望京街道望京街124号",
+    "district": "朝阳区",
+    "contactName": "唐建",
+    "contactPhone": "13120252767",
+    "introduction": "专注管网检测评估，覆盖排水供水燃气管道的无损检测与安全评估。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "燃气",
+      "排水",
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 97,
+    "version": 1,
+    "createdAt": "2026-06-24T10:00:00+08:00",
+    "updatedAt": "2026-08-14T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000026",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京恒义检测科技有限公司",
+    "shortName": "恒义检测",
+    "unifiedSocialCreditCode": "91110114MA0100005L",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市朝阳区望京街道阜通东大街125号",
+    "district": "朝阳区",
+    "contactName": "许建",
+    "contactPhone": "13194120707",
+    "introduction": "提供管道CCTV检测与腐蚀评估，开展供水漏水与燃气泄漏检测并出具健康评估报告。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估",
+      "漏水检测"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "排水",
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "寻找燃气泄漏检测分包",
+      "对接排水管网检测评估项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 93,
+    "version": 1,
+    "createdAt": "2026-07-11T10:00:00+08:00",
+    "updatedAt": "2026-08-18T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000027",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京德盛检测科技有限公司",
+    "shortName": "德盛检测",
+    "unifiedSocialCreditCode": "91110114MA0100005T",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市大兴区清源街道兴业大街126号",
+    "district": "大兴区",
+    "contactName": "韩建",
+    "contactPhone": "13825954415",
+    "introduction": "专注管网检测评估，覆盖排水供水燃气管道的无损检测与安全评估。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估",
+      "漏水检测",
+      "燃气泄漏检测"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "燃气",
+      "供水",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 87,
+    "version": 1,
+    "createdAt": "2026-06-04T10:00:00+08:00",
+    "updatedAt": "2026-08-28T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000028",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京天力检测科技有限公司",
+    "shortName": "天力检测",
+    "unifiedSocialCreditCode": "91110114MA01000061",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市密云区果园街道果园西路127号",
+    "district": "密云区",
+    "contactName": "冯建",
+    "contactPhone": "13086517282",
+    "introduction": "提供管道CCTV检测与腐蚀评估，开展供水漏水与燃气泄漏检测并出具健康评估报告。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "燃气",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "对接排水管网检测评估项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 100,
+    "version": 1,
+    "createdAt": "2026-07-12T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000029",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京宏正检测科技有限公司",
+    "shortName": "宏正检测",
+    "unifiedSocialCreditCode": "91110114MA01000068",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市海淀区上地街道信息路128号",
+    "district": "海淀区",
+    "contactName": "邓建",
+    "contactPhone": "13870581193",
+    "introduction": "专注管网检测评估，覆盖排水供水燃气管道的无损检测与安全评估。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估",
+      "漏水检测"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找燃气泄漏检测分包"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 86,
+    "version": 1,
+    "createdAt": "2026-05-03T10:00:00+08:00",
+    "updatedAt": "2026-08-19T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000030",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京广聚检测科技有限公司",
+    "shortName": "广聚检测",
+    "unifiedSocialCreditCode": "91110114MA0100006F",
+    "category": "检测监测机构",
+    "role": "管道检测评估机构",
+    "address": "北京市昌平区回龙观街道文华东路129号",
+    "district": "昌平区",
+    "contactName": "曹建",
+    "contactPhone": "13788568110",
+    "introduction": "提供管道CCTV检测与腐蚀评估，开展供水漏水与燃气泄漏检测并出具健康评估报告。",
+    "capabilities": [
+      "CCTV管道检测",
+      "管道腐蚀评估",
+      "燃气泄漏检测",
+      "漏水检测"
+    ],
+    "products": [
+      "CCTV检测服务",
+      "管道健康评估报告",
+      "漏水检测服务"
+    ],
+    "scenes": [
+      "供水",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "对接排水管网检测评估项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-06-18T10:00:00+08:00",
+    "updatedAt": "2026-08-19T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000031",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京通衢管道工程有限公司",
+    "shortName": "通衢工程",
+    "unifiedSocialCreditCode": "91110114MA0100006N",
+    "category": "工程服务商",
+    "role": "非开挖修复服务商",
+    "address": "北京市昌平区回龙观街道龙禧二街130号",
+    "district": "昌平区",
+    "contactName": "彭建",
+    "contactPhone": "13123078345",
+    "introduction": "专注老旧管网非开挖更新，提供管道内衬修复与顶管施工一体化服务。",
+    "capabilities": [
+      "非开挖修复",
+      "CIPP翻转内衬"
+    ],
+    "products": [
+      "CIPP内衬修复",
+      "管道顶管施工",
+      "水平定向钻施工"
+    ],
+    "scenes": [
+      "排水",
+      "燃气",
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 96,
+    "version": 1,
+    "createdAt": "2026-05-28T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000032",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京兴华管道工程有限公司",
+    "shortName": "兴华工程",
+    "unifiedSocialCreditCode": "91110114MA0100006V",
+    "category": "工程服务商",
+    "role": "非开挖修复服务商",
+    "address": "北京市西城区德胜街道德胜门外大街131号",
+    "district": "西城区",
+    "contactName": "曾建",
+    "contactPhone": "13178832231",
+    "introduction": "从事管道非开挖修复，掌握CIPP翻转内衬、顶管与水平定向钻等核心技术。",
+    "capabilities": [
+      "非开挖修复",
+      "CIPP翻转内衬",
+      "管道顶管施工"
+    ],
+    "products": [
+      "CIPP内衬修复",
+      "管道顶管施工",
+      "水平定向钻施工"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "承接老旧管网非开挖修复工程",
+      "寻找CIPP材料供应商"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 58,
+    "version": 1,
+    "createdAt": "2026-05-11T10:00:00+08:00",
+    "updatedAt": "2026-08-04T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000033",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京华衢管道工程有限公司",
+    "shortName": "华衢工程",
+    "unifiedSocialCreditCode": "91110114MA01000073",
+    "category": "工程服务商",
+    "role": "非开挖修复服务商",
+    "address": "北京市朝阳区奥运村街道北辰东路132号",
+    "district": "朝阳区",
+    "contactName": "肖建",
+    "contactPhone": "13737049672",
+    "introduction": "专注老旧管网非开挖更新，提供管道内衬修复与顶管施工一体化服务。",
+    "capabilities": [
+      "非开挖修复",
+      "CIPP翻转内衬"
+    ],
+    "products": [
+      "CIPP内衬修复",
+      "管道顶管施工",
+      "水平定向钻施工"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "寻找CIPP材料供应商",
+      "承接老旧管网非开挖修复工程"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 92,
+    "version": 1,
+    "createdAt": "2026-05-21T10:00:00+08:00",
+    "updatedAt": "2026-08-16T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000034",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京富泽管道工程有限公司",
+    "shortName": "富泽工程",
+    "unifiedSocialCreditCode": "91110114MA0100007A",
+    "category": "工程服务商",
+    "role": "非开挖修复服务商",
+    "address": "北京市昌平区天通苑北街道天通苑北街133号",
+    "district": "昌平区",
+    "contactName": "田建",
+    "contactPhone": "13021431304",
+    "introduction": "从事管道非开挖修复，掌握CIPP翻转内衬、顶管与水平定向钻等核心技术。",
+    "capabilities": [
+      "非开挖修复",
+      "CIPP翻转内衬",
+      "管道顶管施工",
+      "水平定向钻"
+    ],
+    "products": [
+      "CIPP内衬修复",
+      "管道顶管施工",
+      "水平定向钻施工"
+    ],
+    "scenes": [
+      "供水",
+      "燃气",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "寻找CIPP材料供应商"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 91,
+    "version": 1,
+    "createdAt": "2026-05-28T10:00:00+08:00",
+    "updatedAt": "2026-08-11T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000035",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京永泰管道工程有限公司",
+    "shortName": "永泰工程",
+    "unifiedSocialCreditCode": "91110114MA0100007H",
+    "category": "工程服务商",
+    "role": "非开挖修复服务商",
+    "address": "北京市通州区梨园镇梨园南街134号",
+    "district": "通州区",
+    "contactName": "董建",
+    "contactPhone": "13044949954",
+    "introduction": "专注老旧管网非开挖更新，提供管道内衬修复与顶管施工一体化服务。",
+    "capabilities": [
+      "非开挖修复",
+      "CIPP翻转内衬",
+      "管道顶管施工"
+    ],
+    "products": [
+      "CIPP内衬修复",
+      "管道顶管施工",
+      "水平定向钻施工"
+    ],
+    "scenes": [
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "承接老旧管网非开挖修复工程"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 86,
+    "version": 1,
+    "createdAt": "2026-05-25T10:00:00+08:00",
+    "updatedAt": "2026-08-06T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000036",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京安顺管道工程有限公司",
+    "shortName": "安顺工程",
+    "unifiedSocialCreditCode": "91110114MA0100007Q",
+    "category": "工程服务商",
+    "role": "非开挖修复服务商",
+    "address": "北京市丰台区新村街道南四环西路135号",
+    "district": "丰台区",
+    "contactName": "潘建",
+    "contactPhone": "13260937204",
+    "introduction": "从事管道非开挖修复，掌握CIPP翻转内衬、顶管与水平定向钻等核心技术。",
+    "capabilities": [
+      "非开挖修复",
+      "CIPP翻转内衬",
+      "管道顶管施工"
+    ],
+    "products": [
+      "CIPP内衬修复",
+      "管道顶管施工"
+    ],
+    "scenes": [
+      "燃气",
+      "排水",
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 83,
+    "version": 1,
+    "createdAt": "2026-07-17T10:00:00+08:00",
+    "updatedAt": "2026-08-05T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000037",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京康达防腐保温工程有限公司",
+    "shortName": "康达保温",
+    "unifiedSocialCreditCode": "91110114MA0100007X",
+    "category": "材料供应商",
+    "role": "管道防腐保温服务商",
+    "address": "北京市昌平区天通苑北街道立汤路136号",
+    "district": "昌平区",
+    "contactName": "袁建",
+    "contactPhone": "13381180979",
+    "introduction": "专注管道防腐保温材料供应与施工，保障市政管网节能并延长使用寿命。",
+    "capabilities": [
+      "管道防腐处理",
+      "聚氨酯保温",
+      "阴极保护",
+      "保温层修复"
+    ],
+    "products": [
+      "聚氨酯保温管",
+      "防腐涂料",
+      "阴极保护设备"
+    ],
+    "scenes": [
+      "燃气",
+      "热力",
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "对接热力管网保温改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 66,
+    "version": 1,
+    "createdAt": "2026-05-24T10:00:00+08:00",
+    "updatedAt": "2026-08-03T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000038",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京顺泽防腐保温工程有限公司",
+    "shortName": "顺泽保温",
+    "unifiedSocialCreditCode": "91110114MA01000085",
+    "category": "材料供应商",
+    "role": "管道防腐保温服务商",
+    "address": "北京市昌平区天通苑北街道太平庄中二街137号",
+    "district": "昌平区",
+    "contactName": "蔡建",
+    "contactPhone": "13595782348",
+    "introduction": "提供管道防腐与聚氨酯保温服务，服务热力燃气管网的保温层修复与阴极保护。",
+    "capabilities": [
+      "管道防腐处理",
+      "聚氨酯保温",
+      "保温层修复"
+    ],
+    "products": [
+      "聚氨酯保温管",
+      "防腐涂料",
+      "阴极保护设备"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 45,
+    "version": 1,
+    "createdAt": "2026-05-09T10:00:00+08:00",
+    "updatedAt": "2026-08-25T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000039",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京齐力防腐保温工程有限公司",
+    "shortName": "齐力保温",
+    "unifiedSocialCreditCode": "91110114MA0100008C",
+    "category": "材料供应商",
+    "role": "管道防腐保温服务商",
+    "address": "北京市昌平区天通苑南街道天通苑南街138号",
+    "district": "昌平区",
+    "contactName": "蒋建",
+    "contactPhone": "13996606551",
+    "introduction": "专注管道防腐保温材料供应与施工，保障市政管网节能并延长使用寿命。",
+    "capabilities": [
+      "管道防腐处理",
+      "聚氨酯保温",
+      "保温层修复",
+      "阴极保护"
+    ],
+    "products": [
+      "聚氨酯保温管",
+      "防腐涂料",
+      "阴极保护设备"
+    ],
+    "scenes": [
+      "供水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "对接热力管网保温改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 95,
+    "version": 1,
+    "createdAt": "2026-06-08T10:00:00+08:00",
+    "updatedAt": "2026-08-10T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000040",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京合源防腐保温工程有限公司",
+    "shortName": "合源保温",
+    "unifiedSocialCreditCode": "91110114MA0100008K",
+    "category": "材料供应商",
+    "role": "管道防腐保温服务商",
+    "address": "北京市朝阳区奥运村街道安立路139号",
+    "district": "朝阳区",
+    "contactName": "余建",
+    "contactPhone": "13857078386",
+    "introduction": "提供管道防腐与聚氨酯保温服务，服务热力燃气管网的保温层修复与阴极保护。",
+    "capabilities": [
+      "管道防腐处理",
+      "聚氨酯保温",
+      "阴极保护",
+      "保温层修复"
+    ],
+    "products": [
+      "聚氨酯保温管",
+      "防腐涂料",
+      "阴极保护设备"
+    ],
+    "scenes": [
+      "热力",
+      "供水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "对接热力管网保温改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 94,
+    "version": 1,
+    "createdAt": "2026-07-08T10:00:00+08:00",
+    "updatedAt": "2026-08-27T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000041",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京众诚防腐保温工程有限公司",
+    "shortName": "众诚保温",
+    "unifiedSocialCreditCode": "91110114MA0100008S",
+    "category": "材料供应商",
+    "role": "管道防腐保温服务商",
+    "address": "北京市朝阳区劲松街道劲松路140号",
+    "district": "朝阳区",
+    "contactName": "王国",
+    "contactPhone": "13934850331",
+    "introduction": "专注管道防腐保温材料供应与施工，保障市政管网节能并延长使用寿命。",
+    "capabilities": [
+      "管道防腐处理",
+      "聚氨酯保温",
+      "保温层修复",
+      "阴极保护"
+    ],
+    "products": [
+      "聚氨酯保温管",
+      "防腐涂料",
+      "阴极保护设备"
+    ],
+    "scenes": [
+      "燃气",
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 82,
+    "version": 1,
+    "createdAt": "2026-07-20T10:00:00+08:00",
+    "updatedAt": "2026-08-15T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000042",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京泰宁市政设备科技有限公司",
+    "shortName": "泰宁市政",
+    "unifiedSocialCreditCode": "91110114MA01000090",
+    "category": "设备供应商",
+    "role": "智能井盖供应商",
+    "address": "北京市平谷区兴谷街道新平北路141号",
+    "district": "平谷区",
+    "contactName": "李国",
+    "contactPhone": "13684583410",
+    "introduction": "研发制造智能井盖与复合材料井盖，提供井盖位移监测与防盗解决方案。",
+    "capabilities": [
+      "智能井盖研发",
+      "井盖防盗锁",
+      "复合材料井盖制造",
+      "井盖位移监测"
+    ],
+    "products": [
+      "智能井盖",
+      "复合材料井盖",
+      "球墨铸铁井盖"
+    ],
+    "scenes": [
+      "排水",
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 73,
+    "version": 1,
+    "createdAt": "2026-05-22T10:00:00+08:00",
+    "updatedAt": "2026-08-21T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000043",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京万泽市政设备科技有限公司",
+    "shortName": "万泽市政",
+    "unifiedSocialCreditCode": "91110114MA01000097",
+    "category": "设备供应商",
+    "role": "智能井盖供应商",
+    "address": "北京市石景山区鲁谷街道银河南街142号",
+    "district": "石景山区",
+    "contactName": "张国",
+    "contactPhone": "13440661519",
+    "introduction": "专注市政井盖研发生产，产品覆盖球墨铸铁与复合材料井盖，助力道路安全。",
+    "capabilities": [
+      "智能井盖研发",
+      "井盖防盗锁",
+      "井盖位移监测",
+      "复合材料井盖制造"
+    ],
+    "products": [
+      "智能井盖",
+      "复合材料井盖",
+      "球墨铸铁井盖"
+    ],
+    "scenes": [
+      "供水",
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 86,
+    "version": 1,
+    "createdAt": "2026-06-07T10:00:00+08:00",
+    "updatedAt": "2026-08-09T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000044",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京中盛市政设备科技有限公司",
+    "shortName": "中盛市政",
+    "unifiedSocialCreditCode": "91110114MA0100009E",
+    "category": "设备供应商",
+    "role": "智能井盖供应商",
+    "address": "北京市昌平区天通苑南街道太平庄中街143号",
+    "district": "昌平区",
+    "contactName": "刘国",
+    "contactPhone": "13568944112",
+    "introduction": "研发制造智能井盖与复合材料井盖，提供井盖位移监测与防盗解决方案。",
+    "capabilities": [
+      "智能井盖研发",
+      "井盖防盗锁",
+      "复合材料井盖制造",
+      "井盖位移监测"
+    ],
+    "products": [
+      "智能井盖",
+      "复合材料井盖",
+      "球墨铸铁井盖"
+    ],
+    "scenes": [
+      "供水",
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-05-25T10:00:00+08:00",
+    "updatedAt": "2026-08-09T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000045",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京华烁市政设备科技有限公司",
+    "shortName": "华烁市政",
+    "unifiedSocialCreditCode": "91110114MA0100009M",
+    "category": "设备供应商",
+    "role": "智能井盖供应商",
+    "address": "北京市昌平区天通苑南街道立水桥东一路144号",
+    "district": "昌平区",
+    "contactName": "陈国",
+    "contactPhone": "13496413919",
+    "introduction": "专注市政井盖研发生产，产品覆盖球墨铸铁与复合材料井盖，助力道路安全。",
+    "capabilities": [
+      "智能井盖研发",
+      "井盖防盗锁",
+      "复合材料井盖制造"
+    ],
+    "products": [
+      "智能井盖",
+      "复合材料井盖",
+      "球墨铸铁井盖"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "对接市政井盖更换项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 89,
+    "version": 1,
+    "createdAt": "2026-06-13T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000046",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京光正市政设备科技有限公司",
+    "shortName": "光正市政",
+    "unifiedSocialCreditCode": "91110114MA0100009U",
+    "category": "设备供应商",
+    "role": "智能井盖供应商",
+    "address": "北京市门头沟区大峪街道新桥大街145号",
+    "district": "门头沟区",
+    "contactName": "杨国",
+    "contactPhone": "13351399270",
+    "introduction": "研发制造智能井盖与复合材料井盖，提供井盖位移监测与防盗解决方案。",
+    "capabilities": [
+      "智能井盖研发",
+      "井盖防盗锁"
+    ],
+    "products": [
+      "智能井盖",
+      "复合材料井盖"
+    ],
+    "scenes": [
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 76,
+    "version": 1,
+    "createdAt": "2026-06-05T10:00:00+08:00",
+    "updatedAt": "2026-08-21T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000047",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京金海监测设备科技有限公司",
+    "shortName": "金海监测",
+    "unifiedSocialCreditCode": "91110114MA010000A2",
+    "category": "设备供应商",
+    "role": "管网监测设备供应商",
+    "address": "北京市昌平区霍营街道霍营西路146号",
+    "district": "昌平区",
+    "contactName": "赵国",
+    "contactPhone": "13876608100",
+    "introduction": "专注管网监测终端研发，为供水燃气热力管网提供在线监测与预警硬件。",
+    "capabilities": [
+      "传感器研发",
+      "管网在线监测",
+      "压力流量监测"
+    ],
+    "products": [
+      "压力传感器",
+      "流量计",
+      "液位传感器",
+      "管网监测终端"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找智慧水务平台集成合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "DISABLED",
+    "completeness": 66,
+    "version": 1,
+    "createdAt": "2026-06-13T10:00:00+08:00",
+    "updatedAt": "2026-08-11T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000048",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京银桥监测设备科技有限公司",
+    "shortName": "银桥监测",
+    "unifiedSocialCreditCode": "91110114MA010000A9",
+    "category": "设备供应商",
+    "role": "管网监测设备供应商",
+    "address": "北京市顺义区石园街道石园西大街147号",
+    "district": "顺义区",
+    "contactName": "黄国",
+    "contactPhone": "13272242200",
+    "introduction": "研发管网在线监测设备，提供压力流量液位传感器与数据采集传输方案。",
+    "capabilities": [
+      "传感器研发",
+      "管网在线监测",
+      "数据采集传输"
+    ],
+    "products": [
+      "压力传感器",
+      "流量计",
+      "液位传感器",
+      "管网监测终端"
+    ],
+    "scenes": [
+      "供水",
+      "综合管廊",
+      "热力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 93,
+    "version": 1,
+    "createdAt": "2026-06-01T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000049",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京中研监测设备科技有限公司",
+    "shortName": "中研监测",
+    "unifiedSocialCreditCode": "91110114MA010000AG",
+    "category": "设备供应商",
+    "role": "管网监测设备供应商",
+    "address": "北京市大兴区荣华街道荣华中路148号",
+    "district": "大兴区",
+    "contactName": "周国",
+    "contactPhone": "13764789431",
+    "introduction": "专注管网监测终端研发，为供水燃气热力管网提供在线监测与预警硬件。",
+    "capabilities": [
+      "传感器研发",
+      "管网在线监测"
+    ],
+    "products": [
+      "压力传感器",
+      "流量计",
+      "液位传感器",
+      "管网监测终端"
+    ],
+    "scenes": [
+      "热力",
+      "综合管廊"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 98,
+    "version": 1,
+    "createdAt": "2026-07-05T10:00:00+08:00",
+    "updatedAt": "2026-08-03T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000050",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京博瑞监测设备科技有限公司",
+    "shortName": "博瑞监测",
+    "unifiedSocialCreditCode": "91110114MA010000AP",
+    "category": "设备供应商",
+    "role": "管网监测设备供应商",
+    "address": "北京市房山区城关街道城关北大街149号",
+    "district": "房山区",
+    "contactName": "吴国",
+    "contactPhone": "13137832748",
+    "introduction": "研发管网在线监测设备，提供压力流量液位传感器与数据采集传输方案。",
+    "capabilities": [
+      "传感器研发",
+      "管网在线监测",
+      "数据采集传输",
+      "压力流量监测"
+    ],
+    "products": [
+      "压力传感器",
+      "流量计",
+      "液位传感器",
+      "管网监测终端"
+    ],
+    "scenes": [
+      "供水",
+      "综合管廊",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找智慧水务平台集成合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 95,
+    "version": 1,
+    "createdAt": "2026-07-16T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000051",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京睿智监测设备科技有限公司",
+    "shortName": "睿智监测",
+    "unifiedSocialCreditCode": "91110114MA010000AW",
+    "category": "设备供应商",
+    "role": "管网监测设备供应商",
+    "address": "北京市昌平区霍营街道龙锦三街150号",
+    "district": "昌平区",
+    "contactName": "徐国",
+    "contactPhone": "13409732327",
+    "introduction": "专注管网监测终端研发，为供水燃气热力管网提供在线监测与预警硬件。",
+    "capabilities": [
+      "传感器研发",
+      "管网在线监测"
+    ],
+    "products": [
+      "压力传感器",
+      "流量计",
+      "液位传感器",
+      "管网监测终端"
+    ],
+    "scenes": [
+      "燃气",
+      "综合管廊"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 86,
+    "version": 1,
+    "createdAt": "2026-05-09T10:00:00+08:00",
+    "updatedAt": "2026-08-11T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000052",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京卓越智能科技有限公司",
+    "shortName": "卓越智能",
+    "unifiedSocialCreditCode": "91110114MA010000B4",
+    "category": "设备供应商",
+    "role": "巡检机器人供应商",
+    "address": "北京市石景山区八角街道八角西街151号",
+    "district": "石景山区",
+    "contactName": "孙国",
+    "contactPhone": "13950923872",
+    "introduction": "研发管道巡检机器人，提供CCTV爬行器与缺陷自动识别服务，降低人工下井风险。",
+    "capabilities": [
+      "管道巡检机器人研发",
+      "爬行器检测",
+      "机器人定位导航",
+      "缺陷识别"
+    ],
+    "products": [
+      "管道巡检机器人",
+      "CCTV爬行器",
+      "机器人巡检服务"
+    ],
+    "scenes": [
+      "排水",
+      "供水",
+      "综合管廊"
+    ],
+    "cooperationNeeds": [
+      "拓展排水管网巡检市场"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 91,
+    "version": 1,
+    "createdAt": "2026-07-11T10:00:00+08:00",
+    "updatedAt": "2026-08-10T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000053",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京隆泰智能科技有限公司",
+    "shortName": "隆泰智能",
+    "unifiedSocialCreditCode": "91110114MA010000BB",
+    "category": "设备供应商",
+    "role": "巡检机器人供应商",
+    "address": "北京市通州区北苑街道新华西街152号",
+    "district": "通州区",
+    "contactName": "马国",
+    "contactPhone": "13630440656",
+    "introduction": "专注排水管道巡检机器人研发，实现管内缺陷检测与定位导航一体化。",
+    "capabilities": [
+      "管道巡检机器人研发",
+      "爬行器检测",
+      "机器人定位导航",
+      "缺陷识别"
+    ],
+    "products": [
+      "管道巡检机器人",
+      "CCTV爬行器",
+      "机器人巡检服务"
+    ],
+    "scenes": [
+      "供水",
+      "综合管廊",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 85,
+    "version": 1,
+    "createdAt": "2026-06-12T10:00:00+08:00",
+    "updatedAt": "2026-08-02T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000054",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京恒基智能科技有限公司",
+    "shortName": "恒基智能",
+    "unifiedSocialCreditCode": "91110114MA010000BJ",
+    "category": "设备供应商",
+    "role": "巡检机器人供应商",
+    "address": "北京市昌平区霍营街道科星西路153号",
+    "district": "昌平区",
+    "contactName": "朱国",
+    "contactPhone": "13690882058",
+    "introduction": "研发管道巡检机器人，提供CCTV爬行器与缺陷自动识别服务，降低人工下井风险。",
+    "capabilities": [
+      "管道巡检机器人研发",
+      "爬行器检测",
+      "缺陷识别"
+    ],
+    "products": [
+      "管道巡检机器人",
+      "CCTV爬行器",
+      "机器人巡检服务"
+    ],
+    "scenes": [
+      "供水",
+      "综合管廊",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-07-02T10:00:00+08:00",
+    "updatedAt": "2026-08-13T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000055",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京伟业智能科技有限公司",
+    "shortName": "伟业智能",
+    "unifiedSocialCreditCode": "91110114MA010000BR",
+    "category": "设备供应商",
+    "role": "巡检机器人供应商",
+    "address": "北京市海淀区上地街道创业路154号",
+    "district": "海淀区",
+    "contactName": "胡国",
+    "contactPhone": "13827793568",
+    "introduction": "专注排水管道巡检机器人研发，实现管内缺陷检测与定位导航一体化。",
+    "capabilities": [
+      "管道巡检机器人研发",
+      "爬行器检测"
+    ],
+    "products": [
+      "管道巡检机器人",
+      "CCTV爬行器",
+      "机器人巡检服务"
+    ],
+    "scenes": [
+      "供水",
+      "综合管廊",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "拓展排水管网巡检市场"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 100,
+    "version": 1,
+    "createdAt": "2026-05-01T10:00:00+08:00",
+    "updatedAt": "2026-08-25T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000056",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京禹泽设计咨询有限公司",
+    "shortName": "禹泽咨询",
+    "unifiedSocialCreditCode": "91110114MA010000BY",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市丰台区新村街道丰台南路155号",
+    "district": "丰台区",
+    "contactName": "郭国",
+    "contactPhone": "13891396067",
+    "introduction": "提供市政管网规划设计与造价咨询，覆盖供水排水燃气热力管网专项规划。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划"
+    ],
+    "products": [],
+    "scenes": [
+      "热力",
+      "燃气",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-05-26T10:00:00+08:00",
+    "updatedAt": "2026-08-17T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000057",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京海纳设计咨询有限公司",
+    "shortName": "海纳咨询",
+    "unifiedSocialCreditCode": "91110114MA010000C6",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市朝阳区劲松街道东三环南路156号",
+    "district": "朝阳区",
+    "contactName": "何国",
+    "contactPhone": "13116575014",
+    "introduction": "专注城市管网设计咨询，编制可行性研究与设计方案，服务市政基础设施项目。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划",
+      "供水管网设计"
+    ],
+    "products": [],
+    "scenes": [
+      "燃气",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 83,
+    "version": 1,
+    "createdAt": "2026-06-01T10:00:00+08:00",
+    "updatedAt": "2026-08-07T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000058",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京川源设计咨询有限公司",
+    "shortName": "川源咨询",
+    "unifiedSocialCreditCode": "91110114MA010000CD",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市丰台区太平桥街道太平桥路157号",
+    "district": "丰台区",
+    "contactName": "高国",
+    "contactPhone": "13412585253",
+    "introduction": "提供市政管网规划设计与造价咨询，覆盖供水排水燃气热力管网专项规划。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划",
+      "造价咨询",
+      "供水管网设计"
+    ],
+    "products": [],
+    "scenes": [
+      "供水",
+      "燃气",
+      "热力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 88,
+    "version": 1,
+    "createdAt": "2026-07-05T10:00:00+08:00",
+    "updatedAt": "2026-08-26T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000059",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京山石设计咨询有限公司",
+    "shortName": "山石咨询",
+    "unifiedSocialCreditCode": "91110114MA010000CL",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市朝阳区团结湖街道团结湖路158号",
+    "district": "朝阳区",
+    "contactName": "林国",
+    "contactPhone": "13494354841",
+    "introduction": "专注城市管网设计咨询，编制可行性研究与设计方案，服务市政基础设施项目。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划"
+    ],
+    "products": [],
+    "scenes": [
+      "供水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "承接市政管网设计项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 46,
+    "version": 1,
+    "createdAt": "2026-07-20T10:00:00+08:00",
+    "updatedAt": "2026-08-07T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000060",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京林海设计咨询有限公司",
+    "shortName": "林海咨询",
+    "unifiedSocialCreditCode": "91110114MA010000CT",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市昌平区回龙观街道龙泽园路159号",
+    "district": "昌平区",
+    "contactName": "罗国",
+    "contactPhone": "13940510486",
+    "introduction": "提供市政管网规划设计与造价咨询，覆盖供水排水燃气热力管网专项规划。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划",
+      "造价咨询"
+    ],
+    "products": [],
+    "scenes": [
+      "燃气",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 80,
+    "version": 1,
+    "createdAt": "2026-05-05T10:00:00+08:00",
+    "updatedAt": "2026-08-02T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000061",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京云峰设计咨询有限公司",
+    "shortName": "云峰咨询",
+    "unifiedSocialCreditCode": "91110114MA010000D1",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市通州区北苑街道通惠南路160号",
+    "district": "通州区",
+    "contactName": "郑国",
+    "contactPhone": "13079408612",
+    "introduction": "专注城市管网设计咨询，编制可行性研究与设计方案，服务市政基础设施项目。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划"
+    ],
+    "products": [
+      "规划设计方案",
+      "可行性研究报告"
+    ],
+    "scenes": [
+      "燃气",
+      "供水",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "承接市政管网设计项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-05-27T10:00:00+08:00",
+    "updatedAt": "2026-08-02T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000062",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京星桥设计咨询有限公司",
+    "shortName": "星桥咨询",
+    "unifiedSocialCreditCode": "91110114MA010000D8",
+    "category": "设计咨询单位",
+    "role": "市政管网设计咨询单位",
+    "address": "北京市海淀区清河街道清河中街161号",
+    "district": "海淀区",
+    "contactName": "梁国",
+    "contactPhone": "13911203426",
+    "introduction": "提供市政管网规划设计与造价咨询，覆盖供水排水燃气热力管网专项规划。",
+    "capabilities": [
+      "管网规划设计",
+      "排水专项规划"
+    ],
+    "products": [
+      "规划设计方案",
+      "可行性研究报告"
+    ],
+    "scenes": [
+      "供水",
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "承接市政管网设计项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 97,
+    "version": 1,
+    "createdAt": "2026-07-02T10:00:00+08:00",
+    "updatedAt": "2026-08-28T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000063",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京月华工程监理有限公司",
+    "shortName": "月华监理",
+    "unifiedSocialCreditCode": "91110114MA010000DF",
+    "category": "设计咨询单位",
+    "role": "市政工程监理单位",
+    "address": "北京市延庆区儒林街道东外大街162号",
+    "district": "延庆区",
+    "contactName": "谢国",
+    "contactPhone": "13781236015",
+    "introduction": "专注市政管网工程监理，对热力排水等管网改造项目实施全过程质量控制。",
+    "capabilities": [
+      "市政工程监理",
+      "管网施工监理",
+      "安全监理",
+      "造价控制"
+    ],
+    "products": [],
+    "scenes": [
+      "综合管廊",
+      "道路",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "承接热力管网改造监理项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 59,
+    "version": 1,
+    "createdAt": "2026-06-01T10:00:00+08:00",
+    "updatedAt": "2026-08-22T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000064",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京日升工程监理有限公司",
+    "shortName": "日升监理",
+    "unifiedSocialCreditCode": "91110114MA010000DN",
+    "category": "设计咨询单位",
+    "role": "市政工程监理单位",
+    "address": "北京市门头沟区大峪街道门头沟路163号",
+    "district": "门头沟区",
+    "contactName": "宋国",
+    "contactPhone": "13492433477",
+    "introduction": "提供市政工程与管网施工监理服务，开展安全监理与造价控制以保障工程质量。",
+    "capabilities": [
+      "市政工程监理",
+      "管网施工监理",
+      "安全监理",
+      "造价控制"
+    ],
+    "products": [],
+    "scenes": [
+      "道路"
+    ],
+    "cooperationNeeds": [
+      "承接热力管网改造监理项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 99,
+    "version": 1,
+    "createdAt": "2026-07-02T10:00:00+08:00",
+    "updatedAt": "2026-08-12T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000065",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京长风工程监理有限公司",
+    "shortName": "长风监理",
+    "unifiedSocialCreditCode": "91110114MA010000DV",
+    "category": "设计咨询单位",
+    "role": "市政工程监理单位",
+    "address": "北京市顺义区石园街道顺平路164号",
+    "district": "顺义区",
+    "contactName": "唐国",
+    "contactPhone": "13912779840",
+    "introduction": "专注市政管网工程监理，对热力排水等管网改造项目实施全过程质量控制。",
+    "capabilities": [
+      "市政工程监理",
+      "管网施工监理",
+      "造价控制",
+      "安全监理"
+    ],
+    "products": [],
+    "scenes": [
+      "排水",
+      "道路"
+    ],
+    "cooperationNeeds": [
+      "承接热力管网改造监理项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 84,
+    "version": 1,
+    "createdAt": "2026-07-11T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000066",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京万里工程监理有限公司",
+    "shortName": "万里监理",
+    "unifiedSocialCreditCode": "91110114MA010000E3",
+    "category": "设计咨询单位",
+    "role": "市政工程监理单位",
+    "address": "北京市昌平区回龙观街道育知东路165号",
+    "district": "昌平区",
+    "contactName": "许国",
+    "contactPhone": "13729680950",
+    "introduction": "提供市政工程与管网施工监理服务，开展安全监理与造价控制以保障工程质量。",
+    "capabilities": [
+      "市政工程监理",
+      "管网施工监理"
+    ],
+    "products": [],
+    "scenes": [
+      "综合管廊",
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-06-13T10:00:00+08:00",
+    "updatedAt": "2026-08-27T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000067",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京信诺工程监理有限公司",
+    "shortName": "信诺监理",
+    "unifiedSocialCreditCode": "91110114MA010000EA",
+    "category": "设计咨询单位",
+    "role": "市政工程监理单位",
+    "address": "北京市大兴区荣华街道科创五街166号",
+    "district": "大兴区",
+    "contactName": "韩国",
+    "contactPhone": "13765574293",
+    "introduction": "专注市政管网工程监理，对热力排水等管网改造项目实施全过程质量控制。",
+    "capabilities": [
+      "市政工程监理",
+      "管网施工监理",
+      "造价控制",
+      "安全监理"
+    ],
+    "products": [],
+    "scenes": [
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 67,
+    "version": 1,
+    "createdAt": "2026-05-20T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000068",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京诚信热力工程有限公司",
+    "shortName": "诚信热力",
+    "unifiedSocialCreditCode": "91110114MA010000EH",
+    "category": "工程服务商",
+    "role": "热力管网施工总包",
+    "address": "北京市房山区良乡地区良乡中路167号",
+    "district": "房山区",
+    "contactName": "冯国",
+    "contactPhone": "13868785432",
+    "introduction": "承接供热管网施工与热力站改造，具备管道焊接与暖通安装一体化施工能力。",
+    "capabilities": [
+      "供热管网施工",
+      "热力站改造",
+      "管道焊接"
+    ],
+    "products": [
+      "供热管网施工服务"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 65,
+    "version": 1,
+    "createdAt": "2026-07-25T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000069",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京德润热力工程有限公司",
+    "shortName": "德润热力",
+    "unifiedSocialCreditCode": "91110114MA010000EQ",
+    "category": "工程服务商",
+    "role": "热力管网施工总包",
+    "address": "北京市海淀区清河街道安宁庄东路168号",
+    "district": "海淀区",
+    "contactName": "邓国",
+    "contactPhone": "13058852761",
+    "introduction": "专注热力管网施工总包，服务老旧小区供热改造与换热站更新工程。",
+    "capabilities": [
+      "供热管网施工",
+      "热力站改造",
+      "暖通安装"
+    ],
+    "products": [
+      "供热管网施工服务",
+      "换热站改造"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "寻找保温材料供应商",
+      "承接老旧小区供热管网改造"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 91,
+    "version": 1,
+    "createdAt": "2026-06-19T10:00:00+08:00",
+    "updatedAt": "2026-08-15T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000070",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京泽润热力工程有限公司",
+    "shortName": "泽润热力",
+    "unifiedSocialCreditCode": "91110114MA010000EX",
+    "category": "工程服务商",
+    "role": "热力管网施工总包",
+    "address": "北京市昌平区回龙观街道回南北路169号",
+    "district": "昌平区",
+    "contactName": "曹国",
+    "contactPhone": "13334965943",
+    "introduction": "承接供热管网施工与热力站改造，具备管道焊接与暖通安装一体化施工能力。",
+    "capabilities": [
+      "供热管网施工",
+      "热力站改造",
+      "暖通安装"
+    ],
+    "products": [
+      "供热管网施工服务",
+      "换热站改造"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-05-16T10:00:00+08:00",
+    "updatedAt": "2026-08-01T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000071",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京润达热力工程有限公司",
+    "shortName": "润达热力",
+    "unifiedSocialCreditCode": "91110114MA010000F5",
+    "category": "工程服务商",
+    "role": "热力管网施工总包",
+    "address": "北京市丰台区太平桥街道莲花池东路170号",
+    "district": "丰台区",
+    "contactName": "彭国",
+    "contactPhone": "13199741682",
+    "introduction": "专注热力管网施工总包，服务老旧小区供热改造与换热站更新工程。",
+    "capabilities": [
+      "供热管网施工",
+      "热力站改造"
+    ],
+    "products": [
+      "供热管网施工服务",
+      "换热站改造"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "寻找保温材料供应商"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 69,
+    "version": 1,
+    "createdAt": "2026-07-10T10:00:00+08:00",
+    "updatedAt": "2026-08-18T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000072",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京新宇热力工程有限公司",
+    "shortName": "新宇热力",
+    "unifiedSocialCreditCode": "91110114MA010000FC",
+    "category": "工程服务商",
+    "role": "热力管网施工总包",
+    "address": "北京市东城区和平里街道和平里西街171号",
+    "district": "东城区",
+    "contactName": "曾国",
+    "contactPhone": "13311424842",
+    "introduction": "承接供热管网施工与热力站改造，具备管道焊接与暖通安装一体化施工能力。",
+    "capabilities": [
+      "供热管网施工",
+      "热力站改造"
+    ],
+    "products": [
+      "供热管网施工服务",
+      "换热站改造"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "寻找保温材料供应商"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-06-17T10:00:00+08:00",
+    "updatedAt": "2026-08-13T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000073",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京天宇热力工程有限公司",
+    "shortName": "天宇热力",
+    "unifiedSocialCreditCode": "91110114MA010000FK",
+    "category": "工程服务商",
+    "role": "热力管网施工总包",
+    "address": "北京市大兴区兴丰街道兴丰大街172号",
+    "district": "大兴区",
+    "contactName": "肖国",
+    "contactPhone": "13772713571",
+    "introduction": "专注热力管网施工总包，服务老旧小区供热改造与换热站更新工程。",
+    "capabilities": [
+      "供热管网施工",
+      "热力站改造",
+      "暖通安装"
+    ],
+    "products": [
+      "供热管网施工服务",
+      "换热站改造"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "寻找保温材料供应商"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 84,
+    "version": 1,
+    "createdAt": "2026-06-11T10:00:00+08:00",
+    "updatedAt": "2026-08-03T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000074",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京华岳水务工程有限公司",
+    "shortName": "华岳水务",
+    "unifiedSocialCreditCode": "91110114MA010000FS",
+    "category": "工程服务商",
+    "role": "供水管网施工服务商",
+    "address": "北京市昌平区回龙观街道文华东路173号",
+    "district": "昌平区",
+    "contactName": "田国",
+    "contactPhone": "13004310716",
+    "introduction": "承接供水管道安装与给水管网改造，提供管道试压与水表安装服务。",
+    "capabilities": [
+      "供水管道安装",
+      "给水管网改造"
+    ],
+    "products": [
+      "供水管网施工服务",
+      "二次供水改造"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "对接供水管网更新改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 91,
+    "version": 1,
+    "createdAt": "2026-07-09T10:00:00+08:00",
+    "updatedAt": "2026-08-13T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000075",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京恒源水务工程有限公司",
+    "shortName": "恒源水务",
+    "unifiedSocialCreditCode": "91110114MA010000G0",
+    "category": "工程服务商",
+    "role": "供水管网施工服务商",
+    "address": "北京市朝阳区团结湖街道东三环北路174号",
+    "district": "朝阳区",
+    "contactName": "董国",
+    "contactPhone": "13843277884",
+    "introduction": "专注供水管网施工，开展二次供水改造与管网更新，保障居民用水安全。",
+    "capabilities": [
+      "供水管道安装",
+      "给水管网改造",
+      "管道试压"
+    ],
+    "products": [
+      "供水管网施工服务",
+      "二次供水改造"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "对接供水管网更新改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-06-15T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000076",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京瑞丰水务工程有限公司",
+    "shortName": "瑞丰水务",
+    "unifiedSocialCreditCode": "91110114MA010000G7",
+    "category": "工程服务商",
+    "role": "供水管网施工服务商",
+    "address": "北京市丰台区方庄街道方庄路175号",
+    "district": "丰台区",
+    "contactName": "潘国",
+    "contactPhone": "13624557966",
+    "introduction": "承接供水管道安装与给水管网改造，提供管道试压与水表安装服务。",
+    "capabilities": [
+      "供水管道安装",
+      "给水管网改造",
+      "水表安装",
+      "管道试压"
+    ],
+    "products": [
+      "供水管网施工服务",
+      "二次供水改造"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "对接供水管网更新改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 97,
+    "version": 1,
+    "createdAt": "2026-07-03T10:00:00+08:00",
+    "updatedAt": "2026-08-09T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000077",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京金谷水务工程有限公司",
+    "shortName": "金谷水务",
+    "unifiedSocialCreditCode": "91110114MA010000GE",
+    "category": "工程服务商",
+    "role": "供水管网施工服务商",
+    "address": "北京市通州区中仓街道新华大街176号",
+    "district": "通州区",
+    "contactName": "袁国",
+    "contactPhone": "13576561823",
+    "introduction": "专注供水管网施工，开展二次供水改造与管网更新，保障居民用水安全。",
+    "capabilities": [
+      "供水管道安装",
+      "给水管网改造"
+    ],
+    "products": [
+      "供水管网施工服务"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 97,
+    "version": 1,
+    "createdAt": "2026-05-19T10:00:00+08:00",
+    "updatedAt": "2026-08-02T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000078",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京玉源燃气工程有限公司",
+    "shortName": "玉源燃气",
+    "unifiedSocialCreditCode": "91110114MA010000GM",
+    "category": "工程服务商",
+    "role": "燃气管道施工总包",
+    "address": "北京市丰台区方庄街道芳城路177号",
+    "district": "丰台区",
+    "contactName": "蔡国",
+    "contactPhone": "13975554203",
+    "introduction": "承接燃气管道安装与调压站施工，具备带气作业与管道焊接探伤能力。",
+    "capabilities": [
+      "燃气管道安装",
+      "带气作业",
+      "燃气调压站施工",
+      "管道焊接探伤"
+    ],
+    "products": [
+      "燃气管道施工服务",
+      "燃气调压柜安装"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找燃气管道带压开孔分包"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 36,
+    "version": 1,
+    "createdAt": "2026-06-01T10:00:00+08:00",
+    "updatedAt": "2026-08-22T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000079",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京清源燃气工程有限公司",
+    "shortName": "清源燃气",
+    "unifiedSocialCreditCode": "91110114MA010000GU",
+    "category": "工程服务商",
+    "role": "燃气管道施工总包",
+    "address": "北京市海淀区中关村街道中关村大街178号",
+    "district": "海淀区",
+    "contactName": "蒋国",
+    "contactPhone": "13203780342",
+    "introduction": "专注燃气管道施工总包，服务老旧小区燃气更新与管网隐患整治工程。",
+    "capabilities": [
+      "燃气管道安装",
+      "带气作业",
+      "管道焊接探伤",
+      "燃气调压站施工"
+    ],
+    "products": [
+      "燃气管道施工服务",
+      "燃气调压柜安装"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "DISABLED",
+    "completeness": 51,
+    "version": 1,
+    "createdAt": "2026-05-16T10:00:00+08:00",
+    "updatedAt": "2026-08-20T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000080",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京昆源燃气工程有限公司",
+    "shortName": "昆源燃气",
+    "unifiedSocialCreditCode": "91110114MA010000H2",
+    "category": "工程服务商",
+    "role": "燃气管道施工总包",
+    "address": "北京市昌平区回龙观街道龙禧二街179号",
+    "district": "昌平区",
+    "contactName": "余国",
+    "contactPhone": "13687421036",
+    "introduction": "承接燃气管道安装与调压站施工，具备带气作业与管道焊接探伤能力。",
+    "capabilities": [
+      "燃气管道安装",
+      "带气作业"
+    ],
+    "products": [
+      "燃气管道施工服务",
+      "燃气调压柜安装"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 86,
+    "version": 1,
+    "createdAt": "2026-07-03T10:00:00+08:00",
+    "updatedAt": "2026-08-12T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000081",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京燕岭燃气工程有限公司",
+    "shortName": "燕岭燃气",
+    "unifiedSocialCreditCode": "91110114MA010000H9",
+    "category": "工程服务商",
+    "role": "燃气管道施工总包",
+    "address": "北京市昌平区天通苑北街道天通苑北街180号",
+    "district": "昌平区",
+    "contactName": "王志",
+    "contactPhone": "13611650790",
+    "introduction": "专注燃气管道施工总包，服务老旧小区燃气更新与管网隐患整治工程。",
+    "capabilities": [
+      "燃气管道安装",
+      "带气作业",
+      "燃气调压站施工",
+      "管道焊接探伤"
+    ],
+    "products": [
+      "燃气管道施工服务",
+      "燃气调压柜安装"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 100,
+    "version": 1,
+    "createdAt": "2026-05-13T10:00:00+08:00",
+    "updatedAt": "2026-08-22T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000082",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京紫薇燃气工程有限公司",
+    "shortName": "紫薇燃气",
+    "unifiedSocialCreditCode": "91110114MA010000HG",
+    "category": "工程服务商",
+    "role": "燃气管道施工总包",
+    "address": "北京市海淀区中关村街道海淀路181号",
+    "district": "海淀区",
+    "contactName": "李志",
+    "contactPhone": "13348409960",
+    "introduction": "承接燃气管道安装与调压站施工，具备带气作业与管道焊接探伤能力。",
+    "capabilities": [
+      "燃气管道安装",
+      "带气作业",
+      "管道焊接探伤",
+      "燃气调压站施工"
+    ],
+    "products": [
+      "燃气管道施工服务"
+    ],
+    "scenes": [
+      "燃气"
+    ],
+    "cooperationNeeds": [
+      "寻找燃气管道带压开孔分包"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 85,
+    "version": 1,
+    "createdAt": "2026-06-08T10:00:00+08:00",
+    "updatedAt": "2026-08-07T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000083",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京香岭排水工程有限公司",
+    "shortName": "香岭排水",
+    "unifiedSocialCreditCode": "91110114MA010000HP",
+    "category": "工程服务商",
+    "role": "排水管网施工服务商",
+    "address": "北京市海淀区学院路街道学院路182号",
+    "district": "海淀区",
+    "contactName": "张志",
+    "contactPhone": "13177441847",
+    "introduction": "专注排水管网施工，开展雨污分流改造与管网更新，改善城市水环境。",
+    "capabilities": [
+      "排水管道铺设",
+      "雨水口改造"
+    ],
+    "products": [
+      "排水管网施工服务"
+    ],
+    "scenes": [
+      "道路",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 81,
+    "version": 1,
+    "createdAt": "2026-07-04T10:00:00+08:00",
+    "updatedAt": "2026-08-06T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000084",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京玉澜排水工程有限公司",
+    "shortName": "玉澜排水",
+    "unifiedSocialCreditCode": "91110114MA010000HW",
+    "category": "工程服务商",
+    "role": "排水管网施工服务商",
+    "address": "北京市朝阳区望京街道望京街183号",
+    "district": "朝阳区",
+    "contactName": "刘志",
+    "contactPhone": "13870020522",
+    "introduction": "承接排水管道铺设与雨水口改造，提供管道疏通与顶管施工服务。",
+    "capabilities": [
+      "排水管道铺设",
+      "雨水口改造",
+      "管道疏通"
+    ],
+    "products": [
+      "排水管网施工服务",
+      "雨污分流改造"
+    ],
+    "scenes": [
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-05-18T10:00:00+08:00",
+    "updatedAt": "2026-08-06T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000085",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京泰平排水工程有限公司",
+    "shortName": "泰平排水",
+    "unifiedSocialCreditCode": "91110114MA010000J4",
+    "category": "工程服务商",
+    "role": "排水管网施工服务商",
+    "address": "北京市昌平区天通苑北街道立汤路184号",
+    "district": "昌平区",
+    "contactName": "陈志",
+    "contactPhone": "13756241511",
+    "introduction": "专注排水管网施工，开展雨污分流改造与管网更新，改善城市水环境。",
+    "capabilities": [
+      "排水管道铺设",
+      "雨水口改造",
+      "顶管施工"
+    ],
+    "products": [
+      "排水管网施工服务",
+      "雨污分流改造"
+    ],
+    "scenes": [
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 54,
+    "version": 1,
+    "createdAt": "2026-06-02T10:00:00+08:00",
+    "updatedAt": "2026-08-14T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000086",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京光远排水工程有限公司",
+    "shortName": "光远排水",
+    "unifiedSocialCreditCode": "91110114MA010000JB",
+    "category": "工程服务商",
+    "role": "排水管网施工服务商",
+    "address": "北京市石景山区八角街道阜石路185号",
+    "district": "石景山区",
+    "contactName": "杨志",
+    "contactPhone": "13087945477",
+    "introduction": "承接排水管道铺设与雨水口改造，提供管道疏通与顶管施工服务。",
+    "capabilities": [
+      "排水管道铺设",
+      "雨水口改造",
+      "管道疏通"
+    ],
+    "products": [
+      "排水管网施工服务"
+    ],
+    "scenes": [
+      "道路",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 53,
+    "version": 1,
+    "createdAt": "2026-06-09T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000087",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京晨光电力工程有限公司",
+    "shortName": "晨光电力",
+    "unifiedSocialCreditCode": "91110114MA010000JJ",
+    "category": "工程服务商",
+    "role": "电力管沟施工服务商",
+    "address": "北京市昌平区天通苑北街道太平庄中二街186号",
+    "district": "昌平区",
+    "contactName": "赵志",
+    "contactPhone": "13910512107",
+    "introduction": "专注电力架空线入地工程，提供电力管沟施工与电缆保护管敷设服务。",
+    "capabilities": [
+      "电力管沟施工",
+      "电缆排管敷设",
+      "电缆井施工",
+      "电力隧道施工"
+    ],
+    "products": [
+      "电力管沟施工服务",
+      "电缆隧道施工"
+    ],
+    "scenes": [
+      "电力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 80,
+    "version": 1,
+    "createdAt": "2026-05-05T10:00:00+08:00",
+    "updatedAt": "2026-08-22T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000088",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京北垣电力工程有限公司",
+    "shortName": "北垣电力",
+    "unifiedSocialCreditCode": "91110114MA010000JR",
+    "category": "工程服务商",
+    "role": "电力管沟施工服务商",
+    "address": "北京市昌平区天通苑南街道天通苑南街187号",
+    "district": "昌平区",
+    "contactName": "黄志",
+    "contactPhone": "13198418266",
+    "introduction": "承接电力管沟与电缆隧道施工，开展电缆排管敷设与电缆井施工。",
+    "capabilities": [
+      "电力管沟施工",
+      "电缆排管敷设"
+    ],
+    "products": [
+      "电力管沟施工服务",
+      "电缆隧道施工"
+    ],
+    "scenes": [
+      "道路"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 87,
+    "version": 1,
+    "createdAt": "2026-05-06T10:00:00+08:00",
+    "updatedAt": "2026-08-17T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000089",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京中汇电力工程有限公司",
+    "shortName": "中汇电力",
+    "unifiedSocialCreditCode": "91110114MA010000JY",
+    "category": "工程服务商",
+    "role": "电力管沟施工服务商",
+    "address": "北京市昌平区天通苑南街道太平庄中街188号",
+    "district": "昌平区",
+    "contactName": "周志",
+    "contactPhone": "13733045943",
+    "introduction": "专注电力架空线入地工程，提供电力管沟施工与电缆保护管敷设服务。",
+    "capabilities": [
+      "电力管沟施工",
+      "电缆排管敷设"
+    ],
+    "products": [
+      "电力管沟施工服务",
+      "电缆隧道施工"
+    ],
+    "scenes": [
+      "电力"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 92,
+    "version": 1,
+    "createdAt": "2026-05-23T10:00:00+08:00",
+    "updatedAt": "2026-08-12T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000090",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京广源管廊工程有限公司",
+    "shortName": "广源管廊",
+    "unifiedSocialCreditCode": "91110114MA010000K6",
+    "category": "工程服务商",
+    "role": "综合管廊施工服务商",
+    "address": "北京市朝阳区望京街道阜通东大街189号",
+    "district": "朝阳区",
+    "contactName": "吴志",
+    "contactPhone": "13934696240",
+    "introduction": "承接综合管廊施工与附属设施安装，提供管廊结构与运维一体化服务。",
+    "capabilities": [
+      "综合管廊施工",
+      "管廊结构施工"
+    ],
+    "products": [
+      "综合管廊施工服务",
+      "管廊运维服务"
+    ],
+    "scenes": [
+      "电力",
+      "综合管廊"
+    ],
+    "cooperationNeeds": [
+      "承接综合管廊运维项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 91,
+    "version": 1,
+    "createdAt": "2026-06-11T10:00:00+08:00",
+    "updatedAt": "2026-08-20T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000091",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京泰达管廊工程有限公司",
+    "shortName": "泰达管廊",
+    "unifiedSocialCreditCode": "91110114MA010000KD",
+    "category": "工程服务商",
+    "role": "综合管廊施工服务商",
+    "address": "北京市西城区德胜街道新街口外大街190号",
+    "district": "西城区",
+    "contactName": "徐志",
+    "contactPhone": "13692295097",
+    "introduction": "专注城市综合管廊建设运维，统筹电力通信管线入廊与日常巡检管理。",
+    "capabilities": [
+      "综合管廊施工",
+      "管廊结构施工"
+    ],
+    "products": [
+      "综合管廊施工服务",
+      "管廊运维服务"
+    ],
+    "scenes": [
+      "电力",
+      "综合管廊"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 97,
+    "version": 1,
+    "createdAt": "2026-07-19T10:00:00+08:00",
+    "updatedAt": "2026-08-14T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000092",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京恒达管廊工程有限公司",
+    "shortName": "恒达管廊",
+    "unifiedSocialCreditCode": "91110114MA010000KL",
+    "category": "工程服务商",
+    "role": "综合管廊施工服务商",
+    "address": "北京市昌平区天通苑南街道立水桥东一路191号",
+    "district": "昌平区",
+    "contactName": "孙志",
+    "contactPhone": "13749317013",
+    "introduction": "承接综合管廊施工与附属设施安装，提供管廊结构与运维一体化服务。",
+    "capabilities": [
+      "综合管廊施工",
+      "管廊结构施工",
+      "管廊运维",
+      "管廊附属设施安装"
+    ],
+    "products": [
+      "综合管廊施工服务",
+      "管廊运维服务"
+    ],
+    "scenes": [
+      "综合管廊",
+      "通信"
+    ],
+    "cooperationNeeds": [
+      "承接综合管廊运维项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 80,
+    "version": 1,
+    "createdAt": "2026-05-19T10:00:00+08:00",
+    "updatedAt": "2026-08-06T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000093",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京宏图管廊工程有限公司",
+    "shortName": "宏图管廊",
+    "unifiedSocialCreditCode": "91110114MA010000KT",
+    "category": "工程服务商",
+    "role": "综合管廊施工服务商",
+    "address": "北京市昌平区霍营街道霍营西路192号",
+    "district": "昌平区",
+    "contactName": "马志",
+    "contactPhone": "13036973580",
+    "introduction": "专注城市综合管廊建设运维，统筹电力通信管线入廊与日常巡检管理。",
+    "capabilities": [
+      "综合管廊施工",
+      "管廊结构施工"
+    ],
+    "products": [
+      "综合管廊施工服务"
+    ],
+    "scenes": [
+      "综合管廊",
+      "电力"
+    ],
+    "cooperationNeeds": [
+      "承接综合管廊运维项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 93,
+    "version": 1,
+    "createdAt": "2026-07-08T10:00:00+08:00",
+    "updatedAt": "2026-08-19T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000094",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京天成水环境科技有限公司",
+    "shortName": "天成环保",
+    "unifiedSocialCreditCode": "91110114MA010000L1",
+    "category": "技术服务商",
+    "role": "海绵城市建设服务商",
+    "address": "北京市昌平区霍营街道龙锦三街193号",
+    "district": "昌平区",
+    "contactName": "朱志",
+    "contactPhone": "13594075775",
+    "introduction": "提供海绵城市设计与雨水调蓄方案，开展透水铺装与水生态修复工程。",
+    "capabilities": [
+      "海绵城市设计",
+      "雨水调蓄",
+      "透水铺装"
+    ],
+    "products": [
+      "雨水调蓄设施",
+      "透水铺装材料"
+    ],
+    "scenes": [
+      "排水",
+      "道路",
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 88,
+    "version": 1,
+    "createdAt": "2026-05-27T10:00:00+08:00",
+    "updatedAt": "2026-08-19T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000095",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京同创水环境科技有限公司",
+    "shortName": "同创环保",
+    "unifiedSocialCreditCode": "91110114MA010000L8",
+    "category": "技术服务商",
+    "role": "海绵城市建设服务商",
+    "address": "北京市西城区金融街街道金融大街194号",
+    "district": "西城区",
+    "contactName": "胡志",
+    "contactPhone": "13331050656",
+    "introduction": "专注海绵城市建设，提供雨水调蓄设施与透水铺装材料及配套施工服务。",
+    "capabilities": [
+      "海绵城市设计",
+      "雨水调蓄",
+      "水生态修复"
+    ],
+    "products": [
+      "雨水调蓄设施",
+      "透水铺装材料"
+    ],
+    "scenes": [
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "承接海绵城市改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 53,
+    "version": 1,
+    "createdAt": "2026-05-13T10:00:00+08:00",
+    "updatedAt": "2026-08-12T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000096",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京新源水环境科技有限公司",
+    "shortName": "新源环保",
+    "unifiedSocialCreditCode": "91110114MA010000LF",
+    "category": "技术服务商",
+    "role": "海绵城市建设服务商",
+    "address": "北京市通州区中仓街道西大街195号",
+    "district": "通州区",
+    "contactName": "郭志",
+    "contactPhone": "13591980886",
+    "introduction": "提供海绵城市设计与雨水调蓄方案，开展透水铺装与水生态修复工程。",
+    "capabilities": [
+      "海绵城市设计",
+      "雨水调蓄"
+    ],
+    "products": [
+      "雨水调蓄设施",
+      "透水铺装材料"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "承接海绵城市改造项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "INCOMPLETE",
+    "completeness": 31,
+    "version": 1,
+    "createdAt": "2026-07-20T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000097",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京宇通智慧水务科技有限公司",
+    "shortName": "宇通水务",
+    "unifiedSocialCreditCode": "91110114MA010000LN",
+    "category": "技术服务商",
+    "role": "智慧水务解决方案商",
+    "address": "北京市朝阳区奥运村街道北辰东路196号",
+    "district": "朝阳区",
+    "contactName": "何志",
+    "contactPhone": "13420104268",
+    "introduction": "专注水务数字化，为供水排水企业提供管网一张图与智慧调度解决方案。",
+    "capabilities": [
+      "智慧水务平台开发",
+      "管网GIS系统",
+      "水表远传集抄",
+      "数据中台建设"
+    ],
+    "products": [
+      "智慧水务平台",
+      "GIS系统",
+      "远传水表"
+    ],
+    "scenes": [
+      "供水",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "寻找供水企业数字化转型项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 90,
+    "version": 1,
+    "createdAt": "2026-05-08T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000098",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京华新智慧水务科技有限公司",
+    "shortName": "华新水务",
+    "unifiedSocialCreditCode": "91110114MA010000LV",
+    "category": "技术服务商",
+    "role": "智慧水务解决方案商",
+    "address": "北京市大兴区兴丰街道黄村西大街197号",
+    "district": "大兴区",
+    "contactName": "高志",
+    "contactPhone": "13415565458",
+    "introduction": "开发智慧水务平台与管网GIS系统，提供水表远传集抄与数据中台建设服务。",
+    "capabilities": [
+      "智慧水务平台开发",
+      "管网GIS系统"
+    ],
+    "products": [
+      "智慧水务平台",
+      "GIS系统",
+      "远传水表"
+    ],
+    "scenes": [
+      "供水",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "寻找供水企业数字化转型项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "DISABLED",
+    "completeness": 55,
+    "version": 1,
+    "createdAt": "2026-06-23T10:00:00+08:00",
+    "updatedAt": "2026-08-26T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000099",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京康泰智慧水务科技有限公司",
+    "shortName": "康泰水务",
+    "unifiedSocialCreditCode": "91110114MA010000M3",
+    "category": "技术服务商",
+    "role": "智慧水务解决方案商",
+    "address": "北京市通州区梨园镇九棵树东路198号",
+    "district": "通州区",
+    "contactName": "林志",
+    "contactPhone": "13968751374",
+    "introduction": "专注水务数字化，为供水排水企业提供管网一张图与智慧调度解决方案。",
+    "capabilities": [
+      "智慧水务平台开发",
+      "管网GIS系统"
+    ],
+    "products": [
+      "智慧水务平台",
+      "GIS系统"
+    ],
+    "scenes": [
+      "供水",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "DISABLED",
+    "completeness": 57,
+    "version": 1,
+    "createdAt": "2026-06-16T10:00:00+08:00",
+    "updatedAt": "2026-08-12T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000100",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京安和智慧水务科技有限公司",
+    "shortName": "安和水务",
+    "unifiedSocialCreditCode": "91110114MA010000MA",
+    "category": "技术服务商",
+    "role": "智慧水务解决方案商",
+    "address": "北京市昌平区霍营街道科星西路199号",
+    "district": "昌平区",
+    "contactName": "罗志",
+    "contactPhone": "13499483655",
+    "introduction": "开发智慧水务平台与管网GIS系统，提供水表远传集抄与数据中台建设服务。",
+    "capabilities": [
+      "智慧水务平台开发",
+      "管网GIS系统",
+      "数据中台建设",
+      "水表远传集抄"
+    ],
+    "products": [
+      "智慧水务平台",
+      "GIS系统",
+      "远传水表"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 88,
+    "version": 1,
+    "createdAt": "2026-05-21T10:00:00+08:00",
+    "updatedAt": "2026-08-08T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000101",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京永昌市政运营管理有限公司",
+    "shortName": "永昌运维",
+    "unifiedSocialCreditCode": "91110114MA010000MH",
+    "category": "运营维护商",
+    "role": "管网运营维护商",
+    "address": "北京市昌平区回龙观街道龙泽园路200号",
+    "district": "昌平区",
+    "contactName": "郑志",
+    "contactPhone": "13151352645",
+    "introduction": "专注排水供水管网运维，开展管道养护、泵站代维与突发事故应急抢修。",
+    "capabilities": [
+      "管网日常巡检",
+      "管道疏通养护",
+      "应急抢修"
+    ],
+    "products": [
+      "管网运维服务",
+      "泵站代维",
+      "应急抢修服务"
+    ],
+    "scenes": [
+      "热力",
+      "排水",
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "承接排水管网养护项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 85,
+    "version": 1,
+    "createdAt": "2026-07-12T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000102",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京宏盛市政运营管理有限公司",
+    "shortName": "宏盛运维",
+    "unifiedSocialCreditCode": "91110114MA010000MQ",
+    "category": "运营维护商",
+    "role": "管网运营维护商",
+    "address": "北京市通州区梨园镇梨园南街201号",
+    "district": "通州区",
+    "contactName": "梁志",
+    "contactPhone": "13510689988",
+    "introduction": "承接管网日常巡检与疏通养护，提供泵站代维与应急抢修服务。",
+    "capabilities": [
+      "管网日常巡检",
+      "管道疏通养护",
+      "泵站运维"
+    ],
+    "products": [
+      "管网运维服务",
+      "泵站代维",
+      "应急抢修服务"
+    ],
+    "scenes": [
+      "热力"
+    ],
+    "cooperationNeeds": [
+      "承接排水管网养护项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 83,
+    "version": 1,
+    "createdAt": "2026-07-20T10:00:00+08:00",
+    "updatedAt": "2026-08-08T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000103",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京金源市政运营管理有限公司",
+    "shortName": "金源运维",
+    "unifiedSocialCreditCode": "91110114MA010000MX",
+    "category": "运营维护商",
+    "role": "管网运营维护商",
+    "address": "北京市丰台区卢沟桥街道卢沟桥路202号",
+    "district": "丰台区",
+    "contactName": "谢志",
+    "contactPhone": "13986524670",
+    "introduction": "专注排水供水管网运维，开展管道养护、泵站代维与突发事故应急抢修。",
+    "capabilities": [
+      "管网日常巡检",
+      "管道疏通养护"
+    ],
+    "products": [
+      "管网运维服务",
+      "泵站代维",
+      "应急抢修服务"
+    ],
+    "scenes": [
+      "供水",
+      "热力",
+      "排水"
+    ],
+    "cooperationNeeds": [],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 85,
+    "version": 1,
+    "createdAt": "2026-06-13T10:00:00+08:00",
+    "updatedAt": "2026-08-23T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000104",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京顺通市政运营管理有限公司",
+    "shortName": "顺通运维",
+    "unifiedSocialCreditCode": "91110114MA010000N5",
+    "category": "运营维护商",
+    "role": "管网运营维护商",
+    "address": "北京市朝阳区奥运村街道安立路203号",
+    "district": "朝阳区",
+    "contactName": "宋志",
+    "contactPhone": "13168547092",
+    "introduction": "承接管网日常巡检与疏通养护，提供泵站代维与应急抢修服务。",
+    "capabilities": [
+      "管网日常巡检",
+      "管道疏通养护",
+      "泵站运维",
+      "应急抢修"
+    ],
+    "products": [
+      "管网运维服务",
+      "泵站代维",
+      "应急抢修服务"
+    ],
+    "scenes": [
+      "热力",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "承接排水管网养护项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 86,
+    "version": 1,
+    "createdAt": "2026-07-13T10:00:00+08:00",
+    "updatedAt": "2026-08-24T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000105",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "北京晨辉市政运营管理有限公司",
+    "shortName": "晨辉运维",
+    "unifiedSocialCreditCode": "91110114MA010000NC",
+    "category": "运营维护商",
+    "role": "管网运营维护商",
+    "address": "北京市海淀区学院路街道成府路204号",
+    "district": "海淀区",
+    "contactName": "唐志",
+    "contactPhone": "13929313641",
+    "introduction": "专注排水供水管网运维，开展管道养护、泵站代维与突发事故应急抢修。",
+    "capabilities": [
+      "管网日常巡检",
+      "管道疏通养护",
+      "应急抢修"
+    ],
+    "products": [
+      "管网运维服务",
+      "泵站代维",
+      "应急抢修服务"
+    ],
+    "scenes": [
+      "供水"
+    ],
+    "cooperationNeeds": [
+      "承接排水管网养护项目"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "PENDING_REVIEW",
+    "completeness": 65,
+    "version": 1,
+    "createdAt": "2026-07-14T10:00:00+08:00",
+    "updatedAt": "2026-08-19T10:00:00+08:00",
+    "deletedAt": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000201",
+    "associationId": "00000000-0000-0000-0000-000000000106",
+    "name": "京城管网科技有限公司",
+    "shortName": "京城管网",
+    "unifiedSocialCreditCode": "91110114MA010000NK",
+    "category": "技术服务商",
+    "role": "管网智能监测服务商",
+    "address": "北京市昌平区回龙观街道龙泽园路201号",
+    "district": "昌平区",
+    "contactName": "王远",
+    "contactPhone": "13725559062",
+    "introduction": "面向城市地下管网提供智能监测与泄漏预警整体解决方案，覆盖供水燃气热力排水多类管线。",
+    "capabilities": [
+      "管网运行监测",
+      "泄漏预警分析"
+    ],
+    "products": [
+      "管网智能监测平台",
+      "智能井盖传感器"
+    ],
+    "scenes": [
+      "供水",
+      "燃气",
+      "热力",
+      "排水"
+    ],
+    "cooperationNeeds": [
+      "寻找区县供水燃气企业监测合作"
+    ],
+    "visibility": "ASSOCIATION",
+    "status": "ACTIVE",
+    "completeness": 92,
+    "version": 1,
+    "createdAt": "2026-06-08T10:00:00+08:00",
+    "updatedAt": "2026-08-15T10:00:00+08:00",
+    "deletedAt": null
+  }
+]

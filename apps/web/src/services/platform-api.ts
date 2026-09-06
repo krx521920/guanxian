@@ -12,6 +12,7 @@ import type {
   EcosystemPage,
   EcosystemMatch,
   EnterpriseDashboardData,
+  MemberDistribution,
   MemberEnterprise,
   MemberImportCommitResult,
   MemberImportPreview,
@@ -34,6 +35,9 @@ import type {
   Subscription,
   SystemAssociationOption,
   SystemEnterpriseOption,
+  Tender,
+  TenderPush,
+  TenderUpsertPayload,
   VersionedMember,
 } from '../types/domain'
 import { ApiRequestError, request, requestBlob } from './http'
@@ -242,4 +246,18 @@ export const platformApi = {
     `/notifications/messages/${encodeURIComponent(id)}/read`,
     { method: 'PUT' },
   ),
+
+  // —— 招标信息（管线智联·服贸会新增模块）——
+  tenders: (query = '', category = '', region = '', status = '', page = 0, size = 20) => request<EcosystemPage<Tender>>(
+    `/tenders?query=${encodeURIComponent(query)}&category=${encodeURIComponent(category)}&region=${encodeURIComponent(region)}&status=${encodeURIComponent(status)}&page=${page}&size=${size}`,
+  ),
+  tendersMine: (page = 0, size = 20) => request<EcosystemPage<Tender>>(
+    `/tenders/mine?page=${page}&size=${size}`,
+  ),
+  createTender: (payload: TenderUpsertPayload) => request<Tender>('/tenders', { method: 'POST', body: JSON.stringify(payload) }),
+  createTenderBatch: (items: TenderUpsertPayload[]) => request<Tender[]>('/tenders/batch', { method: 'POST', body: JSON.stringify(items) }),
+  pushTender: (id: string, enterpriseIds: string[] | null) => request<TenderPush[]>(`/tenders/${encodeURIComponent(id)}/push`, { method: 'POST', body: JSON.stringify({ enterpriseIds }) }),
+  tenderPushes: (id: string) => request<TenderPush[]>(`/tenders/${encodeURIComponent(id)}/pushes`),
+  // —— 会员分布统计（协会工作台可视化）——
+  membersDistribution: () => request<MemberDistribution>('/members/distribution'),
 }

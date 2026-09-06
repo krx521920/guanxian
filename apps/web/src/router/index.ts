@@ -30,6 +30,7 @@ const router = createRouter({
         { path: 'policies', component: () => import('../views/PoliciesView.vue'), meta: { title: '政策标准', roles: protectedRouteRoles['/policies'] } },
         { path: 'ecosystem', component: () => import('../views/EcosystemCatalogView.vue'), meta: { title: '产品与需求', roles: protectedRouteRoles['/ecosystem'] } },
         { path: 'matching', component: () => import('../views/MatchingView.vue'), meta: { title: '生态匹配', roles: protectedRouteRoles['/matching'] } },
+        { path: 'tenders', component: () => import('../views/TendersView.vue'), meta: { title: '招标信息', roles: protectedRouteRoles['/tenders'] } },
         { path: 'collaborations', component: () => import('../views/CollaborationsView.vue'), meta: { title: '协作事项', roles: protectedRouteRoles['/collaborations'] } },
         { path: 'attachments', component: () => import('../views/AttachmentCenterView.vue'), meta: { title: '资料附件', roles: protectedRouteRoles['/attachments'] } },
         { path: 'federation', component: () => import('../views/FederationView.vue'), meta: { title: '友好协会', roles: protectedRouteRoles['/federation'] } },

@@ -12,6 +12,7 @@ public record MemberUpsertRequest(
         @Size(max = 32) String unifiedSocialCreditCode,
         @NotBlank @Size(max = 100) String category,
         @Size(max = 300) String address,
+        @Size(max = 100) String district,
         @Size(max = 50) String contactName,
         @Size(max = 50) String contactPhone,
         @Size(max = 2000) String introduction,
@@ -42,7 +43,7 @@ public record MemberUpsertRequest(
             List<String> products,
             List<String> cooperationNeeds,
             String status) {
-        this(name, unifiedSocialCreditCode, category, address, contactName, contactPhone, introduction,
+        this(name, unifiedSocialCreditCode, category, address, null, contactName, contactPhone, introduction,
                 capabilities, products, cooperationNeeds, null, status, null);
     }
 }
