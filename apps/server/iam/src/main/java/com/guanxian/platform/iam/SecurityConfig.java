@@ -40,6 +40,8 @@ import java.util.Set;
 public class SecurityConfig {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private EnterpriseOwnerAuthorities enterpriseOwners;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ManagedEnterpriseAuthorities managedEnterpriseAccounts;
     private static final Set<String> KNOWN_ROLES = Set.of(
             "SYSTEM_ADMIN",
             "ASSOCIATION_ADMIN",
@@ -131,8 +133,10 @@ public class SecurityConfig {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setPrincipalClaimName(principalClaim.trim());
         converter.setJwtGrantedAuthoritiesConverter(jwt -> {
-            var authorities = new LinkedHashSet<GrantedAuthority>(authoritiesFor(jwt));
-            if (enterpriseOwners != null && enterpriseOwners.isOwner(jwt)) {
+            boolean managedOwner = managedEnterpriseAccounts != null && managedEnterpriseAccounts.owner(jwt);
+            // Directly provisioned enterprise accounts cannot inherit unrelated IdP administrator claims.
+            var authorities = new LinkedHashSet<GrantedAuthority>(managedOwner ? List.of() : authoritiesFor(jwt));
+            if (managedOwner || enterpriseOwners != null && enterpriseOwners.isOwner(jwt)) {
                 authorities.add(new SimpleGrantedAuthority("ROLE_ENTERPRISE_ADMIN"));
                 ROLE_PERMISSIONS.get("ENTERPRISE_ADMIN").forEach(permission ->
                         authorities.add(new SimpleGrantedAuthority(permission)));

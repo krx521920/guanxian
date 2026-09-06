@@ -58,6 +58,10 @@ class EnterpriseInvitationServiceTest {
         jdbc.execute("ALTER TABLE enterprise_owner_invitation ADD issuer_binding_version BIGINT");
         jdbc.execute("ALTER TABLE enterprise_owner_grant DROP CONSTRAINT enterprise_owner_grant_role_code_check");
         jdbc.execute("ALTER TABLE enterprise_owner_grant ADD CHECK(role_code IN ('ENTERPRISE_ADMIN','ENTERPRISE_MEMBER'))");
+        try (var input = new ClassPathResource("db/migration/V28__managed_enterprise_accounts.sql").getInputStream()) {
+            String migration=new String(input.readAllBytes(),StandardCharsets.UTF_8).replace("TIMESTAMPTZ","TIMESTAMP WITH TIME ZONE");
+            new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(new org.springframework.core.io.ByteArrayResource(migration.getBytes(StandardCharsets.UTF_8))).execute(jdbc.getDataSource());
+        }
     }
     static void seed(JdbcTemplate jdbc) {
         jdbc.update("INSERT INTO association VALUES(?,'本协会','ACTIVE'),(?,'其他协会','ACTIVE')", ASSOCIATION, FOREIGN_ASSOCIATION);

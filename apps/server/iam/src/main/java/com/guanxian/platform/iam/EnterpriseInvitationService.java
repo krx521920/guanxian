@@ -32,7 +32,11 @@ class EnterpriseInvitationService {
     // If an account was provisioned through this workflow, stale grants cannot be reused
     // by a request whose authentication was resolved before a concurrent binding update.
     static final String CURRENT_OWNER_GRANT = """
-            AND (NOT EXISTS (SELECT 1 FROM enterprise_owner_grant g WHERE g.account_id=u.id)
+            AND ((NOT EXISTS (SELECT 1 FROM enterprise_owner_grant g WHERE g.account_id=u.id)
+                 AND NOT EXISTS (SELECT 1 FROM enterprise_managed_account m WHERE m.account_id=u.id))
+              OR EXISTS (SELECT 1 FROM enterprise_managed_account m WHERE m.account_id=u.id AND m.status='ACTIVE'
+                 AND m.binding_version=u.version AND m.external_subject=u.external_subject
+                 AND m.enterprise_id=u.enterprise_id AND m.association_id=u.association_id)
               OR EXISTS (SELECT 1 FROM enterprise_owner_grant g JOIN enterprise_owner_invitation approved ON approved.id=g.invitation_id
                  WHERE g.account_id=u.id AND g.role_code='ENTERPRISE_ADMIN' AND approved.target_role=g.role_code
                    AND g.binding_version=u.version AND g.external_subject=u.external_subject

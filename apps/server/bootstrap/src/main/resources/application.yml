@@ -57,6 +57,11 @@ management:
         enabled: true
 
 guanxian:
+  accounts:
+    enabled: ${GUANXIAN_ACCOUNTS_ENABLED:false}
+    realm-url: ${GUANXIAN_ACCOUNTS_REALM_URL:${GUANXIAN_JWT_ISSUER_URI:}}
+    client-id: ${GUANXIAN_ACCOUNTS_CLIENT_ID:guanxian-account-provisioner}
+    client-secret-file: ${GUANXIAN_ACCOUNTS_CLIENT_SECRET_FILE:}
   business:
     repository: ${GUANXIAN_BUSINESS_REPOSITORY:postgres}
     seed-demo-data: ${GUANXIAN_SEED_DEMO_DATA:false}

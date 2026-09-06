@@ -277,6 +277,15 @@ export function useAuth() {
       state.error = null
       await userManager().signinRedirect({ state: { returnTo: safeLocalPath(returnTo) } })
     },
+    async changePassword(returnTo = '/') {
+      if (demoMode || !state.user) throw new Error('请使用真实账号登录后修改密码')
+      // Keycloak handles the old/new password, PKCE, state and reauthentication.
+      // No password is collected by our application or passed in a URL.
+      await userManager().signinRedirect({
+        state: { returnTo: safeLocalPath(returnTo) },
+        prompt: 'login', max_age: 0, extraQueryParams: { kc_action: 'UPDATE_PASSWORD' },
+      })
+    },
     loginDemo(role: UserRole) {
       if (!demoMode) throw new Error('生产认证不允许切换演示身份')
       setDemoUser(demoUsers[role])

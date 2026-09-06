@@ -36,19 +36,23 @@ class EnterpriseInvitationHttpTest {
     @Import({SecurityConfig.class,EnterpriseOwnerAuthorities.class,EnterpriseInvitationService.class,
             EnterpriseInvitationController.class,EnterpriseOnboardingController.class,DatabaseActorScopeResolver.class,
             EnterpriseTeamController.class,EnterpriseTeamService.class,
+            ManagedEnterpriseAccountController.class,ManagedEnterpriseAccounts.class,ManagedEnterpriseAuthorities.class,
             CurrentUserController.class,MyEnterpriseController.class,GlobalExceptionHandler.class})
     static class App {
         @Bean DataSource dataSource() throws Exception {
             var ds=new DriverManagerDataSource("jdbc:h2:mem:invitation-http-"+UUID.randomUUID()+";MODE=PostgreSQL;DB_CLOSE_DELAY=-1","sa","");
             var jdbc=new JdbcTemplate(ds); schema(jdbc); seed(jdbc);
+            jdbc.execute("ALTER TABLE enterprise ADD version BIGINT DEFAULT 0 NOT NULL");
             jdbc.execute("CREATE TABLE association_relationship(source_association_id UUID,target_association_id UUID,status VARCHAR(32),allow_member_data BOOLEAN,suspended_at TIMESTAMP,revoked_at TIMESTAMP,expires_at TIMESTAMP)");
             return ds;
         }
+        @Bean ManagedEnterpriseAccountsTest.FakeIdentityProvider accountProvider() { return new ManagedEnterpriseAccountsTest.FakeIdentityProvider(); }
     }
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @Autowired EnterpriseInvitationService invitations;
+    @Autowired ManagedEnterpriseAccountsTest.FakeIdentityProvider accountProvider;
     @MockitoBean JwtDecoder decoder;
     @MockitoBean MemberService members;
 
@@ -89,6 +93,9 @@ class EnterpriseInvitationHttpTest {
                 .andExpect(jsonPath("$.data.items[0].status").value("INACTIVE")).andExpect(jsonPath("$.data.items[0].externalSubject").doesNotExist());
     }
     @BeforeEach void setup() {
+        jdbc.update("DELETE FROM enterprise_managed_account");
+        accountProvider.username=null;accountProvider.operation=null;accountProvider.password=null;accountProvider.created=0;
+        accountProvider.available=true;accountProvider.failPassword=false;accountProvider.failAfterCreate=false;
         jdbc.update("DELETE FROM enterprise_owner_grant"); jdbc.update("DELETE FROM enterprise_owner_invitation");
         jdbc.update("DELETE FROM user_account"); jdbc.update("DELETE FROM revoked_identity_subject"); jdbc.update("DELETE FROM audit_log");
         when(decoder.decode("owner")).thenReturn(jwt("owner-subject","owner.user"));
@@ -147,6 +154,36 @@ class EnterpriseInvitationHttpTest {
         jdbc.update("UPDATE user_account SET status='INACTIVE',version=version+1 WHERE external_subject='owner-subject'");
         mvc.perform(get("/api/v1/my-enterprise").header("Authorization","Bearer owner")).andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/onboarding/session").header("Authorization","Bearer owner")).andExpect(status().isForbidden());
+    }
+    @Test void directAccountHttpCreatesBoundOwnerRequiresConfirmationAndResetInvalidatesBearer() throws Exception {
+        String path="/api/v1/enterprise-accounts/enterprises/"+ENTERPRISE;
+        String body="{\"username\":\"http.owner\",\"note\":\"已核验负责人\",\"confirmed\":true,\"role\":\"SYSTEM_ADMIN\",\"enterpriseId\":\""+FOREIGN_ENTERPRISE+"\"}";
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path).header("Authorization","Bearer owner").contentType("application/json").content(body)).andExpect(status().isForbidden());
+        mvc.perform(post(path).header("Authorization","Bearer admin").header("X-Guanxian-Association-Id",ASSOCIATION).contentType("application/json").content(body))
+                .andExpect(status().isPreconditionRequired());
+        mvc.perform(post(path).header("Authorization","Bearer admin").header("X-Guanxian-Association-Id",FOREIGN_ASSOCIATION).header("If-Match","\"0\"").contentType("application/json").content(body))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path).header("Authorization","Bearer admin").header("X-Guanxian-Association-Id",ASSOCIATION).header("If-Match","\"0\"").contentType("application/json").content(body.replace("\"confirmed\":true","\"confirmed\":false")))
+                .andExpect(status().isBadRequest());
+        mvc.perform(post(path).header("Authorization","Bearer admin").header("X-Guanxian-Association-Id",ASSOCIATION).header("If-Match","\"0\"").contentType("application/json").content(body))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"))
+                .andExpect(jsonPath("$.data.account.enterpriseId").value(ENTERPRISE.toString())).andExpect(jsonPath("$.data.temporaryPassword").isNotEmpty());
+        var jwt=Jwt.withTokenValue("managed").header("alg","RS256").subject(accountProvider.subject).issuedAt(java.time.Instant.now().minusSeconds(2))
+                .claim("preferred_username","http.owner").build();
+        when(decoder.decode("managed")).thenReturn(jwt);
+        mvc.perform(get("/api/v1/users/me").header("Authorization","Bearer managed"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.roles[0]").value("ENTERPRISE_ADMIN"))
+                .andExpect(jsonPath("$.data.enterpriseId").value(ENTERPRISE.toString()));
+        mvc.perform(post(path+"/reset-password").header("Authorization","Bearer managed").header("If-Match","\"2\"")
+                .contentType("application/json").content("{\"note\":\"不允许企业自行使用管理重置\",\"confirmed\":true}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(path+"/reset-password").header("Authorization","Bearer admin").header("X-Guanxian-Association-Id",ASSOCIATION)
+                .header("If-Match","\"2\"").contentType("application/json").content("{\"note\":\"核验后重置\",\"confirmed\":true}"))
+                .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store"));
+        mvc.perform(get("/api/v1/users/me").header("Authorization","Bearer managed")).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).header("Authorization","Bearer admin").header("X-Guanxian-Association-Id",ASSOCIATION))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.temporaryPassword").doesNotExist());
     }
     @Test void enterpriseMembersCanReadButCannotWriteAndSensitiveFieldsAreNotReturned() throws Exception {
         jdbc.update("INSERT INTO user_account(id,external_subject,username,association_id,enterprise_id,status) VALUES(?,'staff-subject','staff',?,?,'ACTIVE')",UUID.randomUUID(),ASSOCIATION,ENTERPRISE);
