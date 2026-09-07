@@ -151,6 +151,10 @@ def prepare(blob: bytes, expected_sha256: str) -> dict:
         "summary": "\n".join(f"{k}：{r[k]}" for k in ("核心要求", "企业需关注", "版本说明", "全文状态") if r[k]),
         "fullTextArchived": False, "source": r,
     } for r in tables["02_政策与标准.csv"]]
+    for record in bundle["policies"]:
+        for field, limit in (("title", 300), ("issuingAuthority", 200), ("documentNumber", 100), ("category", 100), ("region", 64)):
+            if len(record[field] or "") > limit:
+                raise ValueError(f"Policy field too long: {field}")
     bundle["associationDirectory"] = [{
         "sourceId": r["协会ID"], "name": r["协会名称"],
         "websiteLink": safe_link(r["官网"], allow_bare=True),
@@ -176,6 +180,10 @@ def prepare(blob: bytes, expected_sha256: str) -> dict:
             "source": r,
         })
     bundle["externalOpportunities"] = opportunities
+    for records in (bundle["associationDirectory"], opportunities):
+        for record in records:
+            if len(record.get("title", record.get("name", ""))) > 300:
+                raise ValueError("Source title too long")
     bundle["counts"] = {name: len(bundle[name]) for name, *_ in TABLES.values()}
     return bundle
 

@@ -338,7 +338,7 @@ onMounted(async () => {
       <div class="segmented"><button :class="{ active: tab === 'offerings' }" @click="tab = 'offerings'">产品与服务（{{ offeringTotal }}）</button><button :class="{ active: tab === 'demands' }" @click="tab = 'demands'">合作需求（{{ demandTotal }}）</button></div>
       <div v-if="!ownOnly && auth.user.value?.role !== 'OBSERVER'" class="segmented"><button :class="{ active: tab === 'sources' }" @click="tab = 'sources'">企业供给资料</button><button :class="{ active: tab === 'tenders' }" @click="tab = 'tenders'">外部招投标</button></div>
       <div v-if="tab === 'offerings' || tab === 'demands'" class="search-box compact"><span>⌕</span><input v-model="keyword" :placeholder="tab === 'offerings' ? '搜索产品、企业或场景' : '搜索需求、企业或场景'" /></div>
-      <label v-if="canViewDeleted" class="checkbox-row"><input v-model="showDeleted" type="checkbox" @change="toggleDeleted" /> 显示已删除</label>
+      <label v-if="canViewDeleted && (tab === 'offerings' || tab === 'demands')" class="checkbox-row"><input v-model="showDeleted" type="checkbox" @change="toggleDeleted" /> 显示已删除</label>
     </section>
     <SourceDirectory v-if="tab === 'sources' && !ownOnly" kind="ENTERPRISE" />
     <SourceDirectory v-else-if="tab === 'tenders' && !ownOnly" kind="TENDER" />
