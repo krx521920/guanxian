@@ -24,7 +24,7 @@ export function installPreviewTransport() {
     { id: 'KIMI', label: 'Kimi', endpoint: 'https://api.moonshot.cn/v1/chat/completions', modelHint: '填写模型 ID', documentationUrl: 'https://platform.kimi.com/docs/' },
     { id: 'QWEN', label: '千问 · 阿里云百炼（北京）', endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', modelHint: '填写模型 ID', documentationUrl: 'https://help.aliyun.com/zh/model-studio/' },
   ] }
-  const response = (data: unknown) => Response.json({ code: 'OK', data })
+    const response = (data: unknown) => Response.json({ code: 'OK', data })
   window.fetch = async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href)
     if (!url.pathname.startsWith('/api/v1/')) return originalFetch(input, init)
@@ -64,6 +64,8 @@ export function installPreviewTransport() {
       if (!member || unavailableMembers.has(id)) return Response.json({ code: 'FORBIDDEN', message: 'fixture unavailable' }, { status: 403 })
       return Response.json({ code: 'OK', data: member }, { headers: { ETag: '"1"' } })
     }
+    if (url.pathname.endsWith('/dashboards/association')) return response({ metrics: [], activities: [], sceneDistribution: [], pendingTasks: [] })
+    if (url.pathname.endsWith('/system-context/associations') || url.pathname.endsWith('/system-context/enterprises')) return response([])
     if (!url.pathname.endsWith('/assistant/chat/stream')) return response({ items: [], total: 0 })
     previewRequests.push(body)
     const question = String(body.message)

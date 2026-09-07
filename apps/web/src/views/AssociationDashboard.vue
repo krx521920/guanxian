@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import MetricCard from '../components/MetricCard.vue'
-import PageHeader from '../components/PageHeader.vue'
+import NavIcon from '../components/NavIcon.vue'
 import { displayStatus } from '../components/status-display'
 import StatusBadge from '../components/StatusBadge.vue'
 import { useAsyncResource } from '../composables/useAsyncResource'
@@ -90,11 +90,35 @@ const quickLinks = computed(() => {
 
 <template>
   <div>
-    <PageHeader eyebrow="ASSOCIATION OVERVIEW" title="协会工作台" description="待办优先、状态清晰、全程可追溯的协会工作入口">
-      <RouterLink class="secondary-button" to="/members">会员企业</RouterLink>
-      <RouterLink class="secondary-button" to="/members?action=import">导入企业资料</RouterLink>
-      <RouterLink class="primary-button" to="/collaborations?create=1">+ 发布协会事项</RouterLink>
-    </PageHeader>
+    <section class="workspace-resources" aria-labelledby="workspace-resources-title">
+      <div class="workspace-resource-heading">
+        <div><span class="workspace-section-label">YOUR WORKSPACE</span><h2 id="workspace-resources-title">从这里，继续您的工作</h2></div>
+        <RouterLink to="/members?action=import">导入企业资料 <span aria-hidden="true">↗</span></RouterLink>
+      </div>
+      <nav class="workspace-resource-grid" aria-label="常用业务入口">
+        <RouterLink to="/members" class="workspace-resource-card resource-members">
+          <div class="resource-art"><span class="resource-code">01 / MEMBERS</span><NavIcon name="enterprise" /><span class="resource-arrow" aria-hidden="true">↗</span></div>
+          <strong>会员企业</strong><p>查看企业档案，发现会员能力</p>
+        </RouterLink>
+        <RouterLink to="/policies" class="workspace-resource-card resource-policies">
+          <div class="resource-art"><span class="resource-code">02 / KNOWLEDGE</span><NavIcon name="policy" /><span class="resource-arrow" aria-hidden="true">↗</span></div>
+          <strong>政策与标准</strong><p>查阅政策原文，核对参考依据</p>
+        </RouterLink>
+        <RouterLink to="/ecosystem" class="workspace-resource-card resource-ecosystem">
+          <div class="resource-art"><span class="resource-code">03 / ECOSYSTEM</span><NavIcon name="ecosystem" /><span class="resource-arrow" aria-hidden="true">↗</span></div>
+          <strong>产品与需求</strong><p>连接企业供需，了解合作机会</p>
+        </RouterLink>
+        <RouterLink to="/collaborations" class="workspace-resource-card resource-tasks">
+          <div class="resource-art"><span class="resource-code">04 / COLLABORATE</span><NavIcon name="task" /><span class="resource-arrow" aria-hidden="true">↗</span></div>
+          <strong>协作事项</strong><p>查看待办与进展，推进协会工作</p>
+        </RouterLink>
+      </nav>
+    </section>
+
+    <details class="workspace-overview">
+      <summary><span><strong>业务概览</strong><small>待办、会员动态与协作进展</small></span><span class="overview-chevron" aria-hidden="true">⌄</span></summary>
+      <div class="workspace-overview-body">
+        <div class="workspace-overview-actions"><RouterLink class="secondary-button small" to="/collaborations?create=1">发布协会事项</RouterLink><button class="secondary-button small" type="button" @click="load">刷新概览</button></div>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else-if="data">
       <section class="metrics-grid" aria-label="关键指标">
@@ -199,5 +223,45 @@ const quickLinks = computed(() => {
         </article>
       </section>
     </template>
+      </div>
+    </details>
   </div>
 </template>
+
+<style scoped>
+.workspace-resources, .workspace-overview { max-width: 1000px; margin: 0 auto; }
+.workspace-resource-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.workspace-section-label { display: block; color: var(--muted); font-size: 9px; font-weight: 650; letter-spacing: .14em; margin-bottom: 6px; }
+.workspace-resource-heading h2 { margin: 0; color: var(--ink); font-size: 17px; font-weight: 600; }
+.workspace-resource-heading > a { color: var(--muted); font-size: 12px; }
+.workspace-resource-heading > a:hover { color: var(--primary); }
+.workspace-resource-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+.workspace-resource-card { min-width: 0; color: var(--ink); }
+.resource-art { position: relative; height: 146px; padding: 15px; border: 1px solid color-mix(in srgb, var(--line) 65%, transparent); border-radius: 17px; background: var(--art-background); color: var(--art-color); overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; }
+.resource-art::before { content: ''; position: absolute; width: 140px; height: 140px; border: 1px solid currentColor; border-radius: 50%; opacity: .12; right: -35px; top: -35px; }
+.resource-art::after { content: ''; position: absolute; width: 95px; height: 95px; border: 1px solid currentColor; border-radius: 50%; opacity: .12; right: -12px; top: -12px; }
+.resource-code { display: block; position: relative; z-index: 1; font-size: 8px; letter-spacing: .12em; opacity: .78; }
+.resource-art :deep(svg) { position: absolute; width: 54px; height: 54px; bottom: 20px; left: 20px; stroke-width: 1.05; }
+.resource-arrow { position: absolute; right: 16px; bottom: 14px; font-size: 19px; opacity: .7; }
+.resource-members { --art-background: color-mix(in srgb, var(--panel) 87%, #347769); --art-color: #36746b; }
+.resource-policies { --art-background: color-mix(in srgb, var(--panel) 87%, #bb905f); --art-color: #986e3d; }
+.resource-ecosystem { --art-background: color-mix(in srgb, var(--panel) 87%, #7183a1); --art-color: #657c9d; }
+.resource-tasks { --art-background: color-mix(in srgb, var(--panel) 87%, #a28c98); --art-color: #916e85; }
+.workspace-resource-card > strong { display: block; margin: 13px 2px 6px; font-size: 14px; font-weight: 600; }
+.workspace-resource-card > p { margin: 0 2px; font-size: 11px; color: var(--muted); line-height: 1.7; }
+.workspace-resource-card:hover .resource-art { transform: translateY(-3px); box-shadow: 0 8px 22px rgba(25, 43, 42, .07); }
+.workspace-resource-card:focus-visible { outline: 3px solid var(--primary); outline-offset: 5px; border-radius: 17px; }
+.workspace-overview { margin-top: 32px; border-top: 1px solid var(--line); }
+.workspace-overview > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 20px 2px; cursor: pointer; color: var(--ink); }
+.workspace-overview > summary::-webkit-details-marker { display: none; }
+.workspace-overview > summary strong { font-size: 14px; font-weight: 600; }
+.workspace-overview > summary small { color: var(--muted); font-size: 11px; margin-left: 12px; }
+.workspace-overview > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.overview-chevron { font-size: 18px; color: var(--muted); transition: transform .18s ease; }
+.workspace-overview[open] .overview-chevron { transform: rotate(180deg); }
+.workspace-overview-body { padding: 0 0 20px; }
+.workspace-overview-actions { display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 18px; }
+@media (max-width: 800px) { .workspace-resource-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 14px; } .resource-art { height: 132px; } }
+@media (max-width: 480px) { .workspace-resource-heading h2 { font-size: 15px; } .workspace-resource-heading > a { font-size: 10px; white-space: nowrap; } .workspace-resource-grid { gap: 18px 12px; } .resource-art { height: 118px; border-radius: 14px; padding: 12px; } .resource-code { font-size: 7px; } .resource-art :deep(svg) { width: 44px; height: 44px; bottom: 16px; left: 16px; } .workspace-resource-card > strong { font-size: 13px; } .workspace-resource-card > p { font-size: 10px; } .workspace-overview > summary small { display: block; margin: 6px 0 0; } }
+@media (prefers-reduced-motion: reduce) { .resource-art, .overview-chevron { transition: none; } }
+</style>

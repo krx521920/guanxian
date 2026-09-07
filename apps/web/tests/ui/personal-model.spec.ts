@@ -34,17 +34,20 @@ async function fixture(page: Page, egressAllowed = true) {
     await route.fulfill({ json: { code: 'OK', data } })
   })
   await page.goto('/tests/ui/model-settings.html')
+  await page.getByRole('button', { name: '打开管线智能助手' }).click()
   await page.getByRole('button', { name: '打开个人模型接入' }).click()
   await expect(page.getByLabel('模型厂商', { exact: true })).toBeVisible()
   return { settings, saves, tests }
 }
 
-test('dock is bottom-left above chat; save, test, retain key, switch provider, delete', async ({ page }) => {
+test('model icon belongs to the chat header; save, test, retain key, switch provider, delete', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   const state = await fixture(page)
   const modelDock = await page.getByRole('button', { name: '打开个人模型接入' }).boundingBox()
-  const chatDock = await page.getByRole('button', { name: '打开管线智能助手' }).boundingBox()
-  expect(modelDock!.x).toBeLessThan(50)
+  const chatDock = await page.getByRole('button', { name: '关闭管线智能助手' }).boundingBox()
+  expect(modelDock!.x).toBeGreaterThan(900)
+  expect(chatDock!.x + chatDock!.width).toBeGreaterThan(1380)
+  await expect(page.locator('.model-access-launcher')).toHaveCount(0)
   expect(modelDock!.y + modelDock!.height).toBeLessThan(chatDock!.y)
   await page.getByLabel('模型厂商', { exact: true }).selectOption('DEEPSEEK')
   await page.getByLabel('模型 ID', { exact: true }).fill('test-model')
@@ -54,6 +57,7 @@ test('dock is bottom-left above chat; save, test, retain key, switch provider, d
   await page.getByRole('button', { name: '保存设置' }).click()
   await expect(page.getByText('已安全保存')).toBeVisible()
   await expect(page.locator('#personal-model-key')).toHaveValue('')
+  await expect(page.locator('.assistant-model-icon .model-monogram')).toHaveText('D')
   expect(state.saves[0].apiKey).toBe('test-only-key-do-not-use')
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('test-only-key')
   await page.getByRole('button', { name: '测试连接', exact: true }).click()
@@ -75,6 +79,7 @@ test('dock is bottom-left above chat; save, test, retain key, switch provider, d
   expect(state.settings.saved).toBeNull()
   await page.getByRole('button', { name: '关闭模型接入' }).click()
   await expect(page.getByRole('button', { name: '打开个人模型接入' })).toBeFocused()
+  await expect(page.locator('.assistant-model-icon .model-monogram')).toHaveCount(0)
 })
 
 test('platform egress restriction is visible and prevents testing', async ({ page }) => {

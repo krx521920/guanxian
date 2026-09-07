@@ -124,9 +124,9 @@ test('public browsing never initializes a stored private identity or renders the
 })
 
 for (const [role, home, title] of [
-  ['SYSTEM_ADMIN', '/association', '协会工作台'],
-  ['ASSOCIATION_ADMIN', '/association', '协会工作台'],
-  ['ASSOCIATION_OPERATOR', '/association', '协会工作台'],
+  ['SYSTEM_ADMIN', '/association', '从一个问题开始'],
+  ['ASSOCIATION_ADMIN', '/association', '从一个问题开始'],
+  ['ASSOCIATION_OPERATOR', '/association', '从一个问题开始'],
   ['ENTERPRISE_ADMIN', '/enterprise', '企业工作台'],
   ['ENTERPRISE_MEMBER', '/enterprise', '企业工作台'],
   ['OBSERVER', '/members', '会员企业'],
@@ -137,6 +137,14 @@ for (const [role, home, title] of [
     await expect(page).toHaveURL(new RegExp(`${home}$`))
     await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible()
     expect(requests[0]).toBe('/api/v1/users/me')
+    if (home === '/association') {
+      await expect(page.getByRole('region', { name: '管线智能助手', exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: '打开管线智能助手' })).toHaveCount(0)
+      await expect(page.locator('.main-nav').getByRole('link', { name: '协会工作台', exact: true })).toHaveClass(/router-link-active/)
+    } else {
+      await expect(page.locator('.assistant-workspace')).toHaveCount(0)
+      await expect(page.getByRole('button', { name: '打开管线智能助手' })).toBeVisible()
+    }
     if (role.startsWith('ENTERPRISE_')) {
       await expect(page.getByRole('note')).toContainText('虚构·入口验证企业')
       await expect(page.locator('.main-nav').getByRole('link', { name: '审计与账号' })).toHaveCount(0)
