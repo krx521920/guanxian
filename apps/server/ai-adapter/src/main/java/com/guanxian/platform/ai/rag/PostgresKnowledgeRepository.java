@@ -366,7 +366,7 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
                     reviewed_at = CASE WHEN :review THEN now() WHEN :clearReview THEN NULL ELSE reviewed_at END,
                     review_comment = CASE WHEN :review THEN :reviewComment WHEN :clearReview THEN NULL ELSE review_comment END,
                     updated_at = now()
-                """ + deleteUpdate + """
+                """ + deleteUpdate + "\n" + """
                 WHERE id = :documentId AND association_id = :associationId
                   AND lifecycle_version = :expectedVersion
                 """ + lifecyclePredicate, params);
