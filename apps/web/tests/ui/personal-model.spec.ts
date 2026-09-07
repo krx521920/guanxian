@@ -40,7 +40,7 @@ async function fixture(page: Page, egressAllowed = true) {
   return { settings, saves, tests }
 }
 
-test('model icon belongs to the chat header; save, test, retain key, switch provider, delete', async ({ page }) => {
+test('model icon belongs to the composer; save, test, retain key, switch provider, delete', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 })
   const state = await fixture(page)
   const modelDock = await page.getByRole('button', { name: '打开个人模型接入' }).boundingBox()

@@ -374,19 +374,17 @@ onBeforeUnmount(() => {
       class="assistant-panel"
       :role="workspace ? 'region' : 'dialog'"
       :aria-modal="workspace ? undefined : 'false'"
-      aria-labelledby="assistant-title"
+      :aria-label="workspace ? '管线智能助手' : undefined"
+      :aria-labelledby="workspace ? undefined : 'assistant-title'"
     >
-      <header class="assistant-header">
-        <span class="assistant-mark" aria-hidden="true"><AssistantRobotIcon /></span>
-        <div>
-          <strong id="assistant-title">管线智能助手</strong>
-          <small>{{ statusText }}</small>
-        </div>
-        <button ref="modelLauncher" class="assistant-model-icon" type="button" aria-label="打开个人模型接入"
-          :title="`${modelStatus} · 模型接入`" :aria-expanded="modelSettingsOpen" aria-haspopup="dialog" @click="openModelSettings">
-          <span v-if="modelMonogram" class="model-monogram" aria-hidden="true">{{ modelMonogram }}</span>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z M4 7.5l8 4.5 8-4.5M12 12v9M8 5.3l8 4.5" /></svg>
-        </button>
+      <header v-if="!workspace || hasConversation" class="assistant-header">
+        <template v-if="!workspace">
+          <span class="assistant-mark" aria-hidden="true"><AssistantRobotIcon /></span>
+          <div>
+            <strong id="assistant-title">管线智能助手</strong>
+            <small>{{ statusText }}</small>
+          </div>
+        </template>
         <button class="assistant-clear" type="button" :disabled="messages.length === 1" @click="clearConversation">{{ busy ? '取消并清空' : '清空' }}</button>
         <button v-if="!workspace" class="assistant-close" type="button" aria-label="关闭智能助手" @click="close">×</button>
       </header>
@@ -471,11 +469,18 @@ onBeforeUnmount(() => {
           aria-label="向管线智能助手提问"
           @keydown="handleComposerKeydown"
         />
-        <button v-if="busy" type="button" aria-label="停止回答" title="停止回答，保留已生成内容" @click="stopAnswer"><span aria-hidden="true">■</span></button>
-        <button v-else type="submit" :disabled="!available || !question.trim()" aria-label="发送问题">
-          <span v-if="workspace">开始对话</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h13"/></svg>
-        </button>
+        <div class="assistant-composer-actions">
+          <button ref="modelLauncher" class="assistant-model-icon" type="button" aria-label="打开个人模型接入"
+            :title="`${modelStatus} · 模型接入`" :aria-expanded="modelSettingsOpen" aria-haspopup="dialog" @click="openModelSettings">
+            <span v-if="modelMonogram" class="model-monogram" aria-hidden="true">{{ modelMonogram }}</span>
+            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z M4 7.5l8 4.5 8-4.5M12 12v9M8 5.3l8 4.5" /></svg>
+          </button>
+          <button v-if="busy" class="assistant-submit" type="button" aria-label="停止回答" title="停止回答，保留已生成内容" @click="stopAnswer"><span aria-hidden="true">■</span></button>
+          <button v-else class="assistant-submit" type="submit" :disabled="!available || !question.trim()" aria-label="发送问题">
+            <span v-if="workspace">开始对话</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h13"/></svg>
+          </button>
+        </div>
       </form>
       <footer><span class="assistant-model-status">{{ modelStatus }}</span>只读查询 · 不会代替您执行系统操作</footer>
     </section>
@@ -522,7 +527,7 @@ onBeforeUnmount(() => {
 .assistant-preferences label { display: block; margin: 8px 0; }
 .assistant-preferences select { margin-left: 10px; border: 1px solid var(--line); border-radius: 5px; padding: 3px; font: inherit; }
 .assistant-preferences textarea { display: block; width: 100%; margin-top: 4px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; resize: vertical; font: inherit; }
-.assistant-header { min-width: 0; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px auto 30px; align-items: center; gap: 8px; }
+.assistant-header { min-width: 0; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 30px; align-items: center; gap: 8px; }
 .assistant-mark { width: 32px; height: 32px; border-radius: 11px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; }
 .assistant-mark svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .assistant-header div { min-width: 0; display: grid; gap: 3px; }
@@ -562,11 +567,13 @@ onBeforeUnmount(() => {
 .assistant-error, .assistant-context-note { margin: 7px 16px 0; padding: 9px 10px; border-radius: 8px; font-size: 10px; line-height: 1.55; }
 .assistant-error { color: #9a3412; background: #fff2e8; }
 .assistant-context-note { color: var(--muted); background: var(--primary-soft); }
-.assistant-composer { margin: 10px 14px 0; padding: 5px 5px 5px 11px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: end; gap: 6px; }
+.assistant-composer { margin: 10px 14px 0; padding: 5px 5px 5px 11px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 6px; }
+.assistant-composer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.assistant-composer-actions > button { flex-shrink: 0; }
 .assistant-composer:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
 .assistant-composer textarea { min-height: 40px; max-height: 100px; padding: 6px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: inherit; font-size: 12px; line-height: 1.5; }
 .assistant-composer textarea::placeholder { color: var(--muted); }
-.assistant-composer button { width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.assistant-submit { width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--primary); color: #fff; cursor: pointer; display: grid; place-items: center; }
 .assistant-composer button:disabled { cursor: not-allowed; opacity: .45; }
 .assistant-composer svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .assistant-panel footer { padding: 8px 14px 11px; color: var(--muted); font-size: 9px; text-align: center; }
@@ -577,7 +584,7 @@ onBeforeUnmount(() => {
 }
 
 /* One conversation: a workspace canvas at home, a compact robot elsewhere. */
-.assistant-model-icon { width: 34px; height: 34px; padding: 7px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); color: var(--primary); display: grid; place-items: center; cursor: pointer; }
+.assistant-model-icon { width: 36px; height: 36px; padding: 7px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); color: var(--primary); display: grid; place-items: center; cursor: pointer; }
 .assistant-model-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .assistant-model-icon:hover { background: var(--primary-soft); border-color: var(--primary); }
 .model-monogram { font-size: 15px; font-weight: 750; }
@@ -589,19 +596,19 @@ onBeforeUnmount(() => {
 .workspace-intro h1 { margin: 17px 0 16px; color: var(--ink); font: 600 clamp(32px, 4vw, 54px)/1.25 "Noto Serif SC", "Songti SC", SimSun, serif; letter-spacing: .045em; }
 .workspace-intro p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
 .assistant-workspace .assistant-panel { position: relative; left: auto; right: auto; bottom: auto; width: 100%; height: auto; min-height: 240px; border: 1px solid color-mix(in srgb, var(--line) 65%, transparent); border-radius: 26px; box-shadow: 0 10px 40px rgba(22, 42, 45, .06); overflow: hidden; }
-.assistant-workspace .assistant-header { grid-template-columns: 34px minmax(0, 1fr) 34px auto; padding: 18px 24px 12px; border: 0; }
-.assistant-workspace .assistant-header small { font-size: 11px; }
+.assistant-workspace .assistant-header { grid-template-columns: minmax(0, 1fr); justify-items: end; padding: 12px 24px 0; border: 0; }
 .assistant-workspace .assistant-messages { min-height: 180px; height: min(46vh, 480px); flex: none; padding: 16px 24px; }
 .assistant-workspace .assistant-message { max-width: 96%; }
 .assistant-workspace .assistant-message.user { max-width: 85%; }
 .assistant-workspace .assistant-bubble { font-size: 14px; padding: 15px 18px; line-height: 1.9; }
 .assistant-workspace .assistant-preferences { order: 4; margin: 0 26px; font-size: 11px; }
-.assistant-workspace .assistant-composer { order: 3; grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin: 8px 24px 14px; padding: 16px 16px 12px; border-color: var(--line); border-radius: 16px; }
+.assistant-workspace .assistant-composer { order: 3; grid-template-columns: minmax(0, 1fr); align-items: end; margin: 8px 24px 14px; padding: 16px 16px 12px; border-color: var(--line); border-radius: 16px; }
 .assistant-workspace .assistant-composer textarea { min-height: 60px; font-size: 15px; line-height: 1.8; }
-.assistant-workspace .assistant-composer button { width: auto; min-width: 116px; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 0 17px; border-radius: 22px; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1; }
+.assistant-workspace .assistant-submit { width: auto; min-width: 116px; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 0 17px; border-radius: 22px; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1; }
+.assistant-workspace .assistant-model-icon { width: 40px; height: 40px; }
 .assistant-workspace .assistant-panel footer { order: 6; font-size: 10px; padding: 12px 24px 16px; }
 .assistant-workspace .assistant-model-status { display: inline; margin-right: 12px; }
-.workspace-idle .assistant-composer { min-height: 112px; border-color: transparent; padding: 8px 0; margin-top: 0; }
+.workspace-idle .assistant-composer { min-height: 150px; border-color: transparent; padding: 8px 0; margin-top: 16px; }
 .workspace-idle .assistant-composer:focus-within { border-color: transparent; box-shadow: none; }
 .workspace-idle .assistant-preferences { margin-top: 2px; }
 .workspace-prompts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; margin-top: 19px; }
@@ -622,7 +629,7 @@ onBeforeUnmount(() => {
   .assistant-workspace .assistant-messages { padding: 12px; height: min(44vh, 380px); }
   .assistant-workspace .assistant-composer { margin: 4px 14px 12px; padding: 8px; grid-template-columns: minmax(0, 1fr); }
   .assistant-workspace .assistant-composer textarea { min-height: 72px; }
-  .assistant-workspace .assistant-composer button { justify-self: end; min-width: 104px; font-size: 12px; }
+  .assistant-workspace .assistant-submit { min-width: 104px; font-size: 12px; }
   .assistant-workspace .assistant-preferences { margin: 0 16px; }
   .assistant-workspace .assistant-panel footer { padding: 10px 14px 14px; font-size: 9px; }
   .workspace-prompts { gap: 7px; }

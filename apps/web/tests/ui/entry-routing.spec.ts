@@ -81,10 +81,50 @@ async function identityFixture(page: Page, role?: UserRole, options: { unbound?:
     if (path === '/api/v1/dashboards/association') return fulfill({ metrics: [], activities: [], sceneDistribution: [], pendingTasks: [] })
     if (path.includes('notifications') || path.endsWith('/members/page')) return fulfill({ items: [], total: 0, page: 0, size: 20 })
     if (path.includes('/system-context/')) return fulfill([])
+    if (['/api/v1/members', '/api/v1/matches'].includes(path)) return fulfill([])
+    if (['/api/v1/offerings', '/api/v1/demands'].includes(path)) return fulfill({ items: [], total: 0, page: 0, size: 100 })
     // Fail closed for APIs outside the fixture; never proxy requests to a live service.
     return route.fulfill({ status: 403, json: { code: 'FORBIDDEN', message: 'Outside local UI fixture' } })
   })
   return { requests, pageErrors }
+}
+
+for (const width of [1440, 780, 320]) {
+  for (const [path, title, contentSelector] of [
+    ['/members', '会员企业', '.filter-panel'],
+    ['/ecosystem/overview', '产业生态数据概览', '.metrics-grid'],
+  ]) {
+    test(`business heading, description and actions share the content left edge: ${path} at ${width}px`, async ({ page }, info) => {
+      await page.setViewportSize({ width, height: 900 })
+      const { requests, pageErrors } = await identityFixture(page, 'ASSOCIATION_OPERATOR')
+      const writes: string[] = []
+      page.on('request', request => {
+        if (request.url().includes('/api/v1/') && request.method() !== 'GET') writes.push(request.method())
+      })
+      await page.goto(path)
+      if (width === 780) await page.evaluate(() => { document.documentElement.dataset.appearance = 'dark' })
+      const heading = page.locator('.page-heading')
+      await expect(heading.getByRole('heading', { name: title, exact: true })).toBeVisible()
+      await expect(page.locator(contentSelector)).toBeVisible()
+      const contentBox = (await page.locator(contentSelector).boundingBox())!
+      const titleBox = (await heading.locator('h1').boundingBox())!
+      const descriptionBox = (await heading.locator('p').boundingBox())!
+      const actionBox = (await heading.locator('.page-actions > :not(input)').first().boundingBox())!
+      for (const box of [titleBox, descriptionBox, actionBox]) expect(box.x).toBeCloseTo(contentBox.x, 0)
+      await expect(heading).toHaveCSS('text-align', 'left')
+      expect(actionBox.y).toBeGreaterThanOrEqual(descriptionBox.y + descriptionBox.height)
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1)
+      await page.screenshot({ path: info.outputPath(`heading-${path.includes('overview') ? 'ecosystem' : 'members'}-${width}.png`), fullPage: true, animations: 'disabled' })
+      // Stress the shared component with long values without inventing server data or changing authority.
+      await heading.locator('h1').evaluate(element => { element.textContent = '很长的业务标题与EnterpriseNameWithoutSpaces'.repeat(5) })
+      await heading.locator('p').evaluate(element => { element.textContent = 'LongUnbrokenDescription'.repeat(20) })
+      await heading.locator('.page-actions > :not(input)').first().evaluate(element => { element.textContent = '很长的业务操作ButtonWithoutSpaces'.repeat(5) })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1)
+      expect(writes).toEqual([])
+      expect(requests).toContain(path === '/members' ? '/api/v1/members/page' : '/api/v1/offerings')
+      expect(pageErrors).toEqual([])
+    })
+  }
 }
 
 test('anonymous entry has three working paths, and no role selector in OIDC mode', async ({ page }, info) => {

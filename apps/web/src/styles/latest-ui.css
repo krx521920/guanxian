@@ -1,8 +1,13 @@
 /* Latest gov-trust UI, integrated without replacing main's workflow and overlay styles. */
 .icon-button { width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 8px; color: #5a6880; background: #f2f5f8; display: grid; place-items: center; font-size: 15px; transition: background .15s ease, border-color .15s ease, color .15s ease; }
 .icon-button:hover:not(:disabled) { color: var(--primary); border-color: #cfdcea; background: var(--primary-soft); }
-.page-heading { margin-bottom: 28px; display: grid; justify-items: center; gap: 16px; text-align: center; }
-.page-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+/* Business headings share the content's left edge; the conversation hero has its own layout. */
+.page-heading { margin-bottom: 28px; display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; justify-items: start; gap: 16px; text-align: left; }
+.page-heading > div { max-width: 100%; min-width: 0; }
+.page-heading h1, .page-heading p { overflow-wrap: anywhere; }
+.page-actions { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 12px; max-width: 100%; }
+.page-actions:empty { display: none; }
+.page-heading .page-actions > :is(button, a) { max-width: 100%; height: auto; white-space: normal; overflow-wrap: anywhere; }
 .primary-button, .secondary-button, .danger-button { min-height: 40px; padding: 0 22px; border-radius: 8px; font-size: 14px; font-weight: 600; letter-spacing: .02em; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease; }
 .primary-button { border: 1px solid var(--primary-dark); color: #fff; background: var(--primary); box-shadow: 0 1px 2px rgba(18, 42, 74, .18), inset 0 1px 0 rgba(255, 255, 255, .12); }
 .primary-button:hover:not(:disabled) { background: var(--primary-dark); box-shadow: 0 3px 10px rgba(18, 42, 74, .22); transform: translateY(-1px); }
@@ -92,8 +97,6 @@ button:focus-visible, .primary-button:focus-visible, .secondary-button:focus-vis
 .lg-head > p, .lg-secure span { font-size: 13px; }
 .lp-cert { row-gap: 8px; }
 @media (max-width: 780px) {
-  .page-heading { justify-items: flex-start; text-align: left; }
-  .page-actions { justify-content: flex-start; }
   .lg-card { padding: 26px 20px 20px; }
   .lp-column { padding-top: 30px; }
   .lp-pipes { height: 130px; }
