@@ -316,7 +316,14 @@ function handleEscape(event: KeyboardEvent) {
     && !document.querySelector('[role="dialog"][aria-modal="true"]') && open.value) close()
 }
 
-watch(() => [auth.user.value?.id, auth.user.value?.associationId, auth.user.value?.enterpriseId, auth.user.value?.role], () => {
+// Watch primitive sources separately: a renewed (but identical) SessionUser object
+// must not be mistaken for an account/scope switch and erase an unsent draft.
+watch([
+  () => auth.user.value?.id,
+  () => auth.user.value?.associationId,
+  () => auth.user.value?.enterpriseId,
+  () => auth.user.value?.role,
+], () => {
   activeRequest?.abort(new DOMException('协会范围已切换', 'AbortError'))
   activeRequest = null
   requestRevision += 1
