@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
+import SourceDirectory from '../components/SourceDirectory.vue'
 import StatusBadge from '../components/StatusBadge.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
@@ -496,6 +497,7 @@ onMounted(load)
 
     <div v-if="!currentAssociationId && canManage" class="notice-banner warning">系统管理员需先在顶部选择协会上下文，才能代表该协会发起或审批操作。</div>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
+    <SourceDirectory kind="ASSOCIATION" />
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
 
     <template v-else>

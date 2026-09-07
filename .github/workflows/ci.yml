@@ -143,7 +143,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest', 'PostgresEcosystemSystemContextIntegrationTest', 'ManagedEnterpriseAccountsPostgresTest', 'PersonalModelPostgresTest', 'PostgresAssistantAllAssociationsIntegrationTest'):
+          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest', 'PostgresEcosystemSystemContextIntegrationTest', 'ManagedEnterpriseAccountsPostgresTest', 'PersonalModelPostgresTest', 'PostgresAssistantAllAssociationsIntegrationTest', 'SourceDirectoryPostgresTest'):
               reports = list(Path('bootstrap/target/surefire-reports').glob(f'TEST-*{name}.xml'))
               assert len(reports) == 1, f'Missing real database report: {name}'
               suite = ET.parse(reports[0]).getroot()
@@ -156,6 +156,16 @@ jobs:
           path: apps/server/bootstrap/target/bootstrap-0.1.0-SNAPSHOT.jar
           if-no-files-found: error
           retention-days: 1
+
+  platform-source-import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify guarded source import against isolated PostgreSQL
+        run: python tests/operations/platform_dataset_postgres_check.py
 
   web:
     runs-on: ubuntu-latest
