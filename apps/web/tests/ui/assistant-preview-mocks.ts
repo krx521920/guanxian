@@ -9,7 +9,7 @@ export const previewMemberReads: string[] = []
 export const previewFitRequests: Array<Record<string, unknown>> = []
 export const unavailableMembers = new Set<string>()
 declare global {
-  interface Window { __guanxianPreview: { requests: typeof previewRequests; memberReads: string[]; unavailableMembers: Set<string>; members: typeof fixtureMembers; fitRequests: typeof previewFitRequests; fitDelayMs?: number; fitMalformed?: boolean; switchRole?: () => void } }
+  interface Window { __guanxianPreview: { requests: typeof previewRequests; memberReads: string[]; unavailableMembers: Set<string>; members: typeof fixtureMembers; fitRequests: typeof previewFitRequests; fitDelayMs?: number; fitMalformed?: boolean; modelReadDelayMs?: number; switchRole?: () => void } }
 }
 export function installPreviewTransport() {
   if (!import.meta.env.DEV || import.meta.env.VITE_AUTH_MODE !== 'demo' || !['127.0.0.1', 'localhost'].includes(location.hostname)) {
@@ -32,6 +32,9 @@ export function installPreviewTransport() {
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
     if (url.pathname.endsWith('/model-settings/test')) return response({ success: true, message: '模拟响应成功：未连接真实模型，未验证真实 API Key。', latencyMs: 0 })
     if (url.pathname.endsWith('/model-settings')) {
+      if ((!init?.method || init.method === 'GET') && window.__guanxianPreview.modelReadDelayMs) {
+        await new Promise(resolve => setTimeout(resolve, window.__guanxianPreview.modelReadDelayMs))
+      }
       if (init?.method === 'PUT') {
         if (body.apiKey && body.apiKey !== 'preview-demo-key') return Response.json({ code: 'PREVIEW_ONLY', message: '仅接受演示密钥 preview-demo-key' }, { status: 400 })
         settings.saved = { provider: body.provider, model: body.model, enabled: body.enabled, hasKey: true, revision: crypto.randomUUID() }

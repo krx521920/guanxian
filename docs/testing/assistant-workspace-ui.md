@@ -28,6 +28,7 @@ npx playwright test --config playwright.entry.config.ts
 - 41 identity/enterprise browser tests pass. Three old association heading assertions were updated for the new hero title; role routing, selected navigation, inline vs floating assistant, and access boundaries are still asserted.
 - Desktop and mobile workspace/floating screenshots were visually reviewed. Browser fixtures use local synthetic API/identity/model responses; these tests do **not** establish real-model answer quality or production connectivity.
 - Release CI exposed an existing ambiguous invitation-test status locator: approval success and the follow-up list-loading status can coexist. The test now holds the list refresh with an explicit promise gate, verifies both distinct messages, and then verifies the bound account still has ordinary-member read-only rights. No application permission behavior was changed or test skipped.
+- Model-dialog Escape tests wait for the close control to become enabled: the existing modal deliberately blocks closing while an API operation is pending. Tests still require the dialog to disappear and keyboard focus to return to its header icon. No runtime behavior is changed by this readiness synchronization.
 
 ## Local interactive preview
 
