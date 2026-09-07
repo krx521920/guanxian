@@ -215,7 +215,8 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
         String label = switch (kind) { case "MEMBERS" -> "会员企业查询"; case "SELECTED_MEMBERS" -> "所选企业本轮核对"; case "COMPARISON" -> "企业对比"; case "RECOMMENDATIONS" -> "候选企业条件核对"; case "MEMBER_FIT_CHECK" -> "手动条件核对（未调用模型）";
             case "OFFERINGS" -> "产品服务查询"; case "DEMANDS" -> "合作需求查询"; case "MATCHES" -> "已有生态匹配记录"; default -> "协作事项查询"; };
         AssistantBusinessResults.record(context, AssistantBusinessResults.Result.create(kind, result.status(), label,
-                access.actor().associationId(), filters, result.total(), items));
+                access.actor().associationId(), filters, result.total(), items,
+                access.actor().isSystemAdmin() && access.actor().associationId() == null));
         return result;
     }
 
@@ -365,6 +366,9 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
     private static String extractKeyword(String value, QueryKind kind) {
         if (value == null || value.isBlank()) return null;
         String normalized = value.strip();
+        // Scope is supplied by the server actor, never inferred from these words.
+        // Do not accidentally search enterprise names for the scope selector itself.
+        normalized = normalized.replaceAll("(?:全部协会|所有协会|全协会)(?:范围内)?的?", "");
         List<String> noise = switch (kind) {
             case MEMBERS -> List.of(
                     "会员企业", "会员单位", "企业名单", "企业列表", "企业", "会员", "能力", "多少家", "哪些", "有");

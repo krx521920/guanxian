@@ -72,7 +72,7 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
         List<RetrievedChunk> matches = new ArrayList<>();
         for (MemoryChunk chunk : chunks.values()) {
             MemoryDocument document = documents.get(chunk.documentId());
-            if (document == null || chunk.version() != document.version() || !"PUBLISHED".equals(document.status())) continue;
+            if (document == null || document.deletedAt() != null || chunk.version() != document.version() || !"PUBLISHED".equals(document.status())) continue;
             if (!visibleTo(scope, document)) continue;
             double lexical = relevance(chunk.content(), query, terms);
             double semantic = Math.max(0, cosine(queryEmbedding, chunk.embedding()));
@@ -223,7 +223,7 @@ public class MemoryKnowledgeRepository implements KnowledgeRepository {
     int modelExecutionCount() { return modelExecutions.size(); }
 
     private boolean visibleTo(RetrievalScope scope, MemoryDocument document) {
-        if (!scope.associationId().equals(document.associationId())) return false;
+        if (!scope.allAssociations() && !scope.associationId().equals(document.associationId())) return false;
         if ("PUBLIC".equals(document.visibility()) || "ASSOCIATION".equals(document.visibility())) return true;
         return "PRIVATE".equals(document.visibility())
                 && (scope.privileged() || scope.actorSubject().equals(document.createdBySubject()));

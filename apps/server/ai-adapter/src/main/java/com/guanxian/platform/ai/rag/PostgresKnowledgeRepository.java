@@ -179,6 +179,7 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
                 .addValue("associationId", scope.associationId())
                 .addValue("actorSubject", scope.actorSubject())
                 .addValue("privileged", scope.privileged())
+                .addValue("allAssociations", scope.allAssociations())
                 .addValue("limit", Math.min(Math.max(100, limit * 40), 1000));
         List<String> matches = new ArrayList<>();
         List<String> scores = new ArrayList<>();
@@ -204,7 +205,7 @@ public class PostgresKnowledgeRepository implements KnowledgeRepository {
                   AND d.status = 'PUBLISHED'
                   AND dv.status = 'READY'
                   AND dv.version = d.current_version
-                  AND d.association_id = CAST(:associationId AS UUID)
+                  AND (CAST(:allAssociations AS BOOLEAN) OR d.association_id = CAST(:associationId AS UUID))
                   AND (d.visibility IN ('PUBLIC', 'ASSOCIATION')
                        OR (d.visibility = 'PRIVATE'
                            AND (CAST(:privileged AS BOOLEAN) OR d.created_by_subject = :actorSubject)))

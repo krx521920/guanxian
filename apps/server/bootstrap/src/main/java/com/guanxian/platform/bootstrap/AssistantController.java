@@ -81,7 +81,7 @@ public class AssistantController {
             Authentication authentication,
             ActorScope actor,
             UUID associationId) {
-        ActorScope scopedActor = associationId.equals(actor.associationId())
+        ActorScope scopedActor = java.util.Objects.equals(associationId, actor.associationId())
                 ? actor
                 : new ActorScope(
                         actor.userId(), actor.subject(), actor.username(), associationId,
@@ -97,6 +97,15 @@ public class AssistantController {
     }
 
     static UUID readAssociationId(UUID requested, ActorScope actor) {
+        if (actor.isSystemAdmin() && actor.associationId() == null && actor.enterpriseId() == null) {
+            if (requested != null) {
+                throw new ForbiddenException("SYSTEM_CONTEXT_FORBIDDEN",
+                        "request association cannot override the selected association context");
+            }
+            // A server-verified unscoped system administrator reads all associations.
+            // This does not grant an unbound ordinary account any business access.
+            return null;
+        }
         if (actor.associationId() == null) {
             throw new ForbiddenException(
                     "ASSOCIATION_CONTEXT_REQUIRED",

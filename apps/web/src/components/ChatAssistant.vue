@@ -65,12 +65,10 @@ const messages = ref<ChatMessage[]>([welcomeMessage()])
 const hasConversation = computed(() => messages.value.length > 1)
 const modelMonogram = computed(() => ({ DOUBAO: '豆', DEEPSEEK: 'D', KIMI: 'K', QWEN: 'Q' }[modelProvider.value || ''] || null))
 const pageTitle = computed(() => String(route.meta.title || '当前页面'))
-const requiresAssociation = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN' && !auth.user.value.associationId)
-const available = computed(() => !requiresAssociation.value)
+const allAssociations = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN' && !auth.user.value.associationId)
+const available = computed(() => Boolean(auth.user.value))
 const latestMode = computed(() => [...messages.value].reverse().find((item) => item.role === 'assistant' && item.mode)?.mode || 'AUTO')
-const statusText = computed(() => requiresAssociation.value
-  ? '请先在左侧选择管理协会'
-  : `${pageTitle.value} · ${assistantModeLabel(latestMode.value)}`)
+const statusText = computed(() => `${pageTitle.value} · ${allAssociations.value ? '全部协会 · ' : ''}${assistantModeLabel(latestMode.value)}`)
 const quickQuestions = computed(() => {
   if (props.workspace) return ['现在有哪些会员企业？', '当前有哪些合作需求？', '当前有哪些协作事项？']
   if (route.path.startsWith('/policies')) {
@@ -445,7 +443,6 @@ onBeforeUnmount(() => {
       </div>
 
       <p v-if="error" class="assistant-error" role="alert">{{ error }}</p>
-      <p v-if="requiresAssociation" class="assistant-context-note">系统管理员需先从左侧选择管理协会，问答内容才会按该协会隔离。</p>
 
       <details class="assistant-preferences">
         <summary>回答设置 · {{ { AUTO: '自动详略', BRIEF: '简洁', STANDARD: '标准', DETAILED: '详细' }[responseDetail] }}{{ taskGoal.trim() ? ' · 已固定任务目标' : '' }}</summary>
@@ -472,7 +469,7 @@ onBeforeUnmount(() => {
           rows="2"
           maxlength="2000"
           :disabled="busy || !available"
-          :placeholder="!available ? '请先选择管理协会' : workspace ? '今天，有什么业务问题想了解？' : '输入问题，Enter 发送，Shift + Enter 换行'"
+          :placeholder="workspace ? '今天，有什么业务问题想了解？' : '输入问题，Enter 发送，Shift + Enter 换行'"
           aria-label="向管线智能助手提问"
           @keydown="handleComposerKeydown"
         />

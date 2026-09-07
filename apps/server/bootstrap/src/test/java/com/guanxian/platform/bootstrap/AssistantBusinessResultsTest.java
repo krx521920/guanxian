@@ -49,6 +49,33 @@ class AssistantBusinessResultsTest {
         assertThat(journal.snapshot().getLast().toString()).doesNotContain("SECRET");
     }
 
+    @Test void allAssociationLocalQueryUsesVerifiedGlobalActorAndLabelsItsReceipt() {
+        var global = new ActorScope(null, "system", "system", null, null, Set.of("SYSTEM_ADMIN"), Set.of());
+        when(members.findAll(null, null, false, global)).thenReturn(List.of(member(UUID.randomUUID())));
+        var local = tools.answer(new AssistantLocalQueryProvider.LocalQueryRequest(
+                new AssistantAccessContext(global, Set.of("MEMBER_READ")),
+                "查询全部协会的会员企业", "协会工作台", "/dashboard")).orElseThrow();
+        assertThat(local.businessResults()).hasSize(1);
+        var receipt = local.businessResults().getFirst();
+        assertThat(receipt.associationId()).isNull();
+        assertThat(receipt.scope()).contains("全部协会");
+        assertThat(receipt.total()).isEqualTo(1);
+        verify(members).findAll(null, null, false, global);
+        var denied = new AssistantBusinessResults();
+        assertThat(tools.searchMemberEnterprises(null, context(global, Set.of(), denied)).status()).isEqualTo("FORBIDDEN");
+        verifyNoMoreInteractions(members);
+    }
+
+    @Test void sayingAllAssociationsDoesNotExpandAnOrdinaryAccountsScope() {
+        when(members.findAll(null, null, false, actor)).thenReturn(List.of());
+        var local = tools.answer(new AssistantLocalQueryProvider.LocalQueryRequest(
+                new AssistantAccessContext(actor, Set.of("MEMBER_READ")),
+                "查询所有协会的会员企业", "会员企业", "/members")).orElseThrow();
+        assertThat(local.businessResults().getFirst().associationId()).isEqualTo(actor.associationId());
+        assertThat(local.businessResults().getFirst().scope()).doesNotContain("全部协会");
+        verify(members).findAll(null, null, false, actor);
+    }
+
     @Test void comparisonRechecksEveryIdAndUsesCurrentFields() {
         UUID first = UUID.randomUUID(), second = UUID.randomUUID();
         when(members.get(first, actor)).thenReturn(member(first));

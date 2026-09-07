@@ -125,20 +125,24 @@ test('mobile canvas and expandable robot fit the screen, including response sett
   await expect(robot).toBeFocused()
 })
 
-test('scope and identity changes discard prior conversation, and an unselected association cannot send', async ({ page }) => {
+test('scope changes discard prior conversation and no selection defaults to all associations', async ({ page }) => {
   await start(page)
   await send(page, '测试停止')
   await expect(page.getByText('正在输出 · 内容尚未完成')).toBeVisible()
   await page.evaluate(() => window.__workspacePreview.noAssociation())
-  await expect(page.getByLabel('向管线智能助手提问')).toBeDisabled()
+  await expect(page.getByLabel('向管线智能助手提问')).toBeEnabled()
   await expect(page.getByRole('button', { name: '发送问题' })).toBeDisabled()
   await expect(page.locator('.assistant-message.user')).toHaveCount(0)
   await expect(page.locator('.assistant-trace')).toHaveCount(0)
+  await expect(page.getByText('系统管理员需先从左侧选择管理协会，问答内容才会按该协会隔离。')).toHaveCount(0)
+  await send(page, '查询全部协会的会员企业')
+  await expect(page.locator('.assistant-trace')).toHaveCount(1)
+  expect(await page.evaluate(() => window.__guanxianPreview.requests.at(-1)?.associationId)).toBeNull()
   await page.evaluate(() => window.__workspacePreview.switchEnterprise())
   await expect(page.locator('.assistant-workspace')).toHaveCount(0)
   await page.getByRole('button', { name: '打开管线智能助手' }).click()
   await expect(page.locator('.assistant-message.user')).toHaveCount(0)
-  expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(1)
+  expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(2)
 })
 
 test('a narrow-screen stream survives navigation and remains stoppable from the expanded robot', async ({ page }) => {

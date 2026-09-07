@@ -30,8 +30,13 @@ public final class AssistantBusinessResults {
         public Result { filters = Map.copyOf(filters); items = List.copyOf(items); }
         public static Result create(String kind, String status, String label, UUID associationId,
                                     Map<String, String> filters, long total, List<Item> items) {
+            return create(kind, status, label, associationId, filters, total, items, false);
+        }
+        public static Result create(String kind, String status, String label, UUID associationId,
+                                    Map<String, String> filters, long total, List<Item> items, boolean allAssociations) {
             return new Result(1, UUID.randomUUID(), kind, status, label, associationId,
-                    "当前账号有权查看的资料；可能包含按可见范围授权的跨协会资料", filters, Instant.now(), total, items);
+                    allAssociations ? "全部协会（仅限当前账号有权查看的资料）"
+                            : "当前账号有权查看的资料；可能包含按可见范围授权的跨协会资料", filters, Instant.now(), total, items);
         }
     }
 }

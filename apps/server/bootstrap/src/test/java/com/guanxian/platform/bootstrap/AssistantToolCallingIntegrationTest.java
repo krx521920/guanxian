@@ -17,6 +17,8 @@ import com.guanxian.platform.member.api.MemberProfile;
 import com.guanxian.platform.member.internal.MemberService;
 import com.guanxian.platform.shared.security.ActorScope;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -86,14 +88,16 @@ class AssistantToolCallingIntegrationTest {
         assertThat(request.businessResults().snapshot().getLast().items().getFirst().evidence().getFirst().state()).isEqualTo("MATCHED");
     }
 
-    @Test
-    void modelSelectedBusinessToolUsesScopedServiceAndStreamsItsResult() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void modelSelectedBusinessToolUsesScopedServiceAndStreamsItsResult(boolean allAssociations) {
         MemberService memberService = mock(MemberService.class);
+        UUID associationId = UUID.randomUUID();
         ActorScope actor = new ActorScope(
-                null, "actor-1", "operator", UUID.randomUUID(), null,
-                Set.of("ASSOCIATION_OPERATOR"), Set.of());
+                null, "actor-1", "operator", allAssociations ? null : associationId, null,
+                Set.of(allAssociations ? "SYSTEM_ADMIN" : "ASSOCIATION_OPERATOR"), Set.of());
         MemberProfile member = new MemberProfile(
-                UUID.randomUUID(), actor.associationId(), "京城管网科技", "91110000SECRET0001",
+                UUID.randomUUID(), associationId, "京城管网科技", "91110000SECRET0001",
                 "技术服务", "北京市", "张工", "13800000000", "zhang@example.cn", "简介",
                 List.of("管线监测"), List.of("监测平台"), List.of("数据服务"), List.of("燃气"),
                 List.of(), "MEMBERS", "ACTIVE", 1, Instant.EPOCH, Instant.EPOCH,
@@ -147,6 +151,8 @@ class AssistantToolCallingIntegrationTest {
         assertThat(answer.answer()).doesNotContain("13800000000", "91110000SECRET0001");
         assertThat(answer.businessResults()).hasSize(1).isEqualTo(events.get(2).businessResults());
         var receipt = answer.businessResults().getFirst();
+        assertThat(receipt.associationId()).isEqualTo(actor.associationId());
+        assertThat(receipt.scope().contains("全部协会")).isEqualTo(allAssociations);
         assertThat(receipt.filters()).containsEntry("关键词", "监测");
         assertThat(receipt.items()).hasSize(1);
         assertThat(receipt.items().getFirst().id()).isEqualTo(member.id());
