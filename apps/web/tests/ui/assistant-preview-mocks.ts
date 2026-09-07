@@ -9,7 +9,7 @@ export const previewMemberReads: string[] = []
 export const previewFitRequests: Array<Record<string, unknown>> = []
 export const unavailableMembers = new Set<string>()
 declare global {
-  interface Window { __guanxianPreview: { requests: typeof previewRequests; memberReads: string[]; unavailableMembers: Set<string>; members: typeof fixtureMembers; fitRequests: typeof previewFitRequests; fitDelayMs?: number; fitMalformed?: boolean; switchRole?: () => void } }
+  interface Window { __guanxianPreview: { requests: typeof previewRequests; memberReads: string[]; unavailableMembers: Set<string>; members: typeof fixtureMembers; fitRequests: typeof previewFitRequests; fitDelayMs?: number; fitMalformed?: boolean; modelReadDelayMs?: number; switchRole?: () => void } }
 }
 export function installPreviewTransport() {
   if (!import.meta.env.DEV || import.meta.env.VITE_AUTH_MODE !== 'demo' || !['127.0.0.1', 'localhost'].includes(location.hostname)) {
@@ -24,7 +24,7 @@ export function installPreviewTransport() {
     { id: 'KIMI', label: 'Kimi', endpoint: 'https://api.moonshot.cn/v1/chat/completions', modelHint: '填写模型 ID', documentationUrl: 'https://platform.kimi.com/docs/' },
     { id: 'QWEN', label: '千问 · 阿里云百炼（北京）', endpoint: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', modelHint: '填写模型 ID', documentationUrl: 'https://help.aliyun.com/zh/model-studio/' },
   ] }
-  const response = (data: unknown) => Response.json({ code: 'OK', data })
+    const response = (data: unknown) => Response.json({ code: 'OK', data })
   window.fetch = async (input, init) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href)
     if (!url.pathname.startsWith('/api/v1/')) return originalFetch(input, init)
@@ -32,6 +32,9 @@ export function installPreviewTransport() {
     const body = typeof init?.body === 'string' ? JSON.parse(init.body) : {}
     if (url.pathname.endsWith('/model-settings/test')) return response({ success: true, message: '模拟响应成功：未连接真实模型，未验证真实 API Key。', latencyMs: 0 })
     if (url.pathname.endsWith('/model-settings')) {
+      if ((!init?.method || init.method === 'GET') && window.__guanxianPreview.modelReadDelayMs) {
+        await new Promise(resolve => setTimeout(resolve, window.__guanxianPreview.modelReadDelayMs))
+      }
       if (init?.method === 'PUT') {
         if (body.apiKey && body.apiKey !== 'preview-demo-key') return Response.json({ code: 'PREVIEW_ONLY', message: '仅接受演示密钥 preview-demo-key' }, { status: 400 })
         settings.saved = { provider: body.provider, model: body.model, enabled: body.enabled, hasKey: true, revision: crypto.randomUUID() }
@@ -64,6 +67,8 @@ export function installPreviewTransport() {
       if (!member || unavailableMembers.has(id)) return Response.json({ code: 'FORBIDDEN', message: 'fixture unavailable' }, { status: 403 })
       return Response.json({ code: 'OK', data: member }, { headers: { ETag: '"1"' } })
     }
+    if (url.pathname.endsWith('/dashboards/association')) return response({ metrics: [], activities: [], sceneDistribution: [], pendingTasks: [] })
+    if (url.pathname.endsWith('/system-context/associations') || url.pathname.endsWith('/system-context/enterprises')) return response([])
     if (!url.pathname.endsWith('/assistant/chat/stream')) return response({ items: [], total: 0 })
     previewRequests.push(body)
     const question = String(body.message)

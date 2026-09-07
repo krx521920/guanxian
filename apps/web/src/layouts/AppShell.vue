@@ -4,7 +4,7 @@ import { useRoute, useRouter, RouterLink, RouterView, type RouteLocationRaw } fr
 import ChatAssistant from '../components/ChatAssistant.vue'
 import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
-import { defaultRouteForRole, roleLabels } from '../config/roles'
+import { associationRoles, defaultRouteForRole, roleLabels } from '../config/roles'
 import { useAuth } from '../services/auth'
 import { createLatestRequestGate } from '../services/latest-request'
 import { platformApi } from '../services/platform-api'
@@ -66,6 +66,7 @@ const notificationHasNextPage = computed(() => notificationPageIndex.value + 1 <
 const isSystemAdmin = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN')
 const crumbOrganization = computed(() => auth.user.value?.organization || '管线智联平台')
 const workspaceHome = computed(() => auth.user.value ? defaultRouteForRole(auth.user.value.role) : '/')
+const assistantWorkspace = computed(() => route.path === '/association' && !!auth.user.value && associationRoles.includes(auth.user.value.role))
 const identityKey = computed(() => `${auth.user.value?.id}:${auth.user.value?.role}`)
 
 watch(() => auth.user.value, (user) => {
@@ -556,7 +557,10 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </header>
-      <div class="page-container"><RouterView :key="`${identityKey}:${route.fullPath}:${contextRevision}`" /></div>
+      <div class="page-container" :class="{ 'conversation-workspace': assistantWorkspace }">
+        <ChatAssistant :key="identityKey" :workspace="assistantWorkspace" />
+        <RouterView :key="`${identityKey}:${route.fullPath}:${contextRevision}`" />
+      </div>
     </main>
 
     <div v-if="settingsOpen" class="settings-backdrop" @click.self="closeSettings">
@@ -591,11 +595,11 @@ onBeforeUnmount(() => {
         </form>
       </section>
     </div>
-    <ChatAssistant :key="identityKey" />
   </div>
 </template>
 
 <style scoped>
+.sidebar-status { margin-bottom: 0; }
 .preferences-button { color: var(--ink) !important; }
 .public-portal-link { display: block; padding: 10px 12px; color: var(--ink); font-size: 13px; border-radius: 6px; }
 .public-portal-link:hover { background: var(--primary-soft); }

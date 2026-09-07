@@ -5,6 +5,7 @@ import { useAuth } from '../services/auth'
 import { platformApi } from '../services/platform-api'
 import type { KnowledgeCitation } from '../types/domain'
 import { assistantErrorMessage, assistantModeLabel, assistantPhaseLabel, safeCitationUrl, shouldSendAssistantMessage } from './chat-assistant'
+import AssistantRobotIcon from './AssistantRobotIcon.vue'
 import PersonalModelSettings from './PersonalModelSettings.vue'
 import AssistantBusinessResults from './AssistantBusinessResults.vue'
 import { followupSelection, type BusinessResult, type SelectedEnterprise } from '../services/assistant-business-results'
@@ -24,10 +25,13 @@ interface ChatMessage {
   businessResults?: BusinessResult[]
 }
 
+const props = withDefaults(defineProps<{ workspace?: boolean }>(), { workspace: false })
 const route = useRoute()
 const auth = useAuth()
 const open = ref(false)
 const modelSettingsOpen = ref(false)
+const chatLauncher = ref<HTMLButtonElement | null>(null)
+const modelProvider = ref<string | null>(null)
 const modelLauncher = ref<HTMLButtonElement | null>(null)
 const modelStatus = ref('使用平台默认模式')
 let modelStatusRevision = 0
@@ -58,6 +62,8 @@ const welcomeMessage = (): ChatMessage => ({
 })
 
 const messages = ref<ChatMessage[]>([welcomeMessage()])
+const hasConversation = computed(() => messages.value.length > 1)
+const modelMonogram = computed(() => ({ DOUBAO: '豆', DEEPSEEK: 'D', KIMI: 'K', QWEN: 'Q' }[modelProvider.value || ''] || null))
 const pageTitle = computed(() => String(route.meta.title || '当前页面'))
 const requiresAssociation = computed(() => auth.user.value?.role === 'SYSTEM_ADMIN' && !auth.user.value.associationId)
 const available = computed(() => !requiresAssociation.value)
@@ -66,6 +72,7 @@ const statusText = computed(() => requiresAssociation.value
   ? '请先在左侧选择管理协会'
   : `${pageTitle.value} · ${assistantModeLabel(latestMode.value)}`)
 const quickQuestions = computed(() => {
+  if (props.workspace) return ['现在有哪些会员企业？', '当前有哪些合作需求？', '当前有哪些协作事项？']
   if (route.path.startsWith('/policies')) {
     return ['资料中有哪些安全管理要求？', '哪些条款与会员企业有关？']
   }
@@ -89,6 +96,7 @@ function toggle() {
   error.value = ''
   if (open.value) {
     void nextTick(() => input.value?.focus())
+    void scrollToLatest()
     void refreshModelStatus()
   }
 }
@@ -98,12 +106,15 @@ async function refreshModelStatus() {
   const userId = auth.user.value?.id
   try {
     const value = await personalModelApi.get()
-    if (revision === modelStatusRevision && userId === auth.user.value?.id) modelStatus.value = personalModelLabel(value)
+    if (revision === modelStatusRevision && userId === auth.user.value?.id) {
+      modelStatus.value = personalModelLabel(value)
+      modelProvider.value = value.saved?.enabled ? value.saved.provider : null
+    }
   } catch { if (revision === modelStatusRevision && userId === auth.user.value?.id) modelStatus.value = '模型配置状态暂不可用' }
 }
 
 function openModelSettings() {
-  open.value = false
+  // Keep the same conversation mounted beneath the settings dialog.
   modelSettingsOpen.value = true
 }
 
@@ -116,11 +127,13 @@ function modelSettingsChanged(value: ModelSettings) {
   modelStatusRevision += 1
   clearConversation()
   modelStatus.value = personalModelLabel(value)
+  modelProvider.value = value.saved?.enabled ? value.saved.provider : null
 }
 
 function close() {
   open.value = false
   error.value = ''
+  void nextTick(() => chatLauncher.value?.focus())
 }
 
 function clearConversation() {
@@ -137,7 +150,7 @@ function clearConversation() {
   followLatest.value = true
   freshContext.value = false
   taskGoal.value = ''
-  void nextTick(() => input.value?.focus())
+  if (!modelSettingsOpen.value) void nextTick(() => input.value?.focus())
 }
 
 async function scrollToLatest(force = false) {
@@ -299,7 +312,8 @@ function handleComposerKeydown(event: KeyboardEvent) {
 }
 
 function handleEscape(event: KeyboardEvent) {
-  if (event.key === 'Escape' && open.value) close()
+  if (event.key === 'Escape' && !event.defaultPrevented && !modelSettingsOpen.value
+    && !document.querySelector('[role="dialog"][aria-modal="true"]') && open.value) close()
 }
 
 watch(() => [auth.user.value?.id, auth.user.value?.associationId, auth.user.value?.enterpriseId, auth.user.value?.role], () => {
@@ -318,7 +332,22 @@ watch(() => [auth.user.value?.id, auth.user.value?.associationId, auth.user.valu
   taskGoal.value = ''
   responseDetail.value = 'AUTO'
   modelStatus.value = '使用平台默认模式'
+  modelProvider.value = null
+  modelSettingsOpen.value = false
   modelStatusRevision += 1
+  if (props.workspace) void refreshModelStatus()
+})
+
+watch(() => props.workspace, (workspace) => {
+  open.value = false
+  if (workspace) {
+    void refreshModelStatus()
+    void scrollToLatest()
+  }
+}, { immediate: true })
+watch(() => route.path, () => {
+  open.value = false
+  modelSettingsOpen.value = false
 })
 
 window.addEventListener('keydown', handleEscape)
@@ -331,29 +360,38 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="assistant-root">
+  <div class="assistant-root" :class="{ 'assistant-workspace': workspace, 'workspace-idle': workspace && !hasConversation }">
+    <header v-if="workspace" class="workspace-intro">
+      <span class="workspace-eyebrow"><i /> ASSOCIATION WORKSPACE</span>
+      <h1>{{ hasConversation ? '让每一步，都有据可循' : '从一个问题开始' }}</h1>
+      <p>查会员、读政策、跟进协作。把问题交给助手，把判断留给您。</p>
+    </header>
     <PersonalModelSettings v-if="modelSettingsOpen" @close="closeModelSettings" @changed="modelSettingsChanged" />
     <section
-      v-if="open"
+      v-if="workspace || open"
+      :inert="modelSettingsOpen"
       id="platform-chat-assistant"
       class="assistant-panel"
-      role="dialog"
-      aria-modal="false"
+      :role="workspace ? 'region' : 'dialog'"
+      :aria-modal="workspace ? undefined : 'false'"
       aria-labelledby="assistant-title"
     >
       <header class="assistant-header">
-        <span class="assistant-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7v1a4 4 0 0 0 0 8h2v-7H5v-2a7 7 0 0 1 14 0v2h-2v7h2a2 2 0 0 1-2 2h-3"/><path d="M9 17c.8.7 1.8 1 3 1s2.2-.3 3-1"/></svg>
-        </span>
+        <span class="assistant-mark" aria-hidden="true"><AssistantRobotIcon /></span>
         <div>
           <strong id="assistant-title">管线智能助手</strong>
           <small>{{ statusText }}</small>
         </div>
+        <button ref="modelLauncher" class="assistant-model-icon" type="button" aria-label="打开个人模型接入"
+          :title="`${modelStatus} · 模型接入`" :aria-expanded="modelSettingsOpen" aria-haspopup="dialog" @click="openModelSettings">
+          <span v-if="modelMonogram" class="model-monogram" aria-hidden="true">{{ modelMonogram }}</span>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z M4 7.5l8 4.5 8-4.5M12 12v9M8 5.3l8 4.5" /></svg>
+        </button>
         <button class="assistant-clear" type="button" :disabled="messages.length === 1" @click="clearConversation">{{ busy ? '取消并清空' : '清空' }}</button>
-        <button class="assistant-close" type="button" aria-label="关闭智能助手" @click="close">×</button>
+        <button v-if="!workspace" class="assistant-close" type="button" aria-label="关闭智能助手" @click="close">×</button>
       </header>
 
-      <div ref="messageList" class="assistant-messages" aria-label="聊天记录" @scroll="trackScroll">
+      <div v-show="!workspace || hasConversation" ref="messageList" class="assistant-messages" aria-label="聊天记录" @scroll="trackScroll">
         <article v-for="message in messages" :key="message.id" class="assistant-message" :class="message.role">
           <span class="assistant-role">{{ message.role === 'assistant' ? '助手' : '您' }}</span>
           <div class="assistant-bubble">
@@ -397,7 +435,7 @@ onBeforeUnmount(() => {
         <p v-if="freshContext" class="assistant-context-note">下一次提问将使用新会话；所选企业仍会重新核验。</p>
       </div>
 
-      <div v-if="messages.length === 1" class="assistant-prompts" aria-label="快捷问题">
+      <div v-if="!workspace && messages.length === 1" class="assistant-prompts" aria-label="快捷问题">
         <button v-for="item in quickQuestions" :key="item" type="button" :disabled="!available" @click="ask(item)">{{ item }}</button>
       </div>
 
@@ -429,23 +467,26 @@ onBeforeUnmount(() => {
           rows="2"
           maxlength="2000"
           :disabled="busy || !available"
-          :placeholder="available ? '输入问题，Enter 发送，Shift + Enter 换行' : '请先选择管理协会'"
+          :placeholder="!available ? '请先选择管理协会' : workspace ? '今天，有什么业务问题想了解？' : '输入问题，Enter 发送，Shift + Enter 换行'"
           aria-label="向管线智能助手提问"
           @keydown="handleComposerKeydown"
         />
         <button v-if="busy" type="button" aria-label="停止回答" title="停止回答，保留已生成内容" @click="stopAnswer"><span aria-hidden="true">■</span></button>
         <button v-else type="submit" :disabled="!available || !question.trim()" aria-label="发送问题">
+          <span v-if="workspace">开始对话</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 16 8-16 8 3-8-3-8Z"/><path d="M7 12h13"/></svg>
         </button>
       </form>
       <footer><span class="assistant-model-status">{{ modelStatus }}</span>只读查询 · 不会代替您执行系统操作</footer>
     </section>
 
-    <button ref="modelLauncher" class="model-access-launcher" type="button" aria-label="打开个人模型接入" :aria-expanded="modelSettingsOpen" @click="openModelSettings">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v5m6-5v5M6 8h12v3a6 6 0 0 1-12 0V8Zm6 9v4" /></svg>
-      <span>模型接入</span>
-    </button>
+    <nav v-if="workspace && !hasConversation" class="workspace-prompts" aria-label="工作台快捷问题">
+      <span>试着问问</span>
+      <button v-for="item in quickQuestions" :key="item" type="button" :disabled="!available" @click="ask(item)">{{ item }} <span aria-hidden="true">↗</span></button>
+    </nav>
     <button
+      v-if="!workspace"
+      ref="chatLauncher"
       class="assistant-launcher"
       type="button"
       aria-controls="platform-chat-assistant"
@@ -453,8 +494,7 @@ onBeforeUnmount(() => {
       :aria-label="open ? '关闭管线智能助手' : '打开管线智能助手'"
       @click="toggle"
     >
-      <svg v-if="!open" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/><path d="M8 9h8M8 13h5"/></svg>
-      <span v-if="!open">聊天</span>
+      <AssistantRobotIcon v-if="!open" />
       <span v-else aria-hidden="true">×</span>
     </button>
   </div>
@@ -463,17 +503,13 @@ onBeforeUnmount(() => {
 <style scoped>
 .assistant-selection{margin:8px 14px 0;font-size:12px;padding:9px 11px;background:var(--primary-soft);border-radius:10px;max-height:150px;overflow:auto}.assistant-selection>div{display:flex;justify-content:space-between;gap:8px;align-items:center}.assistant-selection ul{list-style:none;margin:6px 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}.assistant-selection li{display:flex;align-items:center;gap:4px;max-width:100%;border:1px solid var(--line);border-radius:7px;padding:3px 6px;background:var(--panel)}.assistant-selection li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px}.assistant-selection button{padding:2px 5px;font:inherit;background:transparent;color:var(--primary);border:0;cursor:pointer;flex-shrink:0}.assistant-selection button:disabled{opacity:.45;cursor:not-allowed}.assistant-selection-note{display:block;color:var(--muted);margin-bottom:8px;overflow-wrap:anywhere}
 .assistant-root { position: relative; z-index: 75; }
-.assistant-launcher { position: fixed; left: 20px; bottom: 20px; min-width: 132px; height: 48px; padding: 0 18px; border: 1px solid color-mix(in srgb, var(--primary) 80%, #fff); border-radius: 24px; background: var(--primary); color: #fff; box-shadow: 0 12px 30px rgba(20, 61, 76, .22); display: inline-flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; }
-.model-access-launcher { position: fixed; left: 20px; bottom: 78px; min-width: 132px; height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 22px; background: var(--panel); color: var(--primary); box-shadow: 0 5px 18px rgba(20, 61, 76, .1); display: inline-flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; }
-.model-access-launcher svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.model-access-launcher:hover { background: var(--primary-soft); }
-.model-access-launcher:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.assistant-launcher { position: fixed; right: 24px; bottom: max(22px, env(safe-area-inset-bottom)); min-width: 56px; width: 56px; height: 56px; padding: 0; border: 1px solid color-mix(in srgb, var(--primary) 80%, #fff); border-radius: 20px; background: var(--primary); color: #fff; box-shadow: 0 8px 24px color-mix(in srgb, var(--primary) 23%, transparent); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; font-weight: 700; }
 .assistant-model-status { display: block; margin-bottom: 4px; color: var(--primary); }
 .assistant-launcher:hover { filter: brightness(1.06); transform: translateY(-1px); }
 .assistant-launcher:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent); outline-offset: 3px; }
-.assistant-launcher svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.assistant-launcher[aria-expanded="true"] { min-width: 48px; width: 48px; padding: 0; font-size: 24px; }
-.assistant-panel { position: fixed; left: 168px; bottom: 20px; width: min(440px, calc(100vw - 192px)); height: min(680px, calc(100dvh - 40px)); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--panel); color: var(--ink); box-shadow: 0 22px 65px rgba(8, 28, 40, .24); display: flex; flex-direction: column; }
+.assistant-launcher svg { width: 27px; height: 27px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.assistant-launcher[aria-expanded="true"] { font-size: 24px; }
+.assistant-panel { position: fixed; right: 24px; bottom: calc(max(22px, env(safe-area-inset-bottom)) + 68px); width: min(480px, calc(100vw - 40px)); height: min(700px, calc(100dvh - 116px)); border: 1px solid var(--line); border-radius: 22px; overflow: hidden; background: var(--panel); color: var(--ink); box-shadow: 0 24px 80px rgba(8, 28, 40, .17); display: flex; flex-direction: column; }
 .assistant-panel > * { flex-shrink: 0; }
 .assistant-panel > .assistant-messages { flex: 1 1 auto; }
 .assistant-progress { display: block; color: var(--muted); margin-top: 6px; }
@@ -486,8 +522,8 @@ onBeforeUnmount(() => {
 .assistant-preferences label { display: block; margin: 8px 0; }
 .assistant-preferences select { margin-left: 10px; border: 1px solid var(--line); border-radius: 5px; padding: 3px; font: inherit; }
 .assistant-preferences textarea { display: block; width: 100%; margin-top: 4px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; resize: vertical; font: inherit; }
-.assistant-header { min-width: 0; padding: 14px 14px 13px; border-bottom: 1px solid var(--line); background: linear-gradient(135deg, var(--primary-soft), var(--panel)); display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 30px; align-items: center; gap: 9px; }
-.assistant-mark { width: 36px; height: 36px; border-radius: 12px; background: var(--primary); color: #fff; display: grid; place-items: center; }
+.assistant-header { min-width: 0; padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: grid; grid-template-columns: 34px minmax(0, 1fr) 34px auto 30px; align-items: center; gap: 8px; }
+.assistant-mark { width: 32px; height: 32px; border-radius: 11px; background: var(--primary-soft); color: var(--primary); display: grid; place-items: center; }
 .assistant-mark svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .assistant-header div { min-width: 0; display: grid; gap: 3px; }
 .assistant-header strong { font-size: 14px; }
@@ -501,7 +537,7 @@ onBeforeUnmount(() => {
 .assistant-message { max-width: 88%; display: grid; gap: 5px; }
 .assistant-message.user { align-self: flex-end; justify-items: end; }
 .assistant-role { padding: 0 4px; color: var(--muted); font-size: 9px; }
-.assistant-bubble { padding: 11px 13px; border: 1px solid var(--line); border-radius: 5px 13px 13px 13px; background: var(--surface-soft); font-size: 12px; line-height: 1.7; }
+.assistant-bubble { padding: 11px 13px; border: 1px solid var(--line); border-radius: 5px 13px 13px 13px; background: var(--surface-soft); font-size: 13px; line-height: 1.7; }
 .assistant-message.user .assistant-bubble { border-color: transparent; border-radius: 13px 5px 13px 13px; background: var(--primary); color: #fff; }
 .assistant-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .assistant-mode { display: inline-flex; margin-top: 8px; padding: 3px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); font-size: 9px; font-weight: 700; }
@@ -526,7 +562,7 @@ onBeforeUnmount(() => {
 .assistant-error, .assistant-context-note { margin: 7px 16px 0; padding: 9px 10px; border-radius: 8px; font-size: 10px; line-height: 1.55; }
 .assistant-error { color: #9a3412; background: #fff2e8; }
 .assistant-context-note { color: var(--muted); background: var(--primary-soft); }
-.assistant-composer { margin: 10px 14px 0; padding: 5px 5px 5px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: end; gap: 6px; }
+.assistant-composer { margin: 10px 14px 0; padding: 5px 5px 5px 11px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: end; gap: 6px; }
 .assistant-composer:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 12%, transparent); }
 .assistant-composer textarea { min-height: 40px; max-height: 100px; padding: 6px 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--ink); font: inherit; font-size: 12px; line-height: 1.5; }
 .assistant-composer textarea::placeholder { color: var(--muted); }
@@ -535,14 +571,62 @@ onBeforeUnmount(() => {
 .assistant-composer svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .assistant-panel footer { padding: 8px 14px 11px; color: var(--muted); font-size: 9px; text-align: center; }
 @keyframes assistant-pulse { 0%, 70%, 100% { opacity: .25; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-2px); } }
-@media (max-width: 640px) {
-  .assistant-launcher { left: 14px; bottom: 14px; min-width: 48px; width: 48px; padding: 0; }
-  .model-access-launcher { left: 14px; bottom: 72px; min-width: 116px; height: 40px; padding: 0 14px; }
-  .assistant-launcher span:not([aria-hidden="true"]) { display: none; }
-  .assistant-panel { left: 12px; bottom: 122px; width: calc(100vw - 24px); height: min(650px, calc(100dvh - 138px)); }
-}
 @media (prefers-reduced-motion: reduce) {
   .assistant-launcher { transition: none; }
   .assistant-thinking i { animation: none; opacity: .7; }
+}
+
+/* One conversation: a workspace canvas at home, a compact robot elsewhere. */
+.assistant-model-icon { width: 34px; height: 34px; padding: 7px; border-radius: 11px; border: 1px solid var(--line); background: var(--panel); color: var(--primary); display: grid; place-items: center; cursor: pointer; }
+.assistant-model-icon svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.assistant-model-icon:hover { background: var(--primary-soft); border-color: var(--primary); }
+.model-monogram { font-size: 15px; font-weight: 750; }
+.assistant-model-icon:focus-visible, .workspace-prompts button:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.assistant-workspace { position: relative; z-index: auto; max-width: 1000px; margin: 0 auto 38px; }
+.workspace-intro { padding: clamp(24px, 5vh, 62px) 12px 36px; text-align: center; }
+.workspace-eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 650; letter-spacing: .18em; color: var(--primary); }
+.workspace-eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); }
+.workspace-intro h1 { margin: 17px 0 16px; color: var(--ink); font: 600 clamp(32px, 4vw, 54px)/1.25 "Noto Serif SC", "Songti SC", SimSun, serif; letter-spacing: .045em; }
+.workspace-intro p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+.assistant-workspace .assistant-panel { position: relative; left: auto; right: auto; bottom: auto; width: 100%; height: auto; min-height: 240px; border: 1px solid color-mix(in srgb, var(--line) 65%, transparent); border-radius: 26px; box-shadow: 0 10px 40px rgba(22, 42, 45, .06); overflow: hidden; }
+.assistant-workspace .assistant-header { grid-template-columns: 34px minmax(0, 1fr) 34px auto; padding: 18px 24px 12px; border: 0; }
+.assistant-workspace .assistant-header small { font-size: 11px; }
+.assistant-workspace .assistant-messages { min-height: 180px; height: min(46vh, 480px); flex: none; padding: 16px 24px; }
+.assistant-workspace .assistant-message { max-width: 96%; }
+.assistant-workspace .assistant-message.user { max-width: 85%; }
+.assistant-workspace .assistant-bubble { font-size: 14px; padding: 15px 18px; line-height: 1.9; }
+.assistant-workspace .assistant-preferences { order: 4; margin: 0 26px; font-size: 11px; }
+.assistant-workspace .assistant-composer { order: 3; grid-template-columns: minmax(0, 1fr) auto; align-items: end; margin: 8px 24px 14px; padding: 16px 16px 12px; border-color: var(--line); border-radius: 16px; }
+.assistant-workspace .assistant-composer textarea { min-height: 60px; font-size: 15px; line-height: 1.8; }
+.assistant-workspace .assistant-composer button { width: auto; min-width: 116px; height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 0 17px; border-radius: 22px; font-family: inherit; font-size: 13px; font-weight: 600; line-height: 1; }
+.assistant-workspace .assistant-panel footer { order: 6; font-size: 10px; padding: 12px 24px 16px; }
+.assistant-workspace .assistant-model-status { display: inline; margin-right: 12px; }
+.workspace-idle .assistant-composer { min-height: 112px; border-color: transparent; padding: 8px 0; margin-top: 0; }
+.workspace-idle .assistant-composer:focus-within { border-color: transparent; box-shadow: none; }
+.workspace-idle .assistant-preferences { margin-top: 2px; }
+.workspace-prompts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 9px; margin-top: 19px; }
+.workspace-prompts > span { color: var(--muted); font-size: 11px; margin-right: 3px; }
+.workspace-prompts button { display: inline-flex; gap: 12px; border: 1px solid var(--line); border-radius: 18px; background: transparent; color: var(--muted); padding: 8px 13px; cursor: pointer; font: inherit; font-size: 11px; }
+.workspace-prompts button:hover { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
+.workspace-prompts button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 640px) {
+  .assistant-launcher { left: auto; right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); width: 50px; min-width: 50px; height: 50px; border-radius: 17px; }
+  .assistant-launcher[aria-expanded="true"] { width: 50px; min-width: 50px; }
+  .assistant-panel { left: auto; right: 10px; bottom: calc(max(14px, env(safe-area-inset-bottom)) + 62px); width: calc(100vw - 20px); height: min(680px, calc(100dvh - 92px)); }
+  .assistant-workspace { margin-bottom: 26px; }
+  .workspace-intro { padding: 24px 3px 26px; }
+  .workspace-intro h1 { font-size: 32px; margin: 12px 0; }
+  .workspace-intro p { font-size: 12px; max-width: 260px; margin: auto; }
+  .assistant-workspace .assistant-panel { border-radius: 20px; }
+  .assistant-workspace .assistant-header { padding: 14px 14px 8px; gap: 6px; }
+  .assistant-workspace .assistant-messages { padding: 12px; height: min(44vh, 380px); }
+  .assistant-workspace .assistant-composer { margin: 4px 14px 12px; padding: 8px; grid-template-columns: minmax(0, 1fr); }
+  .assistant-workspace .assistant-composer textarea { min-height: 72px; }
+  .assistant-workspace .assistant-composer button { justify-self: end; min-width: 104px; font-size: 12px; }
+  .assistant-workspace .assistant-preferences { margin: 0 16px; }
+  .assistant-workspace .assistant-panel footer { padding: 10px 14px 14px; font-size: 9px; }
+  .workspace-prompts { gap: 7px; }
+  .workspace-prompts > span { display: none; }
+  .workspace-prompts button { font-size: 10px; padding: 7px 10px; }
 }
 </style>

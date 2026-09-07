@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>协会对话工作台 · 本地预览</title></head>
+<body><div id="app"></div><script type="module">
+import { createApp, h } from 'vue'
+import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import AppShell from '../../src/layouts/AppShell.vue'
+import AssociationDashboard from '../../src/views/AssociationDashboard.vue'
+import { navigation } from '../../src/config/navigation'
+import { useAuth } from '../../src/services/auth'
+import { installPreviewTransport } from './assistant-preview-mocks.ts'
+import '../../src/styles/main.css'
+import '../../src/styles/latest-ui.css'
+installPreviewTransport()
+const auth = useAuth()
+auth.loginDemo('ASSOCIATION_OPERATOR')
+const ModulePage = { render: () => h('section', { class: 'panel', style: 'padding:32px;min-height:420px' }, [
+  h('h1', '业务模块 · 本地预览'),
+  h('p', '此页仅验证右下角机器人与跨页面对话，不连接生产数据或真实模型。'),
+]) }
+const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/workspace', component: AppShell, children: [
+  { path: '/association', component: AssociationDashboard, meta: { title: '协会工作台' } },
+  ...navigation.filter(item => item.to !== '/association').map(item => ({ path: item.to, component: ModulePage, meta: { title: item.label } })),
+] }] })
+window.__workspacePreview = {
+  go: path => router.push(path),
+  noAssociation: () => { auth.loginDemo('SYSTEM_ADMIN'); auth.setSystemContext(null, '全平台', null) },
+  switchEnterprise: () => { auth.loginDemo('ENTERPRISE_ADMIN'); return router.push('/enterprise') },
+}
+await router.push(new URLSearchParams(location.search).get('page') === 'members' ? '/members' : '/association')
+createApp({ render: () => h(RouterView) }).use(router).mount('#app')
+</script></body></html>
