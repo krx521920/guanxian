@@ -47,7 +47,7 @@ export function modelSettingsError(reason: unknown): string {
   if (value.status === 403) return '当前账号没有使用智能助手的权限。'
   if (value.code === 'MODEL_SETTINGS_UNAVAILABLE') return '模型配置暂不可用，请联系管理员检查加密服务及平台数据外发设置。'
   if (value.code === 'REQUEST_TIMEOUT') return '请求超时，请稍后重试；重新打开可确认保存状态。'
-  if (value.code === 'INVALID_MODEL_SETTINGS') return '请检查模型 ID、API Key 和授权勾选；连续测试请间隔 30 秒。'
+  if (value.code === 'INVALID_MODEL_SETTINGS') return '请检查模型 ID 和 API Key；连续测试请间隔 30 秒。'
   return '暂时无法完成请求，请稍后重试。'
 }
 

@@ -10,9 +10,11 @@ function initialSettings(): ModelSettings {
   ] }
 }
 
-async function fixture(page: Page, egressAllowed = true) {
+async function fixture(page: Page, egressAllowed = true, storageAvailable = true, saved: ModelSettings['saved'] = null) {
   const settings = initialSettings()
   settings.egressAllowed = egressAllowed
+  settings.storageAvailable = storageAvailable
+  settings.saved = saved
   const saves: Record<string, unknown>[] = []
   const tests: Record<string, unknown>[] = []
   await page.route('**/api/v1/**', async route => {
@@ -37,6 +39,8 @@ async function fixture(page: Page, egressAllowed = true) {
   await page.getByRole('button', { name: '打开管线智能助手' }).click()
   await page.getByRole('button', { name: '打开个人模型接入' }).click()
   await expect(page.getByLabel('模型厂商', { exact: true })).toBeVisible()
+  expect(saves).toHaveLength(0)
+  expect(tests).toHaveLength(0)
   return { settings, saves, tests }
 }
 
@@ -52,13 +56,19 @@ test('model icon belongs to the composer; save, test, retain key, switch provide
   await page.getByLabel('模型厂商', { exact: true }).selectOption('DEEPSEEK')
   await page.getByLabel('模型 ID', { exact: true }).fill('test-model')
   await page.locator('#personal-model-key').fill('test-only-key-do-not-use')
-  await expect(page.getByRole('button', { name: '保存设置' })).toBeDisabled()
-  await page.getByRole('checkbox', { name: /我了解并同意/ }).check()
-  await page.getByRole('button', { name: '保存设置' }).click()
+  await expect(page.getByRole('dialog', { name: '模型接入' }).getByRole('checkbox')).toHaveCount(0)
+  await expect(page.getByText(/保存即启用并同意/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '保存并启用' })).toBeEnabled()
+  await page.getByRole('button', { name: '保存并启用' }).click()
   await expect(page.getByText('已安全保存')).toBeVisible()
   await expect(page.locator('#personal-model-key')).toHaveValue('')
   await expect(page.locator('.assistant-model-icon .model-monogram')).toHaveText('D')
   expect(state.saves[0].apiKey).toBe('test-only-key-do-not-use')
+  expect(state.saves[0].enabled).toBe(true)
+  expect(state.saves[0].externalDataConsent).toBe(true)
+  const dialogBox = await page.getByRole('dialog', { name: '模型接入' }).boundingBox()
+  expect(dialogBox!.width).toBeLessThanOrEqual(480)
+  expect(dialogBox!.height).toBeLessThanOrEqual(680)
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('test-only-key')
   await page.getByRole('button', { name: '测试连接', exact: true }).click()
   await expect(page.getByText(/测试首个文本响应：123 ms/)).toBeVisible()
@@ -66,13 +76,17 @@ test('model icon belongs to the composer; save, test, retain key, switch provide
   await page.screenshot({ path: '../../test-results/personal-model-ui/desktop.png', fullPage: true })
   await page.getByLabel('模型 ID', { exact: true }).fill('another-model')
   await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeDisabled()
-  await page.getByRole('button', { name: '保存设置' }).click()
+  await page.getByRole('button', { name: '保存并启用' }).click()
   await expect(page.getByText('已安全保存')).toBeVisible()
   expect(state.saves[1].apiKey).toBe('')
   await page.getByLabel('模型厂商', { exact: true }).selectOption('KIMI')
   await expect(page.locator('#personal-model-key')).toHaveValue('')
-  await expect(page.getByRole('checkbox', { name: /我了解并同意/ })).not.toBeChecked()
-  await expect(page.getByRole('button', { name: '保存设置' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '保存并启用' })).toBeDisabled()
+  await page.getByLabel('模型 ID', { exact: true }).fill('kimi-test-model')
+  await page.locator('#personal-model-key').fill('kimi-test-only-key')
+  await page.getByRole('button', { name: '保存并启用' }).click()
+  await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeEnabled()
+  expect(state.saves[2]).toMatchObject({ provider: 'KIMI', enabled: true, externalDataConsent: true })
   await page.getByRole('button', { name: '删除配置', exact: true }).click()
   await page.getByRole('button', { name: '确认删除', exact: true }).click()
   await expect(page.getByText(/个人配置与密钥已删除/)).toBeVisible()
@@ -82,11 +96,51 @@ test('model icon belongs to the composer; save, test, retain key, switch provide
   await expect(page.locator('.assistant-model-icon .model-monogram')).toHaveCount(0)
 })
 
-test('platform egress restriction is visible and prevents testing', async ({ page }) => {
+test('platform egress restriction prevents testing and never claims a saved setting is callable', async ({ page }) => {
   const state = await fixture(page, false)
-  await expect(page.getByText(/平台尚未允许模型数据外发/)).toBeVisible()
+  await expect(page.getByText(/模型网络访问未开启/)).toBeVisible()
   await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeDisabled()
   expect(state.tests).toHaveLength(0)
+  await page.getByLabel('模型 ID', { exact: true }).fill('test-model')
+  await page.locator('#personal-model-key').fill('test-only-key-do-not-use')
+  await page.getByRole('button', { name: '保存配置' }).click()
+  await expect(page.getByText(/当前仍使用本地模式/)).toBeVisible()
+  await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeDisabled()
+  expect(state.tests).toHaveLength(0)
+})
+
+test('missing encryption and egress show one actionable warning and never save a key', async ({ page }) => {
+  const state = await fixture(page, false, false)
+  await expect(page.locator('.model-warning')).toHaveCount(1)
+  await expect(page.getByText(/需要配置密钥加密和模型网络访问/)).toBeVisible()
+  await expect(page.locator('#personal-model-key')).toBeDisabled()
+  await expect(page.getByRole('button', { name: '保存配置' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeDisabled()
+  expect(state.saves).toHaveLength(0)
+  expect(state.tests).toHaveLength(0)
+})
+
+test('opening a disabled configuration never silently enables or calls it; saving enables explicitly', async ({ page }) => {
+  const state = await fixture(page, true, true, { provider: 'DEEPSEEK', model: 'test-model', enabled: false, hasKey: true, revision: 'old' })
+  await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeDisabled()
+  expect(state.settings.saved!.enabled).toBe(false)
+  await page.getByRole('button', { name: '保存并启用' }).click()
+  await expect(page.getByRole('button', { name: '测试连接', exact: true })).toBeEnabled()
+  expect(state.saves[0]).toMatchObject({ enabled: true, externalDataConsent: true, apiKey: '' })
+  expect(state.tests).toHaveLength(0)
+})
+
+test('short and narrow viewport keeps close and save actions on screen', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 480 })
+  await fixture(page, false, false)
+  for (const locator of [page.getByRole('dialog', { name: '模型接入' }), page.getByRole('button', { name: '关闭模型接入' }), page.getByRole('button', { name: '保存配置' })]) {
+    const box = await locator.boundingBox()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.y).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(320)
+    expect(box!.y + box!.height).toBeLessThanOrEqual(480)
+  }
+  expect(await page.locator('.model-settings-body').evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true)
 })
 
 test('mobile dialog fits and closes with Escape without retaining unsaved key', async ({ page }) => {
