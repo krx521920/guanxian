@@ -3,6 +3,8 @@ import appShell from '../layouts/AppShell.vue?raw'
 import associationDashboard from './AssociationDashboard.vue?raw'
 import enterpriseDashboard from './EnterpriseDashboard.vue?raw'
 import loginView from './LoginView.vue?raw'
+import loginCard from '../components/login/LoginCard.vue?raw'
+import loginPortal from '../components/login/LoginPortal.vue?raw'
 import membersView from './MembersView.vue?raw'
 
 describe('dashboard and member UI closure', () => {
@@ -31,9 +33,10 @@ describe('dashboard and member UI closure', () => {
   })
 
   it('does not market unfinished AI capability on the login page', () => {
-    expect(loginView).toContain('可信业务数据支持行业协作')
-    expect(loginView).toContain('规则匹配')
-    expect(loginView).not.toMatch(/\bAI\b|智能匹配|生态中枢/)
+    expect(loginView).toContain('<LoginPortal />')
+    expect(loginCard).toContain('账号身份由后台核验')
+    expect(loginPortal).toContain('数据来源随模块标注')
+    expect(loginCard + loginPortal).not.toMatch(/\bAI\b|智能匹配|生态中枢/)
   })
 
   it('keeps member paging, retry and empty results tied to the real server response', () => {

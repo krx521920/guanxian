@@ -8,6 +8,7 @@ import AppShell from '../../src/layouts/AppShell.vue'
 import { useAuth } from '../../src/services/auth'
 import { installPreviewTransport } from './assistant-preview-mocks.ts'
 import '../../src/styles/main.css'
+import '../../src/styles/latest-ui.css'
 installPreviewTransport()
 useAuth().loginDemo('ASSOCIATION_OPERATOR')
 window.__guanxianPreview.switchRole = () => useAuth().loginDemo('ENTERPRISE_ADMIN')
