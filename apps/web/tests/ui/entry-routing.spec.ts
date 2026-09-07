@@ -5,6 +5,48 @@ const associationId = '10000000-0000-4000-8000-000000000001'
 const enterpriseId = '20000000-0000-4000-8000-000000000001'
 const authority = 'http://127.0.0.1:18188/identity/realms/entry-tests'
 
+for (const [status, payload, message] of [
+  [200, { code: 'OK', data: { status: 'UP' } }, '系统正常运行'],
+  [503, { code: 'DEPENDENCY_UNAVAILABLE', data: { status: 'DOWN' } }, '服务暂不可用（HTTP 503）'],
+  [200, { code: 'OK', data: { status: 'DOWN' } }, '服务状态尚未确认'],
+  [200, { code: 'ERROR', data: { status: 'UP' } }, '服务状态尚未确认'],
+] as const) {
+  test(`login health strip reports actual public result: ${status} / ${payload.code} / ${payload.data.status}`, async ({ page }) => {
+    await page.route('**/api/v1/**', route => {
+      const request = route.request()
+      expect(new URL(request.url()).pathname).toBe('/api/v1/health')
+      expect(request.headers()['authorization']).toBeUndefined()
+      expect(request.headers()['cookie']).toBeUndefined()
+      return route.fulfill({ status, json: payload })
+    })
+    await page.goto('/login')
+    await expect(page.getByRole('status', { name: `系统状态：${message}` })).toBeVisible()
+    await expect(page.getByRole('button', { name: '企业登录' })).toBeEnabled()
+    await expect(page.getByRole('link', { name: '游客浏览' })).toHaveAttribute('href', '/public')
+    if (message !== '系统正常运行') await expect(page.getByText('系统正常运行', { exact: true })).toHaveCount(0)
+  })
+}
+
+test('login health timeout remains non-blocking and never reports a fabricated success', async ({ page }) => {
+  await page.clock.install()
+  let release: () => void = () => {}
+  const gate = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/v1/health', async route => {
+    await gate
+    await route.fulfill({ json: { code: 'OK', data: { status: 'UP' } } }).catch(() => {})
+  })
+  const requested = page.waitForRequest('**/api/v1/health')
+  try {
+    await page.goto('/login?entry=enterprise')
+    await requested
+    await expect(page.getByRole('status')).toContainText('正在检测系统状态')
+    await page.clock.fastForward(6000)
+    await expect(page.getByRole('status')).toContainText('检测超时')
+    await expect(page.getByRole('button', { name: '继续统一身份登录' })).toBeEnabled()
+    await expect(page.getByText('系统正常运行', { exact: true })).toHaveCount(0)
+  } finally { release() }
+})
+
 async function identityFixture(page: Page, role?: UserRole, options: { unbound?: boolean; rejected?: boolean; expired?: boolean } = {}) {
   const requests: string[] = []
   const pageErrors: string[] = []
@@ -20,6 +62,8 @@ async function identityFixture(page: Page, role?: UserRole, options: { unbound?:
   }, { role, authority, expired: options.expired })
   await page.route('**/api/v1/**', async route => {
     const path = new URL(route.request().url()).pathname
+    // Public liveness is separate from authenticated/business data requests.
+    if (path === '/api/v1/health') return route.fulfill({ json: { code: 'OK', data: { status: 'UP' } } })
     requests.push(path)
     const fulfill = (data: unknown) => route.fulfill({ json: { code: 'OK', data } })
     if (path === '/api/v1/public/enterprises') {
@@ -50,7 +94,8 @@ test('anonymous entry has three working paths, and no role selector in OIDC mode
   await expect(page.getByRole('button', { name: '企业登录' })).toBeVisible()
   await expect(page.getByRole('button', { name: '管理员登录' })).toBeVisible()
   await expect(page.getByRole('combobox')).toHaveCount(0)
-  await page.screenshot({ path: info.outputPath('unified-entry.png'), fullPage: true })
+  await expect(page.getByRole('status')).toContainText('系统正常运行')
+  await page.screenshot({ path: info.outputPath('unified-entry.png'), fullPage: true, animations: 'disabled' })
   await page.getByRole('button', { name: '企业登录' }).click()
   await expect(page.getByRole('heading', { name: '企业账号登录' })).toBeVisible()
   await expect(page.getByRole('button', { name: '继续统一身份登录' })).toBeVisible()
@@ -169,7 +214,8 @@ test('mobile entry and public portal fit the viewport with reachable navigation'
   await page.goto('/')
   await expect(page.getByRole('button', { name: '企业登录' })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
-  await page.screenshot({ path: info.outputPath('entry-mobile.png'), fullPage: true })
+  await expect(page.getByRole('status')).toContainText('系统正常运行')
+  await page.screenshot({ path: info.outputPath('entry-mobile.png'), fullPage: true, animations: 'disabled' })
   await page.getByRole('link', { name: '游客浏览' }).click()
   await expect(page.getByRole('heading', { name: '暂无符合条件的已发布企业' })).toBeVisible()
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)

@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import './styles/main.css'
+import './styles/latest-ui.css'
 
 // 键盘可达性：Esc 关闭当前最上层弹窗（触发遮罩层的 click.self 关闭逻辑）
 document.addEventListener('keydown', (event) => {

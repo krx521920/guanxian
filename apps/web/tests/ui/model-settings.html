@@ -6,6 +6,7 @@ import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import AppShell from '../../src/layouts/AppShell.vue'
 import { useAuth } from '../../src/services/auth'
 import '../../src/styles/main.css'
+import '../../src/styles/latest-ui.css'
 useAuth().loginDemo('ASSOCIATION_OPERATOR')
 const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/members', component: AppShell, meta: { title: '会员企业' } }] })
 await router.push('/members')
