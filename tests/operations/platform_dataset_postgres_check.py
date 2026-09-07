@@ -38,7 +38,11 @@ def main():
                         "--env", "POSTGRES_PASSWORD=local-integration-test-only", "postgres:16-alpine"], check=True, timeout=120)
         created = True
         for _ in range(45):
-            ready = subprocess.run(["docker", "exec", name, "pg_isready", "-U", "postgres"], capture_output=True, timeout=10)
+            # The entrypoint briefly starts a Unix-socket-only server before
+            # creating POSTGRES_DB. Wait for the final TCP listener, not that
+            # temporary bootstrap server, before applying schema SQL.
+            ready = subprocess.run(["docker", "exec", name, "pg_isready", "-h", "127.0.0.1",
+                                    "-U", "postgres", "-d", "guanxian"], capture_output=True, timeout=10)
             if ready.returncode == 0:
                 break
             time.sleep(1)
