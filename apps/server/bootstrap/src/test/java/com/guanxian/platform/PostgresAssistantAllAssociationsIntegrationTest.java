@@ -53,8 +53,12 @@ class PostgresAssistantAllAssociationsIntegrationTest {
         ingest(ingestion, first, "甲协会已发布", "ASSOCIATION", "PUBLISHED");
         ingest(ingestion, second, "乙协会私有已发布", "PRIVATE", "PUBLISHED");
         ingest(ingestion, second, "乙协会待审核", "PUBLIC", "DRAFT");
-        ingest(ingestion, second, "乙协会已删除", "PUBLIC", "PUBLISHED");
-        jdbc.update("UPDATE knowledge_document SET deleted_at = now() WHERE association_id = ? AND title = ?", second, "乙协会已删除");
+        UUID deletedId = ingest(ingestion, second, "乙协会已删除", "PUBLIC", "PUBLISHED");
+        var owner = new KnowledgeIngestionService.KnowledgeActor(second, null, "owner", "owner", true, "test-soft-delete");
+        var beforeDelete = ingestion.getDocument(deletedId, owner, false);
+        var deleted = ingestion.changeLifecycle(deletedId, beforeDelete.lifecycleVersion(),
+                KnowledgeIngestionService.LifecycleAction.DELETE, false, null, owner);
+        assertThat(deleted.deleted()).isTrue();
 
         // A deterministic in-process provider tests the real persistence path without model egress.
         ChatModelProvider provider = new ChatModelProvider() {
@@ -80,8 +84,8 @@ class PostgresAssistantAllAssociationsIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
-    private void ingest(KnowledgeIngestionService ingestion, UUID association, String title, String visibility, String status) {
-        ingestion.ingest(new KnowledgeTextDocument(null, association, title, "POLICY", "MANUAL", null,
-                visibility, status, "owner", "跨域巡检核验要求保留巡检记录。"));
+    private UUID ingest(KnowledgeIngestionService ingestion, UUID association, String title, String visibility, String status) {
+        return ingestion.ingest(new KnowledgeTextDocument(null, association, title, "POLICY", "MANUAL", null,
+                visibility, status, "owner", "跨域巡检核验要求保留巡检记录。")).documentId();
     }
 }
