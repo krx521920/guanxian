@@ -27,6 +27,7 @@ npx playwright test --config playwright.entry.config.ts
 - 32 chat/model browser tests pass, including 6 new workspace cases. They cover desktop/mobile layout, real module links, shared conversation ID and draft, no automatic message sending, model-modal focus and unsaved key handling, identity/scope reset, and a 320px-wide active stream across navigation.
 - 41 identity/enterprise browser tests pass. Three old association heading assertions were updated for the new hero title; role routing, selected navigation, inline vs floating assistant, and access boundaries are still asserted.
 - Desktop and mobile workspace/floating screenshots were visually reviewed. Browser fixtures use local synthetic API/identity/model responses; these tests do **not** establish real-model answer quality or production connectivity.
+- Release CI exposed an existing ambiguous invitation-test status locator: approval success and the follow-up list-loading status can coexist. The test now holds the list refresh with an explicit promise gate, verifies both distinct messages, and then verifies the bound account still has ordinary-member read-only rights. No application permission behavior was changed or test skipped.
 
 ## Local interactive preview
 

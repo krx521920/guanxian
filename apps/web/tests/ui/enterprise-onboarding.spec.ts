@@ -11,6 +11,7 @@ function scenario() {
       username:'owner.user', status:'ISSUED', version:0, targetRole:'ENTERPRISE_ADMIN' as 'ENTERPRISE_ADMIN'|'ENTERPRISE_MEMBER', expiresAt:'2099-09-08T12:00:00Z', createdAt:'2026-09-05T12:00:00Z',
       claimantName:null as string|null, claimantSubject:null as string|null, reviewNote:null as string|null },
     created:false, conflict:false, writes:[] as unknown[], requests:[] as string[], errors:[] as string[],
+    approvedListGate:null as Promise<void>|null,
     workflow:null as ProfileWorkflow|null,
     profile: { id:enterpriseId, associationId, name:'虚构·企业接入验证公司', unifiedSocialCreditCode:'TEST-ONLY-0001', category:'技术服务',
       address:'虚构地址',contactName:'测试负责人', contactPhone:'测试号码', contactEmail:'owner@example.test', introduction:'原有企业简介',
@@ -80,7 +81,10 @@ async function fixture(page:Page, role?:FixtureRole, state= scenario()) {
       expect(request.postDataJSON()).toEqual({enterpriseId,username:'owner.user'})
       state.created=true;return ok({invitation:state.invitation,token})
     }
-    if(path==='/api/v1/enterprise-invitations') return ok({items:state.created?[state.invitation]:[],total:state.created?1:0})
+    if(path==='/api/v1/enterprise-invitations') {
+      if(state.invitation.status==='APPROVED') await state.approvedListGate
+      return ok({items:state.created?[state.invitation]:[],total:state.created?1:0})
+    }
     if(path.endsWith('/review')) {
       expect(request.headers()['if-match']).toBe('"1"')
       state.invitation.status='APPROVED';state.invitation.version++;state.invitation.reviewNote=request.postDataJSON().note
@@ -119,13 +123,21 @@ test('member invitation explicitly requests read-only rights and cannot open a w
 test('administrator review distinguishes ordinary member rights from owner rights',async({page,browser})=>{
   const state=await fixture(page,'SYSTEM_ADMIN');state.created=true
   Object.assign(state.invitation,{status:'CLAIMED',version:1,targetRole:'ENTERPRISE_MEMBER'})
+  let releaseList:()=>void=()=>{}
+  state.approvedListGate=new Promise<void>(resolve=>{releaseList=resolve})
   await page.goto('/operations/invitations')
   await page.getByRole('button',{name:'核验绑定'}).click()
   await expect(page.getByRole('heading',{name:'核验普通成员并开通只读权限'})).toBeVisible()
   await page.getByLabel('核验依据 / 退回原因').fill('已核验团队加入授权，仅授予只读')
   await page.getByRole('checkbox',{name:'我已通过可信渠道确认此账号获准加入该企业团队，仅开通普通成员只读权限。'}).check()
   await page.getByRole('button',{name:'批准绑定'}).click()
-  await expect(page.getByRole('status')).toContainText('账号已按邀请权限绑定')
+  // Approval can succeed before its follow-up list refresh finishes. Assert the
+  // distinct success and loading messages while deterministically holding that refresh.
+  try {
+    await expect(page.getByRole('status').filter({hasText:'账号已按邀请权限绑定'})).toBeVisible()
+    await expect(page.getByRole('status').filter({hasText:'正在处理…'})).toBeVisible()
+  } finally {releaseList()}
+  await expect(page.getByRole('status').filter({hasText:'正在处理…'})).toHaveCount(0)
   const context=await browser.newContext({baseURL:'http://127.0.0.1:18188',locale:'zh-CN'})
   try {
     const member=await context.newPage();await fixture(member,'pending',state)
