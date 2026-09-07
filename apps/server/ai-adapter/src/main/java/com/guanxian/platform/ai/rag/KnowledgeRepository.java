@@ -22,10 +22,16 @@ public interface KnowledgeRepository {
     DocumentContent currentContent(UUID documentId, DocumentScope scope);
     ReembeddingResult replaceEmbeddings(ReembeddingCommand command);
 
-    record RetrievalScope(UUID associationId, String actorSubject, boolean privileged) {
+    record RetrievalScope(UUID associationId, String actorSubject, boolean privileged, boolean allAssociations) {
+        public RetrievalScope(UUID associationId, String actorSubject, boolean privileged) {
+            this(associationId, actorSubject, privileged, false);
+        }
         public RetrievalScope {
-            if (associationId == null || actorSubject == null || actorSubject.isBlank()) {
+            if ((associationId == null && !allAssociations) || actorSubject == null || actorSubject.isBlank()) {
                 throw new IllegalArgumentException("association and actor subject are required for knowledge retrieval");
+            }
+            if (allAssociations && (!privileged || associationId != null)) {
+                throw new IllegalArgumentException("all-association retrieval requires explicit unscoped privileged access");
             }
         }
     }

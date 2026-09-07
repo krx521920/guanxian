@@ -67,14 +67,14 @@ public class PolicyRagService {
         if (question.actorSubject() == null || question.actorSubject().isBlank()) {
             throw new IllegalArgumentException("actor subject is required");
         }
-        if (question.associationId() == null) {
+        if (question.associationId() == null && !question.allAssociations()) {
             throw new IllegalArgumentException("association is required for knowledge retrieval");
         }
         int limit = question.maxCitations() == null
                 ? properties.getRetrievalLimit()
                 : Math.min(Math.max(1, question.maxCitations()), properties.getRetrievalLimit());
         RetrievalScope retrievalScope = new RetrievalScope(
-                question.associationId(), question.actorSubject(), question.privilegedKnowledgeAccess());
+                question.associationId(), question.actorSubject(), question.privilegedKnowledgeAccess(), question.allAssociations());
         double[] queryEmbedding = queryEmbedding(question);
         List<RetrievedChunk> chunks = repository.retrieve(
                         retrievalScope, question.question(), queryEmbedding, limit).stream()
@@ -236,7 +236,12 @@ public class PolicyRagService {
     }
 
     public record RagQuestion(UUID associationId, String actorSubject, String question, Integer maxCitations,
-                              String requestId, boolean privilegedKnowledgeAccess, boolean allowModelCompletion) {
+                              String requestId, boolean privilegedKnowledgeAccess, boolean allowModelCompletion,
+                              boolean allAssociations) {
+        public RagQuestion(UUID associationId, String actorSubject, String question, Integer maxCitations,
+                           String requestId, boolean privilegedKnowledgeAccess, boolean allowModelCompletion) {
+            this(associationId, actorSubject, question, maxCitations, requestId, privilegedKnowledgeAccess, allowModelCompletion, false);
+        }
         public RagQuestion(
                 UUID associationId,
                 String actorSubject,

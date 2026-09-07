@@ -143,13 +143,36 @@ class AssistantControllerScopeTest {
     }
 
     @Test
-    void unscopedSystemAdministratorCannotStartConversation() {
+    void unscopedSystemAdministratorQueriesAllAssociationsWithoutInventingAScope() {
         when(actorScopeResolver.resolve(authentication)).thenReturn(systemAdmin(null));
+        controller.chat(request(null), authentication);
+        var capture = ArgumentCaptor.forClass(PlatformAssistantService.AssistantQuestion.class);
+        verify(assistantService).chat(capture.capture());
+        assertThat(capture.getValue().access().actor()).isEqualTo(systemAdmin(null));
+        assertThat(capture.getValue().access().authorities()).containsExactly("POLICY_READ");
+    }
 
-        assertThatThrownBy(() -> controller.chat(request(null), authentication))
-                .isInstanceOfSatisfying(ForbiddenException.class,
-                        error -> assertThat(error.code()).isEqualTo("ASSOCIATION_CONTEXT_REQUIRED"));
-        verify(assistantService, never()).chat(any());
+    @Test
+    void unscopedSystemAdministratorCanAlsoStreamButCannotOverrideScopeInTheBody() {
+        when(actorScopeResolver.resolve(authentication)).thenReturn(systemAdmin(null));
+        when(assistantService.stream(any())).thenReturn(Flux.just(PlatformAssistantService.AssistantStreamEvent.start(CONVERSATION)));
+        assertThat(controller.stream(request(null), authentication, new MockHttpServletResponse()).collectList().block()).hasSize(1);
+        var capture = ArgumentCaptor.forClass(PlatformAssistantService.AssistantQuestion.class);
+        verify(assistantService).stream(capture.capture());
+        assertThat(capture.getValue().access().actor().associationId()).isNull();
+        assertThatThrownBy(() -> controller.chat(request(ASSOCIATION_A), authentication))
+                .isInstanceOfSatisfying(ForbiddenException.class, error -> assertThat(error.code()).isEqualTo("SYSTEM_CONTEXT_FORBIDDEN"));
+    }
+
+    @Test
+    void ordinaryUnboundAccountsAndInvalidPartialSystemContextsStillFailClosed() {
+        for (String role : List.of("ASSOCIATION_ADMIN", "ENTERPRISE_ADMIN", "OBSERVER")) {
+            var actor = new ActorScope(null, "ordinary", "ordinary", null, null, Set.of(role), Set.of());
+            assertThatThrownBy(() -> AssistantController.readAssociationId(null, actor))
+                    .isInstanceOf(ForbiddenException.class);
+        }
+        var invalid = new ActorScope(null, "system", "system", null, UUID.randomUUID(), Set.of("SYSTEM_ADMIN"), Set.of());
+        assertThatThrownBy(() -> AssistantController.readAssociationId(null, invalid)).isInstanceOf(ForbiddenException.class);
     }
 
     private static AssistantController.AssistantChatRequest request(UUID associationId) {

@@ -21,6 +21,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PlatformAssistantServiceTest {
     @Test
+    void allAssociationQuestionsWorkWithAndWithoutModelAndKeepMemorySeparateFromScopedQuestions() {
+        for (boolean enabled : List.of(false, true)) {
+            Fixture fixture = fixture(enabled);
+            UUID conversation = UUID.randomUUID();
+            var global = systemQuestion(null, conversation);
+            var answer = fixture.service.chat(global);
+            assertFalse(answer.citations().isEmpty());
+            assertEquals(enabled, answer.modelConnected());
+            var events = fixture.service.stream(global).collectList().block();
+            assertEquals("complete", events.getLast().type());
+            assertNotEquals(PlatformAssistantService.conversationKey(global),
+                    PlatformAssistantService.conversationKey(systemQuestion(fixture.associationId, conversation)));
+            if (enabled) assertTrue(fixture.request.get().prompt().contains("全部协会"));
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                    () -> fixture.service.chat(question(null, "ordinary", UUID.randomUUID())));
+        }
+    }
+
+    private static PlatformAssistantService.AssistantQuestion systemQuestion(UUID association, UUID conversation) {
+        var actor = new ActorScope(null, "system", "system", association, null, Set.of("SYSTEM_ADMIN"), Set.of());
+        return new PlatformAssistantService.AssistantQuestion(new AssistantAccessContext(actor, Set.of("POLICY_READ", "MEMBER_READ")),
+                conversation, "会员资料怎么批量导入？", 3, "会员企业", "/members", "global-query");
+    }
+
+    @Test
     void outputPreferencesAndPinnedGoalReachInferenceButNotRawConversationText() {
         Fixture fixture = fixture(true);
         var original = question(fixture.associationId, "actor-1", UUID.randomUUID());

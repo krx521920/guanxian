@@ -15,6 +15,90 @@ async function loadRequest(options?: { baseUrl?: string; mode?: string; authMode
 }
 
 describe('request', () => {
+  it.each(['json', 'blob', 'stream'])('waits for the session before preparing %s request headers', async kind => {
+    const { request, requestBlob, requestEventStream } = await loadRequest()
+    const { configureSessionGate } = await import('./session-gate')
+    const { setAccessToken } = await import('./token-store')
+    setAccessToken('old')
+    let release!: () => void
+    configureSessionGate(() => new Promise(resolve => { release = () => { setAccessToken('new'); resolve() } }), vi.fn())
+    const fetchMock = vi.fn().mockImplementation(async () => kind === 'stream'
+      ? new Response('data: {"ok":true}\n\n', { headers: { 'Content-Type': 'text/event-stream' } })
+      : Response.json({ code: 'OK', data: 'done' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const pending = kind === 'json' ? request('/members') : kind === 'blob' ? requestBlob('/files/download')
+      : requestEventStream('/chat/stream', { method: 'POST', body: '{}' }, vi.fn())
+    expect(fetchMock).not.toHaveBeenCalled()
+    release()
+    await pending
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(new Headers(fetchMock.mock.calls[0]![1].headers).get('Authorization')).toBe('Bearer new')
+  })
+
+  it('cancelling a queued request does not cancel renewal shared by another caller', async () => {
+    const { request } = await loadRequest()
+    const { configureSessionGate } = await import('./session-gate')
+    let release!: () => void
+    const renewal = new Promise<void>(resolve => { release = resolve })
+    configureSessionGate(() => renewal, vi.fn())
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: true }))
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+    const cancelled = request('/first', { signal: controller.signal })
+    const continuing = request('/second')
+    controller.abort()
+    await expect(cancelled).rejects.toMatchObject({ name: 'AbortError' })
+    release()
+    await continuing
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/v1/second')
+  })
+
+  it.each(['POST', 'PUT', 'DELETE'])('does not send a queued %s in a different identity or scope', async method => {
+    const { request } = await loadRequest()
+    const { configureSessionGate, changeSessionBoundary } = await import('./session-gate')
+    let release!: () => void
+    configureSessionGate(() => new Promise(resolve => { release = resolve }), vi.fn())
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const pending = request('/members', { method, body: '{}' })
+    changeSessionBoundary()
+    release()
+    await expect(pending).rejects.toThrow('账号或管理范围已改变')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it.each([401, 403])('reports only authentication failures and never automatically replays a write: HTTP %s', async status => {
+    const { request } = await loadRequest()
+    const { configureSessionGate } = await import('./session-gate')
+    const unauthorized = vi.fn()
+    configureSessionGate(async () => {}, unauthorized)
+    const fetchMock = vi.fn().mockImplementation(async () => Response.json({ code: 'DENIED' }, { status }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(request('/members/import', { method: 'POST', body: '{}' })).rejects.toMatchObject({ status })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(unauthorized).toHaveBeenCalledTimes(status === 401 ? 1 : 0)
+  })
+
+  it('verifies a candidate token without changing shared token/scope or reentering the session gate', async () => {
+    const { requestIdentity } = await loadRequest()
+    const { configureSessionGate } = await import('./session-gate')
+    const { setAccessToken, getAccessToken, setSystemContext, getSystemContext } = await import('./token-store')
+    const gate = vi.fn().mockRejectedValue(new Error('must not enter'))
+    configureSessionGate(gate, vi.fn())
+    setAccessToken('live-token')
+    const associationId = '10000000-0000-4000-8000-000000000001'
+    setSystemContext(associationId, null)
+    const fetchMock = vi.fn().mockImplementation(async () => Response.json({ code: 'OK', data: { subject: 's' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    await requestIdentity('/users/me', 'candidate-token')
+    const headers = new Headers(fetchMock.mock.calls[0]![1].headers)
+    expect(headers.get('Authorization')).toBe('Bearer candidate-token')
+    expect(headers.has('X-Guanxian-Association-Id')).toBe(false)
+    expect(getAccessToken()).toBe('live-token')
+    expect(getSystemContext().associationId).toBe(associationId)
+    expect(gate).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
     vi.stubGlobal('window', browserWindow)
     randomUUIDMock.mockReset().mockReturnValue('generated-request-id')

@@ -47,7 +47,11 @@ async function loadOidc(scenario: Scenario = {}) {
   const session = scenario.session ?? createStorage({ [ROLE_STORAGE_KEY]: 'SYSTEM_ADMIN' })
   vi.stubGlobal('sessionStorage', session)
   vi.stubGlobal('localStorage', createStorage())
+  const events = new EventTarget()
+  const documentEvents = new EventTarget()
+  vi.stubGlobal('document', { createElement: vi.fn(() => ({})), visibilityState: 'visible', addEventListener: documentEvents.addEventListener.bind(documentEvents) })
   vi.stubGlobal('window', {
+    addEventListener: events.addEventListener.bind(events),
     location: {
       origin: 'https://app.example.test',
       pathname: scenario.path ?? '/',
@@ -57,6 +61,7 @@ async function loadOidc(scenario: Scenario = {}) {
 
   let managerSettings: Record<string, unknown> | null = null
   let expiredHandler: (() => void) | null = null
+  let expiringHandler: (() => void) | null = null
   const getUser = scenario.getUserError
     ? vi.fn().mockRejectedValue(scenario.getUserError)
     : vi.fn().mockResolvedValue(scenario.user ?? null)
@@ -65,6 +70,12 @@ async function loadOidc(scenario: Scenario = {}) {
     : vi.fn().mockResolvedValue(scenario.callbackUser ?? null)
   const signinRedirect = vi.fn().mockResolvedValue(undefined)
   const signoutRedirect = vi.fn().mockResolvedValue(undefined)
+  const removeUser = vi.fn().mockImplementation(async () => { getUser.mockResolvedValue(null) })
+  const signinSilent = vi.fn().mockImplementation(async () => {
+    const refreshed = { ...scenario.user, access_token: 'refreshed-token', refresh_token: 'rotated-refresh', expired: false, expires_in: 300 }
+    getUser.mockResolvedValue(refreshed)
+    return refreshed
+  })
 
   class MockWebStorageStateStore {
     constructor(readonly settings: Record<string, unknown>) {}
@@ -72,6 +83,7 @@ async function loadOidc(scenario: Scenario = {}) {
 
   class MockUserManager {
     readonly events = {
+      addAccessTokenExpiring: vi.fn((handler: () => void) => { expiringHandler = handler }),
       addAccessTokenExpired: vi.fn((handler: () => void) => {
         expiredHandler = handler
       }),
@@ -85,6 +97,8 @@ async function loadOidc(scenario: Scenario = {}) {
     signinRedirectCallback = signinRedirectCallback
     signinRedirect = signinRedirect
     signoutRedirect = signoutRedirect
+    signinSilent = signinSilent
+    removeUser = removeUser
   }
 
   const currentUser = scenario.currentUser ?? {
@@ -100,20 +114,24 @@ async function loadOidc(scenario: Scenario = {}) {
   if (scenario.scopedCurrentUser) {
     request.mockResolvedValueOnce(currentUser).mockResolvedValueOnce(scenario.scopedCurrentUser)
   }
-  const setAccessToken = vi.fn()
+  let token: string | null = null
+  const setAccessToken = vi.fn((value: string | null) => { token = value })
   const setDemoRole = vi.fn()
-  const setSystemContext = vi.fn()
-  const getSystemContext = vi.fn(() => scenario.systemContext ?? {
+  let context = scenario.systemContext ?? {
     associationId: null,
     enterpriseId: null,
-  })
+  }
+  const setSystemContext = vi.fn((associationId: string | null, enterpriseId: string | null) => { context = { associationId, enterpriseId } })
+  const getSystemContext = vi.fn(() => ({ ...context }))
+  const requestIdentity = vi.fn((path: string, ..._args: unknown[]) => request(path))
 
   vi.doMock('oidc-client-ts', () => ({
     UserManager: MockUserManager,
     WebStorageStateStore: MockWebStorageStateStore,
   }))
-  vi.doMock('./http', () => ({ request }))
+  vi.doMock('./http', () => ({ requestIdentity }))
   vi.doMock('./token-store', () => ({
+    getAccessToken: () => token,
     getSystemContext,
     setAccessToken,
     setDemoRole,
@@ -125,6 +143,7 @@ async function loadOidc(scenario: Scenario = {}) {
     auth: module.useAuth(),
     session,
     request,
+    requestIdentity,
     setAccessToken,
     setSystemContext,
     getSystemContext,
@@ -132,10 +151,17 @@ async function loadOidc(scenario: Scenario = {}) {
     signinRedirectCallback,
     signinRedirect,
     signoutRedirect,
+    signinSilent,
+    removeUser,
+    focus: () => events.dispatchEvent(new Event('focus')),
+    online: () => events.dispatchEvent(new Event('online')),
+    visible: () => documentEvents.dispatchEvent(new Event('visibilitychange')),
+    expiring: () => expiringHandler?.(),
     settings: () => managerSettings,
-    expire: () => {
+    expire: async () => {
       if (!expiredHandler) throw new Error('expiry handler was not registered')
       expiredHandler()
+      await module.useAuth().refreshIdentity().catch(() => {})
     },
   }
 }
@@ -151,6 +177,151 @@ afterEach(() => {
 })
 
 describe('OIDC authentication', () => {
+  it('renews an expired stored session before verifying it, without requiring a new login', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: true } })
+    await oidc.auth.initialize()
+    expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
+    expect(oidc.requestIdentity).toHaveBeenCalledWith('/users/me', 'refreshed-token')
+    expect(oidc.auth.user.value?.role).toBe('ASSOCIATION_ADMIN')
+    expect(oidc.auth.error.value).toBeNull()
+  })
+
+  it('coalesces expiry, focus, visibility and concurrent business requests into a single renewal', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false, expires_in: 300 } })
+    await oidc.auth.initialize()
+    const original = oidc.auth.user.value
+    let release!: (value: Record<string, unknown>) => void
+    oidc.signinSilent.mockImplementation(() => new Promise(resolve => { release = resolve }))
+    oidc.getUser.mockResolvedValue({ access_token: 'old', refresh_token: 'refresh', expired: true })
+    const { prepareSession } = await import('./session-gate')
+    const requests = Promise.all([prepareSession(), prepareSession(), oidc.auth.refreshIdentity()])
+    oidc.focus(); oidc.visible(); oidc.expiring()
+    await vi.waitFor(() => expect(oidc.signinSilent).toHaveBeenCalledTimes(1))
+    expect(oidc.auth.user.value).toEqual(original)
+    expect(oidc.setAccessToken).not.toHaveBeenCalledWith(null)
+    release({ access_token: 'new', refresh_token: 'next', expired: false })
+    await requests
+    expect(oidc.setAccessToken).toHaveBeenLastCalledWith('new')
+    expect(oidc.auth.state.sessionIssue).toBeNull()
+  })
+
+  it('keeps a verified workspace on temporary renewal failure, blocks requests, and recovers online', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false } })
+    await oidc.auth.initialize()
+    oidc.getUser.mockResolvedValue({ access_token: 'old', refresh_token: 'refresh', expired: true })
+    oidc.signinSilent.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await oidc.expire()
+    expect(oidc.auth.user.value).not.toBeNull()
+    expect(oidc.auth.state.sessionIssue).toContain('页面内容已保留')
+    const { prepareSession } = await import('./session-gate')
+    await expect(prepareSession()).rejects.toThrow('暂时无法验证')
+    expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
+    oidc.online()
+    await vi.waitFor(() => expect(oidc.auth.state.sessionIssue).toBeNull())
+    expect(oidc.signinSilent).toHaveBeenCalledTimes(2)
+    expect(oidc.auth.user.value).not.toBeNull()
+  })
+
+  it.each(['invalid_grant', 'login_required', 'interaction_required'])('clears credentials only when the provider confirms %s', async error => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false } })
+    await oidc.auth.initialize()
+    oidc.signinSilent.mockRejectedValueOnce(Object.assign(new Error('Do not expose provider detail'), { error }))
+    await oidc.expire()
+    expect(oidc.auth.user.value).toBeNull()
+    expect(oidc.auth.error.value).toContain('到期或被撤销')
+    expect(oidc.auth.error.value).not.toContain('provider detail')
+    expect(oidc.removeUser).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not clear a verified user when an explicit identity refresh gets HTTP 503', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', expired: false } })
+    await oidc.auth.initialize()
+    oidc.request.mockRejectedValueOnce(Object.assign(new Error('temporarily unavailable'), { status: 503 }))
+    await expect(oidc.auth.refreshIdentity()).rejects.toThrow('temporarily unavailable')
+    expect(oidc.auth.user.value).not.toBeNull()
+    await oidc.auth.retrySession()
+    expect(oidc.auth.state.sessionIssue).toBeNull()
+  })
+
+  it('does not resurrect the workspace or transport after logout during renewal', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false } })
+    await oidc.auth.initialize()
+    let release!: (value: Record<string, unknown>) => void
+    oidc.signinSilent.mockImplementation(() => new Promise(resolve => { release = resolve }))
+    const expired = oidc.expire()
+    await vi.waitFor(() => expect(oidc.signinSilent).toHaveBeenCalledTimes(1))
+    await oidc.auth.logout()
+    release({ access_token: 'late', expired: false })
+    await expired
+    expect(oidc.auth.user.value).toBeNull()
+    expect(oidc.setAccessToken).toHaveBeenLastCalledWith(null)
+    expect(oidc.setAccessToken).not.toHaveBeenCalledWith('late')
+    expect(oidc.removeUser).toHaveBeenCalledTimes(1)
+  })
+
+  it('rechecks backend roles after renewal rather than trusting stale token roles', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false } })
+    await oidc.auth.initialize()
+    oidc.request.mockResolvedValueOnce({ subject: 'subject-1', username: 'observer', roles: ['OBSERVER'], permissions: ['MEMBER_READ'] })
+    await oidc.expire()
+    expect(oidc.auth.user.value?.role).toBe('OBSERVER')
+  })
+
+  it('a late unauthorized response for an old token cannot expire the renewed session', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false } })
+    await oidc.auth.initialize()
+    await oidc.expire()
+    const { reportUnauthorized } = await import('./session-gate')
+    reportUnauthorized('Bearer old')
+    await Promise.resolve()
+    expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
+    expect(oidc.auth.user.value).not.toBeNull()
+  })
+
+  it('a current-token HTTP 401 performs one renewal and backend revalidation', async () => {
+    const oidc = await loadOidc({ user: { access_token: 'old', refresh_token: 'refresh', expired: false } })
+    await oidc.auth.initialize()
+    const { reportUnauthorized } = await import('./session-gate')
+    reportUnauthorized('Bearer old')
+    await vi.waitFor(() => expect(oidc.setAccessToken).toHaveBeenLastCalledWith('refreshed-token'))
+    expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
+    expect(oidc.requestIdentity).toHaveBeenLastCalledWith('/users/me', 'refreshed-token')
+  })
+
+  it('retains delegated scope on HTTP 503, but falls back only when that scope is actually revoked', async () => {
+    const associationId = '11111111-1111-4111-8111-111111111111'
+    const base = { subject: 's', username: 'system', roles: ['SYSTEM_ADMIN'], permissions: [] }
+    const scoped = { ...base, associationId, organization: '协会' }
+    const oidc = await loadOidc({ user: { access_token: 'old', expired: false }, systemContext: { associationId, enterpriseId: null }, currentUser: base, scopedCurrentUser: scoped })
+    await oidc.auth.initialize()
+    oidc.request.mockResolvedValueOnce(base).mockRejectedValueOnce(Object.assign(new Error('server down'), { status: 503 }))
+    await expect(oidc.auth.refreshIdentity()).rejects.toThrow('server down')
+    expect(oidc.getSystemContext().associationId).toBe(associationId)
+    expect(oidc.auth.user.value?.associationId).toBe(associationId)
+    oidc.request.mockResolvedValueOnce(base).mockRejectedValueOnce(Object.assign(new Error('revoked'), { status: 403 }))
+    await oidc.auth.retrySession()
+    expect(oidc.getSystemContext().associationId).toBeNull()
+    expect(oidc.auth.user.value?.associationId).toBeUndefined()
+    expect(oidc.auth.user.value?.role).toBe('SYSTEM_ADMIN')
+  })
+
+  it('does not overwrite a newer delegated scope with a late identity verification', async () => {
+    const first = '11111111-1111-4111-8111-111111111111'
+    const second = '22222222-2222-4222-8222-222222222222'
+    const base = { subject: 's', username: 'system', roles: ['SYSTEM_ADMIN'], permissions: [] }
+    const oidc = await loadOidc({ user: { access_token: 'old', expired: false }, systemContext: { associationId: first, enterpriseId: null }, currentUser: base, scopedCurrentUser: { ...base, associationId: first } })
+    await oidc.auth.initialize()
+    let release!: (value: unknown) => void
+    oidc.request.mockResolvedValueOnce(base).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    const checking = oidc.auth.refreshIdentity()
+    await vi.waitFor(() => expect(oidc.request).toHaveBeenCalledTimes(4))
+    oidc.auth.setSystemContext(second, '第二协会', null)
+    release({ ...base, associationId: first })
+    await expect(checking).rejects.toThrow('账号或管理范围已改变')
+    expect(oidc.auth.user.value?.associationId).toBe(second)
+    expect(oidc.getSystemContext().associationId).toBe(second)
+    expect(oidc.auth.state.sessionIssue).toBeNull()
+  })
   it('changes password only through a fresh PKCE identity-provider action and keeps a safe return path', async () => {
     const oidc = await loadOidc({ user: { access_token: 'test-token', expired: false } })
     await oidc.auth.initialize()
@@ -221,7 +392,7 @@ describe('OIDC authentication', () => {
     expect(oidc.auth.takePostLoginRoute()).toBe('/members')
     expect(oidc.auth.takePostLoginRoute()).toBeNull()
 
-    oidc.expire()
+    await oidc.expire()
     expect(oidc.setAccessToken).toHaveBeenLastCalledWith(null)
     expect(oidc.setSystemContext).toHaveBeenLastCalledWith(null, null)
     expect(oidc.auth.user.value).toBeNull()
@@ -259,8 +430,11 @@ describe('OIDC authentication', () => {
 
     expect(oidc.request).toHaveBeenCalledTimes(2)
     expect(oidc.setSystemContext.mock.calls).toEqual([
-      [null, null],
       [associationId, enterpriseId],
+    ])
+    expect(oidc.requestIdentity.mock.calls).toEqual([
+      ['/users/me', 'system-token'],
+      ['/users/me', 'system-token', { associationId, enterpriseId }],
     ])
     expect(oidc.auth.user.value).toMatchObject({
       role: 'SYSTEM_ADMIN',
@@ -370,7 +544,7 @@ describe('OIDC authentication', () => {
     await oidc.auth.refreshIdentity()
     expect(oidc.auth.user.value?.enterpriseId).toBe('e')
     expect(oidc.auth.onboardingIdentity.value).toBeNull()
-    oidc.expire()
+    await oidc.expire()
     expect(oidc.auth.user.value).toBeNull()
     expect(oidc.auth.onboardingIdentity.value).toBeNull()
   })
@@ -394,7 +568,7 @@ describe('OIDC authentication', () => {
     const pending = await loadOidc({ user: { access_token: 'pending-token', expired: false }, currentUser: { subject:'s', username:'u', roles:[] } })
     await pending.auth.initialize()
     expect(pending.auth.onboardingIdentity.value).not.toBeNull()
-    pending.expire()
+    await pending.expire()
     expect(pending.auth.onboardingIdentity.value).toBeNull()
   })
 

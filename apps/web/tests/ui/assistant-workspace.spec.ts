@@ -67,7 +67,7 @@ test('same conversation and draft move between workspace and right-corner robot 
   expect(await page.evaluate(() => window.__guanxianPreview.requests[1].conversationId)).toBe(firstId)
 })
 
-test('model dialog closes back to its header icon and never loses a draft or exposes unsaved key', async ({ page }) => {
+test('model dialog closes back to its composer icon and never loses a draft or exposes unsaved key', async ({ page }) => {
   await start(page)
   await page.evaluate(() => { window.__guanxianPreview.modelReadDelayMs = 400 })
   await page.getByLabel('向管线智能助手提问').fill('保留我的提问')
@@ -81,6 +81,7 @@ test('model dialog closes back to its header icon and never loses a draft or exp
   await expect(page.getByRole('dialog', { name: '模型接入' })).toHaveCount(0)
   await expect(modelIcon).toBeFocused()
   await expect(page.getByLabel('向管线智能助手提问')).toHaveValue('保留我的提问')
+  expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(0)
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('unsaved-fixture-key')
   await modelIcon.click()
   await expect(page.locator('#personal-model-key')).toHaveValue('')
@@ -124,20 +125,24 @@ test('mobile canvas and expandable robot fit the screen, including response sett
   await expect(robot).toBeFocused()
 })
 
-test('scope and identity changes discard prior conversation, and an unselected association cannot send', async ({ page }) => {
+test('scope changes discard prior conversation and no selection defaults to all associations', async ({ page }) => {
   await start(page)
   await send(page, '测试停止')
   await expect(page.getByText('正在输出 · 内容尚未完成')).toBeVisible()
   await page.evaluate(() => window.__workspacePreview.noAssociation())
-  await expect(page.getByLabel('向管线智能助手提问')).toBeDisabled()
+  await expect(page.getByLabel('向管线智能助手提问')).toBeEnabled()
   await expect(page.getByRole('button', { name: '发送问题' })).toBeDisabled()
   await expect(page.locator('.assistant-message.user')).toHaveCount(0)
   await expect(page.locator('.assistant-trace')).toHaveCount(0)
+  await expect(page.getByText('系统管理员需先从左侧选择管理协会，问答内容才会按该协会隔离。')).toHaveCount(0)
+  await send(page, '查询全部协会的会员企业')
+  await expect(page.locator('.assistant-trace')).toHaveCount(1)
+  expect(await page.evaluate(() => window.__guanxianPreview.requests.at(-1)?.associationId)).toBeNull()
   await page.evaluate(() => window.__workspacePreview.switchEnterprise())
   await expect(page.locator('.assistant-workspace')).toHaveCount(0)
   await page.getByRole('button', { name: '打开管线智能助手' }).click()
   await expect(page.locator('.assistant-message.user')).toHaveCount(0)
-  expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(1)
+  expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(2)
 })
 
 test('a narrow-screen stream survives navigation and remains stoppable from the expanded robot', async ({ page }) => {
@@ -155,4 +160,43 @@ test('a narrow-screen stream survives navigation and remains stoppable from the 
   await expect(page.getByText('已停止，以上为未完成内容。')).toBeVisible()
   expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(1)
   await fitsViewport(page)
+  await page.evaluate(() => window.__workspacePreview.go('/association'))
+  await page.getByRole('button', { name: '清空', exact: true }).click()
+  await expect(page.locator('.assistant-header')).toHaveCount(0)
+  await expect(page.getByLabel('向管线智能助手提问')).toBeFocused()
+  await expect(page.getByRole('button', { name: '打开个人模型接入' })).toBeVisible()
 })
+
+for (const width of [1440, 768, 390, 320]) {
+  test(`composer model icon is immediately left of send at ${width}px in both modes`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 900 })
+    await start(page)
+    if (width === 768) await page.evaluate(() => { document.documentElement.dataset.appearance = 'dark' })
+    const canvas = page.getByRole('region', { name: '管线智能助手' })
+    await expect(canvas.locator('.assistant-mark, #assistant-title, .assistant-header')).toHaveCount(0)
+    for (const floating of [false, true]) {
+      if (floating) {
+        await page.evaluate(() => window.__workspacePreview.go('/members'))
+        await page.getByRole('button', { name: '打开管线智能助手' }).click()
+        await expect(page.getByRole('dialog', { name: '管线智能助手' })).toBeVisible()
+      }
+      const actions = page.locator('.assistant-composer-actions')
+      const icon = actions.getByRole('button', { name: '打开个人模型接入' })
+      const sendButton = actions.getByRole('button', { name: '发送问题' })
+      await expect(icon).toHaveAttribute('type', 'button')
+      await expect(icon).toBeEnabled()
+      const iconBox = (await icon.boundingBox())!
+      const sendBox = (await sendButton.boundingBox())!
+      expect(sendBox.x - iconBox.x - iconBox.width).toBeCloseTo(8, 0)
+      expect(iconBox.y + iconBox.height / 2).toBeCloseTo(sendBox.y + sendBox.height / 2, 0)
+      expect(iconBox.height).toEqual(sendBox.height)
+      await page.getByLabel('向管线智能助手提问').fill('只填草稿，不发送')
+      await icon.focus()
+      await page.keyboard.press('Tab')
+      await expect(sendButton).toBeFocused()
+      await fitsViewport(page)
+      await page.screenshot({ path: info.outputPath(`${floating ? 'floating' : 'workspace'}-alignment-${width}.png`), fullPage: true, animations: 'disabled' })
+    }
+    expect(await page.evaluate(() => window.__guanxianPreview.requests.length)).toBe(0)
+  })
+}

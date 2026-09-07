@@ -14,6 +14,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PolicyRagServiceTest {
     @Test
+    void explicitAllAssociationRetrievalIncludesPublishedEvidenceButDoesNotChangeScopedDefaults() {
+        var properties = new RagProperties();
+        var repository = new MemoryKnowledgeRepository();
+        var ingestion = new KnowledgeIngestionService(repository, properties);
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        for (var data : List.of(
+                List.of(first, "甲协会巡检", "ASSOCIATION", "PUBLISHED"),
+                List.of(second, "乙协会私有巡检", "PRIVATE", "PUBLISHED"),
+                List.of(second, "待审巡检", "PUBLIC", "DRAFT"))) {
+            ingestion.ingest(new KnowledgeTextDocument(null, (UUID) data.get(0), (String) data.get(1), "POLICY", "MANUAL", null,
+                    (String) data.get(2), (String) data.get(3), "owner", "跨域巡检测试要求保留巡检记录。"));
+        }
+        var service = new PolicyRagService(repository, disabledProvider(), properties);
+        var global = service.ask(new RagQuestion(null, "system", "跨域巡检测试", 12, "global", true, false, true));
+        assertEquals(Set.of("甲协会巡检", "乙协会私有巡检"), global.citations().stream().map(PolicyRagService.Citation::documentName).collect(java.util.stream.Collectors.toSet()));
+        assertNotNull(global.traceId());
+        var scoped = service.ask(new RagQuestion(first, "system", "跨域巡检测试", 12, "scoped", true, false));
+        assertEquals(List.of("甲协会巡检"), scoped.citations().stream().map(PolicyRagService.Citation::documentName).toList());
+        assertTrue(service.ask(new RagQuestion(second, "ordinary", "跨域巡检测试", 12, null)).citations().isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> service.ask(new RagQuestion(null, "ordinary", "跨域巡检测试", 12, null)));
+        assertThrows(IllegalArgumentException.class, () -> service.ask(new RagQuestion(null, "ordinary", "跨域巡检测试", 12, null, false, false, true)));
+        assertThrows(IllegalArgumentException.class, () -> new KnowledgeRepository.RetrievalScope(first, "system", true, true));
+    }
+
+    @Test
     void disabledExternalModelReturnsTraceableRetrievedSummary() {
         RagProperties properties = new RagProperties();
         properties.setChunkSizeChars(200);

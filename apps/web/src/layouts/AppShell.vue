@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink, RouterView, type RouteLocationRaw } from 'vue-router'
 import ChatAssistant from '../components/ChatAssistant.vue'
+import SessionRecovery from '../components/SessionRecovery.vue'
 import NavIcon from '../components/NavIcon.vue'
 import { navigationForRole } from '../config/navigation'
 import { associationRoles, defaultRouteForRole, roleLabels } from '../config/roles'
@@ -69,8 +70,25 @@ const workspaceHome = computed(() => auth.user.value ? defaultRouteForRole(auth.
 const assistantWorkspace = computed(() => route.path === '/association' && !!auth.user.value && associationRoles.includes(auth.user.value.role))
 const identityKey = computed(() => `${auth.user.value?.id}:${auth.user.value?.role}`)
 
-watch(() => auth.user.value, (user) => {
+watch(() => auth.user.value, (user, previous) => {
   if (!user) void router.replace({ path: '/login', query: { redirect: route.fullPath } })
+  else if (previous && (previous.id !== user.id || previous.role !== user.role)) {
+    void router.replace(defaultRouteForRole(user.role))
+  }
+})
+
+watch([
+  () => auth.user.value?.associationId,
+  () => auth.user.value?.enterpriseId,
+], () => {
+  if (!auth.user.value) return
+  // Scope may also be revoked/changed by the backend during session renewal.
+  // Drop old scoped results, but never remount views for an identical renewal.
+  refreshContextDependentState()
+  if (auth.user.value.role !== 'SYSTEM_ADMIN' && (!auth.user.value.associationId
+    || (auth.user.value.role.startsWith('ENTERPRISE_') && !auth.user.value.enterpriseId))) {
+    void router.replace('/access-help')
+  }
 })
 
 function refreshContextDependentState() {
@@ -104,7 +122,6 @@ async function loadSystemContextOptions() {
       auth.setSystemContext(null, '全平台', null)
       systemEnterprises.value = []
       systemContextError.value = '此前选择的管理协会已失效，请重新选择'
-      refreshContextDependentState()
       return
     }
     const enterprises = await platformApi.systemEnterprises(associationId)
@@ -118,7 +135,6 @@ async function loadSystemContextOptions() {
     auth.setSystemContext(associationId, association.name, validEnterpriseId)
     if (enterpriseId && !validEnterpriseId) {
       systemContextError.value = '此前选择的代管企业已失效，请重新选择'
-      refreshContextDependentState()
     }
   } catch {
     if (systemContextRequestGate.isCurrent(requestEpoch)) {
@@ -139,7 +155,6 @@ async function changeSystemAssociation(event: Event) {
     if (!systemContextRequestGate.isCurrent(requestEpoch)) return
     auth.setSystemContext(associationId, associationName, null)
     systemEnterprises.value = enterprises
-    refreshContextDependentState()
   } catch {
     if (systemContextRequestGate.isCurrent(requestEpoch)) {
       systemContextError.value = '代管企业范围加载失败'
@@ -158,7 +173,6 @@ function changeSystemEnterprise(event: Event) {
   const associationName = systemAssociations.value.find((item) => item.id === associationId)?.name || '全平台'
   auth.setSystemContext(associationId, associationName, enterpriseId)
   systemContextError.value = ''
-  refreshContextDependentState()
 }
 
 async function loadNotifications() {
@@ -410,7 +424,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="auth.user.value" class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'keyboard-navigation': keyboardNavigation }">
+  <div v-if="auth.user.value" class="app-shell" :inert="Boolean(auth.state.sessionIssue)" :class="{ 'sidebar-collapsed': sidebarCollapsed, 'keyboard-navigation': keyboardNavigation }">
     <aside id="main-sidebar" class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <div class="brand-mark"><span /><span /><span /></div>
@@ -596,6 +610,7 @@ onBeforeUnmount(() => {
       </section>
     </div>
   </div>
+  <SessionRecovery />
 </template>
 
 <style scoped>

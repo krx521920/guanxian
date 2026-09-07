@@ -1,4 +1,11 @@
 import { getAccessToken, getDemoRole, getSystemContext } from './token-store'
+import { prepareSession, reportUnauthorized } from './session-gate'
+
+interface VerifiedIdentityTransport {
+  accessToken: string
+  associationId: string | null
+  enterpriseId: string | null
+}
 
 interface ApiEnvelopeCandidate<T> {
   code: unknown
@@ -62,7 +69,7 @@ function headerEntries(headersInit?: HeadersInit): Array<[string, string]> {
   return Object.entries(headersInit)
 }
 
-function prepareHeaders(headersInit?: HeadersInit, body?: BodyInit | null): { headers: Headers; requestId: string } {
+function prepareHeaders(headersInit?: HeadersInit, body?: BodyInit | null, identity?: VerifiedIdentityTransport): { headers: Headers; requestId: string } {
   const entries = headerEntries(headersInit)
   const requestIdValues = entries
     .filter(([name]) => name.toLowerCase() === requestIdHeader.toLowerCase())
@@ -80,11 +87,11 @@ function prepareHeaders(headersInit?: HeadersInit, body?: BodyInit | null): { he
       headers.append(name, value)
     }
   })
-  const accessToken = getAccessToken()
+  const accessToken = identity?.accessToken ?? getAccessToken()
   if (accessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${accessToken}`)
   const demoRole = demoTransportEnabled ? getDemoRole() : null
   if (demoRole) headers.set(demoRoleHeader, demoRole)
-  const systemContext = getSystemContext()
+  const systemContext = identity ?? getSystemContext()
   if (systemContext.associationId) headers.set(associationContextHeader, systemContext.associationId)
   if (systemContext.enterpriseId) headers.set(enterpriseContextHeader, systemContext.enterpriseId)
   if (!headers.has('Content-Type') && !(body instanceof FormData)) {
@@ -132,8 +139,11 @@ export async function request<T>(
   observeResponse?: (response: Response) => void,
   responseKind: 'json' | 'blob' = 'json',
   timeoutMs = defaultTimeoutMs,
+  identity?: VerifiedIdentityTransport,
 ): Promise<T> {
-  const { headers, requestId } = prepareHeaders(options.headers, options.body)
+  const ready = identity ? undefined : prepareSession(options.signal)
+  if (ready) await ready
+  const { headers, requestId } = prepareHeaders(options.headers, options.body, identity)
   const controller = new AbortController()
   const externalSignal = options.signal
   let abortSource: 'external' | 'timeout' | undefined
@@ -167,6 +177,7 @@ export async function request<T>(
         signal: controller.signal,
       })
       observeResponse?.(response)
+      if (response.status === 401 && !identity) reportUnauthorized(headers.get('Authorization'))
     } catch (error) {
       if (abortSource === 'timeout') {
         throw new ApiRequestError('请求超时', requestId, undefined, 'REQUEST_TIMEOUT')
@@ -227,6 +238,8 @@ export async function requestEventStream<T>(
   onEvent: (event: T) => void | boolean | Promise<void | boolean>,
   timeoutMs = 120000,
 ): Promise<void> {
+  const ready = prepareSession(options.signal)
+  if (ready) await ready
   const { headers, requestId } = prepareHeaders(options.headers, options.body)
   headers.set('Accept', 'text/event-stream')
   const controller = new AbortController()
@@ -292,6 +305,7 @@ export async function requestEventStream<T>(
       throw reason
     }
 
+    if (response.status === 401) reportUnauthorized(headers.get('Authorization'))
     if (!response.ok) {
       let payload: ApiEnvelopeCandidate<unknown> | undefined
       try {
@@ -371,4 +385,14 @@ export async function requestEventStream<T>(
 
 export function requestBlob(path: string, options: RequestInit = {}, timeoutMs = defaultTimeoutMs): Promise<Blob> {
   return request<Blob>(path, options, undefined, 'blob', timeoutMs)
+}
+
+// Only identity verification may bypass the gate. Its token/scope are explicit and
+// never mutate the shared transport while concurrent business requests are waiting.
+export function requestIdentity<T>(
+  path: '/users/me' | '/onboarding/session',
+  accessToken: string,
+  context = { associationId: null, enterpriseId: null } as { associationId: string | null; enterpriseId: string | null },
+): Promise<T> {
+  return request<T>(path, {}, undefined, 'json', defaultTimeoutMs, { accessToken, ...context })
 }
