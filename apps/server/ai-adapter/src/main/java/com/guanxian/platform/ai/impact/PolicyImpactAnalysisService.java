@@ -80,6 +80,23 @@ public class PolicyImpactAnalysisService {
         }
         requireVersion(current.version(), expectedVersion);
         String target = approved ? "APPROVED" : "REJECTED";
+        if (approved) {
+            if (current.evidenceDetails() != null && current.evidenceDetails().summaryOnly()) {
+                throw precondition("摘要参考分析不可审核发布，请归档原文后重新分析");
+            }
+            AnalysisSource live = source(current.policyDocumentId(), current.enterpriseId());
+            var liveIds = live.chunks().stream().map(PolicyImpactAnalysisStore.SourceChunk::id).toList();
+            boolean changedQuotes = current.evidenceDetails() != null && current.evidenceDetails().references().stream()
+                    .anyMatch(reference -> !"KNOWLEDGE_CHUNK".equals(reference.kind()) || live.chunks().stream()
+                            .noneMatch(chunk -> chunk.id().equals(reference.id()) && chunk.content().equals(reference.quote())));
+            if (current.evidenceChunkIds().isEmpty() || !liveIds.containsAll(current.evidenceChunkIds())
+                    || changedQuotes
+                    || current.evidenceDetails() != null && (
+                    current.evidenceDetails().policyVersion() != live.metadata().policyVersion()
+                    || current.evidenceDetails().enterpriseVersion() != live.metadata().enterpriseVersion())) {
+                throw precondition("政策、企业资料或原文证据已变化，请重新分析后再审核");
+            }
+        }
         PolicyImpactAnalysisView updated = store.review(id, expectedVersion, target, actor.subject())
                 .orElseThrow(PolicyImpactAnalysisService::stale);
         store.recordChange(actor, approved ? "APPROVE" : "REJECT", updated, comment);
@@ -132,10 +149,10 @@ public class PolicyImpactAnalysisService {
     }
 
     private static void requireEvidence(AnalysisSource source) {
-        if (source.chunks().isEmpty()) {
+        if (source.chunks().isEmpty() && (source.metadata().summary() == null || source.metadata().summary().isBlank())) {
             throw new PolicyImpactException(
                     PolicyImpactException.Reason.EVIDENCE_REQUIRED,
-                    "no published knowledge chunks are linked to this policy");
+                    "政策缺少已归档原文及可追溯摘要，无法生成分析");
         }
     }
 

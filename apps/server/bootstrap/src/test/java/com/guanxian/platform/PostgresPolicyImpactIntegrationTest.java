@@ -11,9 +11,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.util.UUID;
 
@@ -26,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@Testcontainers(disabledWithoutDocker = true)
+@EnabledIf("com.guanxian.platform.IsolatedPolicyPostgres#available")
 @SpringBootTest(properties = {
         "spring.flyway.enabled=true",
         "guanxian.business.repository=postgres",
@@ -46,17 +45,12 @@ class PostgresPolicyImpactIntegrationTest {
     private static final UUID OTHER_POLICY = UUID.fromString("52000000-0000-0000-0000-000000000103");
     private static final UUID OTHER_ANALYSIS = UUID.fromString("52000000-0000-0000-0000-000000000104");
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine")
-            .withDatabaseName("guanxian")
-            .withUsername("guanxian")
-            .withPassword("test-only-password");
+    static final IsolatedPolicyPostgres POSTGRES = new IsolatedPolicyPostgres();
+    @AfterAll static void stopPostgres() { POSTGRES.close(); }
 
     @DynamicPropertySource
     static void configurePostgres(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        POSTGRES.register(registry);
     }
 
     @Autowired
@@ -67,6 +61,51 @@ class PostgresPolicyImpactIntegrationTest {
 
     @Autowired
     JdbcTemplate jdbc;
+
+    @Autowired
+    com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore analysisStore;
+
+    @Test
+    void originalSourceMustBeUnambiguousAndDemandIsNotACapability() {
+        UUID company = UUID.randomUUID(), policy = UUID.randomUUID();
+        String title = "来源关联测试-" + policy;
+        String source = "https://example.test/policy/" + policy;
+        jdbc.update("""
+                INSERT INTO enterprise(id,association_id,name,description,cooperation_needs,status)
+                VALUES (?,?,'来源测试企业','食品服务','["燃气监测合作需求"]','ACTIVE')
+                """, company, ASSOCIATION);
+        jdbc.update("""
+                INSERT INTO policy_document(id,association_id,title,source_url,summary,status,visibility)
+                VALUES (?,?,?,?,'燃气监测摘要','PUBLISHED','MEMBERS')
+                """, policy, ASSOCIATION, title, source);
+        addOriginalDocument(title, source + "/different-source", "燃气监测旧来源正文");
+        var summary = analysisStore.loadSource(policy, company).orElseThrow();
+        org.assertj.core.api.Assertions.assertThat(summary.chunks()).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(summary.enterpriseProfile()).doesNotContain("燃气", "监测合作需求");
+        UUID validChunk = addOriginalDocument(title, source, "燃气监测本次正文");
+        org.assertj.core.api.Assertions.assertThat(analysisStore.loadSource(policy, company).orElseThrow().chunks())
+                .extracting(com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.SourceChunk::id).containsExactly(validChunk);
+        addOriginalDocument(title, source, "同名同来源但无法唯一确认的正文");
+        org.assertj.core.api.Assertions.assertThat(analysisStore.loadSource(policy, company).orElseThrow().chunks()).isEmpty();
+    }
+
+    private UUID addOriginalDocument(String title, String url, String text) {
+        UUID document = UUID.randomUUID(), version = UUID.randomUUID(), chunk = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO knowledge_document(id,association_id,title,document_type,source_type,source_url,
+                    visibility,status,current_version,created_by_subject)
+                VALUES (?, ?, ?, 'POLICY', 'URL', ?, 'ASSOCIATION', 'PUBLISHED', 1, 'test')
+                """, document, ASSOCIATION, title, url);
+        jdbc.update("""
+                INSERT INTO knowledge_document_version(id,document_id,version,parser_name,parser_version,status,created_by_subject)
+                VALUES (?, ?, 1, 'test', '1', 'READY', 'test')
+                """, version, document);
+        jdbc.update("""
+                INSERT INTO knowledge_chunk(id,document_version_id,chunk_index,content,content_hash,token_count)
+                VALUES (?, ?, 0, ?, repeat('c',64), 20)
+                """, chunk, version, text);
+        return chunk;
+    }
 
     @Test
     void persistsDeterministicEvidenceReviewAuditHistoryAndEnterpriseIsolation() throws Exception {
@@ -82,7 +121,7 @@ class PostgresPolicyImpactIntegrationTest {
                 .andExpect(header().string(HttpHeaders.ETAG, "\"0\""))
                 .andExpect(jsonPath("$.data.status").value("PENDING_REVIEW"))
                 .andExpect(jsonPath("$.data.impactLevel").value("HIGH"))
-                .andExpect(jsonPath("$.data.analysisMethod").value("DETERMINISTIC_LEXICAL"))
+                .andExpect(jsonPath("$.data.analysisMethod").value("DETERMINISTIC_TOPIC_V2"))
                 .andExpect(jsonPath("$.data.modelExecutionId").doesNotExist())
                 .andExpect(jsonPath("$.data.evidenceChunkIds.length()").value(greaterThan(0)))
                 .andReturn().getResponse().getContentAsString();
@@ -188,6 +227,49 @@ class PostgresPolicyImpactIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"approved\":true}"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void importedSummaryIsTraceableButDatabaseAndApiBothRejectApproval() throws Exception {
+        UUID enterprise = UUID.randomUUID(), policy = UUID.randomUUID();
+        String run = "summary-test-"+UUID.randomUUID();
+        jdbc.update("INSERT INTO enterprise(id,association_id,name,description,status) VALUES (?,?,'摘要测试企业','供水监测','ACTIVE')",enterprise,ASSOCIATION);
+        jdbc.update("INSERT INTO policy_document(id,association_id,title,summary,status,visibility,tags) VALUES (?,?,'摘要测试政策','供水企业应当监测','PUBLISHED','MEMBERS','[\"供水监测\"]')",policy,ASSOCIATION);
+        jdbc.update("INSERT INTO platform_dataset_import(id,association_id,source_sha256,source_filename,actor_subject,report) VALUES (?,?,?,'fixture','test','{}')",run,ASSOCIATION,"b".repeat(64));
+        jdbc.update("""
+                INSERT INTO platform_source_record(id,import_id,association_id,kind,source_id,title,policy_id,payload)
+                VALUES (gen_random_uuid(),?,?,'POLICY','SUMMARY-TEST','摘要测试政策',?,
+                '{"title":"摘要测试政策","summary":"供水企业应当监测","source":{"涉及领域":"供水监测","适用对象":"供水运营企业","适用地区":"北京市","当前状态":"现行"}}')
+                """,run,ASSOCIATION,policy);
+        try {
+            String response = mockMvc.perform(post("/api/v1/policy-impact-analyses")
+                            .with(httpBasic("association-admin","admin123")).contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"policyDocumentId\":\""+policy+"\",\"enterpriseId\":\""+enterprise+"\"}"))
+                    .andExpect(status().isCreated()).andExpect(jsonPath("$.data.evidenceChunkIds.length()").value(0))
+                    .andExpect(jsonPath("$.data.evidenceDetails.basis").value("SUMMARY_REFERENCE"))
+                    .andExpect(jsonPath("$.data.evidenceDetails.references[0].quote").value("供水企业应当监测"))
+                    .andExpect(jsonPath("$.data.evidenceDetails.assessment.checks[0].explanation").value(org.hamcrest.Matchers.containsString("供水运营企业")))
+                    .andReturn().getResponse().getContentAsString();
+            UUID id = UUID.fromString(objectMapper.readTree(response).path("data").path("id").asText());
+            mockMvc.perform(get("/api/v1/policy-impact-analyses/{id}",id).with(httpBasic("association-admin","admin123")))
+                    .andExpect(jsonPath("$.data.evidenceDetails.basis").value("SUMMARY_REFERENCE"));
+            mockMvc.perform(put("/api/v1/policy-impact-analyses/{id}/review",id).with(httpBasic("association-admin","admin123"))
+                            .header(HttpHeaders.IF_MATCH,"\"0\"").contentType(MediaType.APPLICATION_JSON).content("{\"approved\":true}"))
+                    .andExpect(status().isPreconditionFailed());
+            org.junit.jupiter.api.Assertions.assertThrows(org.springframework.dao.DataIntegrityViolationException.class,
+                    () -> jdbc.update("UPDATE policy_impact_analysis SET status='APPROVED' WHERE id=?",id));
+            jdbc.update("UPDATE policy_document SET summary='供水监测更新',version=version+1 WHERE id=?",policy);
+            mockMvc.perform(put("/api/v1/policy-impact-analyses/{id}/reanalyze",id).with(httpBasic("association-admin","admin123"))
+                            .header(HttpHeaders.IF_MATCH,"\"0\""))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.evidenceDetails.policyVersion").value(1))
+                    .andExpect(jsonPath("$.data.evidenceDetails.assessment.checks[0].explanation").value(org.hamcrest.Matchers.containsString("缺少适用对象")));
+        } finally {
+            jdbc.update("DELETE FROM policy_impact_analysis WHERE policy_document_id=?",policy);
+            jdbc.update("DELETE FROM platform_source_record WHERE policy_id=?",policy);
+            jdbc.update("DELETE FROM platform_dataset_import WHERE id=?",run);
+            jdbc.update("DELETE FROM policy_document WHERE id=?",policy);
+            jdbc.update("DELETE FROM enterprise WHERE id=?",enterprise);
+        }
     }
 
     private void insertSourceData() {

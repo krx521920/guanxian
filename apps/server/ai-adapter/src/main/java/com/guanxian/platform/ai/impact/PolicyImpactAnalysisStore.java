@@ -35,7 +35,11 @@ public interface PolicyImpactAnalysisStore {
             UUID associationId,
             String impactLevel,
             String summary,
-            List<UUID> evidenceChunkIds) {
+            List<UUID> evidenceChunkIds, PolicyAnalysisEvidence evidenceDetails) {
+        public AnalysisDraft(UUID policyDocumentId, String policyTitle, UUID enterpriseId, String enterpriseName,
+                             UUID associationId, String impactLevel, String summary, List<UUID> evidenceChunkIds) {
+            this(policyDocumentId,policyTitle,enterpriseId,enterpriseName,associationId,impactLevel,summary,evidenceChunkIds,null);
+        }
         public AnalysisDraft {
             evidenceChunkIds = evidenceChunkIds == null ? List.of() : List.copyOf(evidenceChunkIds);
         }
@@ -71,9 +75,15 @@ public interface PolicyImpactAnalysisStore {
             String enterpriseName,
             UUID associationId,
             String enterpriseProfile,
-            List<SourceChunk> chunks) {
+            List<SourceChunk> chunks, PolicyAnalysisEvidence.Metadata metadata) {
+        public AnalysisSource(UUID policyDocumentId, String policyTitle, UUID enterpriseId, String enterpriseName,
+                              UUID associationId, String enterpriseProfile, List<SourceChunk> chunks) {
+            this(policyDocumentId,policyTitle,enterpriseId,enterpriseName,associationId,enterpriseProfile,chunks,PolicyAnalysisEvidence.Metadata.empty());
+        }
         public AnalysisSource {
-            chunks = chunks == null ? List.of() : List.copyOf(chunks);
+            chunks = chunks == null ? List.of() : chunks.stream()
+                    .filter(chunk -> chunk != null && chunk.content() != null && !chunk.content().isBlank()).toList();
+            metadata = metadata == null ? PolicyAnalysisEvidence.Metadata.empty() : metadata;
         }
     }
 

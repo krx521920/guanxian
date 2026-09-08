@@ -5,10 +5,13 @@ import AsyncResourceState from '../components/AsyncResourceState.vue'
 import PageHeader from '../components/PageHeader.vue'
 import PaginationBar from '../components/PaginationBar.vue'
 import StatusBadge from '../components/StatusBadge.vue'
+import PolicyCandidates from '../components/PolicyCandidates.vue'
+import PolicyCandidateOverview from '../components/PolicyCandidateOverview.vue'
 import { safePageResourceError, type PageResourceError } from '../composables/useAsyncResource'
 import { useAuth } from '../services/auth'
 import { createLatestRequestGate } from '../services/latest-request'
 import { platformApi } from '../services/platform-api'
+import type { PolicyCandidate } from '../services/policy-candidates'
 import type { MemberEnterprise, Policy, PolicyHistory, PolicyImpactAnalysis, PolicyImpactHistory, PolicyQuestionAnswer, PolicyUpsertPayload, Subscription } from '../types/domain'
 import { apiActionMessage, displayBusinessStatus, formatDateTime, nullableText, splitItems } from './business-form'
 import { displayEffectiveDate, safeExternalUrl } from './policy-display'
@@ -45,6 +48,7 @@ const impactMemberQuery = ref('')
 const impactMemberError = ref('')
 const impactMemberLoading = ref(false)
 const impactEnterpriseId = ref('')
+const impactCandidate = ref<PolicyCandidate | null>(null)
 const subscriptions = ref<Subscription[]>([])
 const subscriptionError = ref('')
 const histories = ref<PolicyHistory[]>([])
@@ -59,7 +63,7 @@ const policyLevels = ref<string[]>([])
 const effectiveFilter = ref('全部')
 const audienceFilter = ref('全部')
 const sortMode = ref('最新发布')
-const effectiveOptions = ['全部', '现行有效', '即将施行', '未定施行日期']
+const effectiveOptions = ['全部', '已到所载施行日期', '即将施行', '未定施行日期']
 const audienceOptions = ['全部', '全体会员', '本协会', '友好协会', '公开']
 const selected = ref<Policy | null>(null)
 const editing = ref<Policy | null>(null)
@@ -88,18 +92,18 @@ function visibilityLabel(value?: string | null): string {
 function effectiveState(policy: Policy): string {
   if (!policy.effectiveDate) return '未定施行日期'
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  return new Date(`${policy.effectiveDate}T00:00:00`).getTime() <= today.getTime() ? '现行有效' : '即将施行'
+  return new Date(`${policy.effectiveDate}T00:00:00`).getTime() <= today.getTime() ? '已到所载施行日期' : '即将施行'
 }
 
 function impactsFor(policy: Policy): PolicyImpactAnalysis[] {
-  return impacts.value.filter((item) => item.policyTitle === policy.title)
+  return impacts.value.filter((item) => item.policyDocumentId === policy.id)
 }
 
 function adviceFor(policy: Policy): string[] {
   if (policy.status === 'DRAFT') return ['补充发布单位、文号与原文链接', '核对摘要与适用对象后提交审核']
   if (policy.status === 'PENDING_REVIEW') return ['核对原文来源与文号', '确认适用对象与可见范围后发布']
   if (policy.status === 'REJECTED') return ['按退回意见修订后重新提交']
-  const advice = ['转发相关会员企业并组织学习', '跟踪施行日期，提前提醒受影响企业']
+  const advice = ['核对企业候选关联与实际适用条件', '核验现行效力、修订及废止情况后再决定是否转发']
   if (impactsFor(policy).length) advice.push('跟进已归档影响分析中的整改建议')
   return advice
 }
@@ -118,6 +122,8 @@ let memberSearchTimer: number | null = null
 const policyListRequestGate = createLatestRequestGate()
 const impactListRequestGate = createLatestRequestGate()
 const impactDetailRequestGate = createLatestRequestGate()
+const impactCreateRequestGate = createLatestRequestGate()
+const impactMemberRequestGate = createLatestRequestGate()
 
 async function load() {
   const requestEpoch = policyListRequestGate.begin()
@@ -325,18 +331,21 @@ function filterImpacts() {
 }
 
 async function loadImpactMembers() {
+  const epoch = impactMemberRequestGate.begin()
   impactMemberLoading.value = true
   impactMemberError.value = ''
   try {
     let members = await platformApi.members(
       impactMemberQuery.value.trim(), 'ACTIVE', impactMemberPage.value, impactMemberSize.value, false,
     )
+    if (!impactMemberRequestGate.isCurrent(epoch) || !impactCreateOpen.value || impactCandidate.value) return
     if (!members.items.length && members.total > 0 && members.page > 0) {
       impactMemberPage.value = Math.max(0, Math.ceil(members.total / members.size) - 1)
       members = await platformApi.members(
         impactMemberQuery.value.trim(), 'ACTIVE', impactMemberPage.value, impactMemberSize.value, false,
       )
     }
+    if (!impactMemberRequestGate.isCurrent(epoch) || !impactCreateOpen.value || impactCandidate.value) return
     impactMembers.value = members.items
     impactMemberTotal.value = members.total
     impactMemberPage.value = members.page
@@ -345,11 +354,12 @@ async function loadImpactMembers() {
       impactEnterpriseId.value = ''
     }
   } catch (reason) {
+    if (!impactMemberRequestGate.isCurrent(epoch) || !impactCreateOpen.value || impactCandidate.value) return
     impactMembers.value = []
     impactMemberTotal.value = 0
     impactMemberError.value = apiActionMessage(reason, '可分析企业加载失败。')
   } finally {
-    impactMemberLoading.value = false
+    if (impactMemberRequestGate.isCurrent(epoch)) impactMemberLoading.value = false
   }
 }
 
@@ -357,6 +367,7 @@ function changeImpactMemberPage(value: number) { impactMemberPage.value = value;
 function resizeImpactMemberPage(value: number) { impactMemberSize.value = value; impactMemberPage.value = 0; impactEnterpriseId.value = ''; void loadImpactMembers() }
 
 function openImpactCreate(item: Policy) {
+  closeImpactCreate()
   impactPolicy.value = item
   impactEnterpriseId.value = ''
   impactMemberQuery.value = ''
@@ -367,26 +378,57 @@ function openImpactCreate(item: Policy) {
   void loadImpactMembers()
 }
 
+function closeImpactCreate() {
+  impactCreateRequestGate.invalidate()
+  impactMemberRequestGate.invalidate()
+  if (memberSearchTimer !== null) { window.clearTimeout(memberSearchTimer); memberSearchTimer = null }
+  impactCreateOpen.value = false
+  impactPolicy.value = null
+  impactCandidate.value = null
+  impactMembers.value = []
+  impactEnterpriseId.value = ''
+  impactMemberLoading.value = false
+  impactBusy.value = false
+}
+
+function prepareCandidateAnalysis(candidate: PolicyCandidate) {
+  const policy = selected.value
+  if (!policy || !canReviewHere.value || policy.associationId !== auth.user.value?.associationId
+      || auth.user.value?.enterpriseId && auth.user.value.enterpriseId !== candidate.enterpriseId) return
+  closeImpactCreate()
+  impactPolicy.value = policy
+  impactCandidate.value = candidate
+  impactEnterpriseId.value = candidate.enterpriseId
+  impactMemberError.value = ''
+  selected.value = null
+  impactCreateOpen.value = true
+}
+
 async function createImpact() {
-  if (!impactPolicy.value || !impactEnterpriseId.value || impactBusy.value) return
+  if (!impactPolicy.value || !impactEnterpriseId.value || impactBusy.value || !canReviewHere.value) return
+  const epoch = impactCreateRequestGate.begin()
   impactBusy.value = true
   impactMemberError.value = ''
   try {
     const created = await platformApi.createPolicyImpact(impactPolicy.value.id, impactEnterpriseId.value)
+    if (!impactCreateRequestGate.isCurrent(epoch) || !impactCreateOpen.value) return
     impactCreateOpen.value = false
     impactPolicy.value = null
     impactStatus.value = ''
     impactPageIndex.value = 0
     await loadImpacts()
-    message.value = '企业政策影响分析已生成并进入待审核状态。'
+    if (!impactCreateRequestGate.isCurrent(epoch)) return
+    message.value = created.evidenceDetails?.basis === 'SUMMARY_REFERENCE'
+      ? '摘要参考分析已保存；须归档原文并重新分析后才能审核发布。' : '企业政策影响分析已生成并进入待审核状态。'
     await openImpact(created)
   } catch (reason) {
+    if (!impactCreateRequestGate.isCurrent(epoch)) return
     impactMemberError.value = apiActionMessage(
       reason,
-      '影响分析生成失败。请确认政策已发布、企业处于正常状态，并已入库与该政策关联的资料证据。',
+      '影响分析生成失败。请确认政策已发布、企业处于正常状态，并有可追溯摘要或明确关联的原文。',
     )
   } finally {
-    impactBusy.value = false
+    if (impactCreateRequestGate.isCurrent(epoch)) impactBusy.value = false
   }
 }
 
@@ -467,6 +509,7 @@ async function reanalyzeImpact() {
 
 async function reviewImpact(approved: boolean) {
   if (!impactSelected.value || impactSelected.value.status !== 'PENDING_REVIEW' || impactBusy.value) return
+  if (approved && impactSelected.value.evidenceDetails?.basis === 'SUMMARY_REFERENCE') return
   const currentImpact = impactSelected.value
   const requestEpoch = impactDetailRequestGate.begin()
   impactBusy.value = true
@@ -499,6 +542,7 @@ async function reviewImpact(approved: boolean) {
 
 function closeImpactDetail() {
   impactDetailRequestGate.invalidate()
+  impactOpen.value = false
   clearImpactDetailState()
   impactDetailError.value = ''
   impactDetailLoading.value = false
@@ -513,7 +557,7 @@ watch([keyword, activeLevel], () => {
   searchTimer = window.setTimeout(() => { page.value = 0; void load() }, 300)
 })
 watch(impactMemberQuery, () => {
-  if (!impactCreateOpen.value) return
+  if (!impactCreateOpen.value || impactCandidate.value) return
   if (memberSearchTimer !== null) window.clearTimeout(memberSearchTimer)
   memberSearchTimer = window.setTimeout(() => {
     impactMemberPage.value = 0
@@ -527,6 +571,8 @@ onBeforeUnmount(() => {
   policyListRequestGate.invalidate()
   impactListRequestGate.invalidate()
   impactDetailRequestGate.invalidate()
+  impactCreateRequestGate.invalidate()
+  impactMemberRequestGate.invalidate()
 })
 
 function subscriptionSupported(item: Subscription) {
@@ -607,6 +653,22 @@ onMounted(async () => {
   try { selected.value = await platformApi.policy(policyId, canManageDeleted.value && includeDeleted.value) }
   catch (reason) { message.value = apiActionMessage(reason, '通知关联的政策当前不可见或已被删除。') }
 })
+
+let candidateOpenEpoch = 0
+async function openCandidatePolicy(id: string) {
+  const epoch = ++candidateOpenEpoch
+  try {
+    const value = await platformApi.policy(id)
+    if (epoch === candidateOpenEpoch) selected.value = value
+  } catch (reason) { if (epoch === candidateOpenEpoch) message.value = apiActionMessage(reason, '该政策已不在当前可见范围。') }
+}
+watch(() => JSON.stringify([auth.user.value?.id, auth.user.value?.role, auth.user.value?.associationId, auth.user.value?.enterpriseId]), () => {
+  candidateOpenEpoch++
+  closeImpactCreate()
+  closeImpactDetail()
+  selected.value = null
+}, { flush: 'sync' })
+onBeforeUnmount(() => { candidateOpenEpoch++ })
 </script>
 
 <template>
@@ -617,6 +679,7 @@ onMounted(async () => {
     </PageHeader>
     <div v-if="canWrite && !canWriteHere" class="save-message page-message">系统管理员需先在左侧选择协会，才能维护政策或订阅。</div>
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
+    <PolicyCandidateOverview v-if="auth.user.value && auth.user.value.role !== 'OBSERVER'" @select="openCandidatePolicy" />
     <section class="policy-hero panel">
       <div class="ai-orb">资料</div>
       <div>
@@ -627,7 +690,7 @@ onMounted(async () => {
         <p v-if="impactLoading">正在读取当前身份可见的真实分析记录。</p>
         <p v-else-if="impactError">{{ impactError }} 政策列表仍可正常使用。</p>
         <p v-else-if="impactAllTotal">数字来自政策影响分析数据库；详情列出当前加载的真实记录。</p>
-        <p v-else>暂无已建档分析，页面不会用模拟数字填充。</p>
+        <p v-else>暂无正式影响分析，不代表政策与企业无关。可先打开政策详情，查看“可能相关的企业”。</p>
       </div>
       <button class="secondary-button" type="button" @click="impactOpen = true">查看影响分析 →</button>
     </section>
@@ -678,6 +741,7 @@ onMounted(async () => {
           <button v-if="canReviewHere && !selected.deleted" class="secondary-button danger-action" type="button" :disabled="busy" @click="deletePolicy(selected)">删除</button>
           <button v-if="canReviewHere && selected.deleted" class="primary-button" type="button" :disabled="busy" @click="restorePolicy(selected)">恢复为草稿</button>
         </div>
+        <PolicyCandidates v-if="auth.user.value?.role !== 'OBSERVER' && !selected.deleted && selected.status === 'PUBLISHED' && !selected.disabled" :key="`${selected.id}-${selected.version}`" :policy-id="selected.id" :can-analyze="canReviewHere && selected.associationId === auth.user.value?.associationId" @analyze="prepareCandidateAnalysis" />
       </section>
     </div>
 
@@ -705,7 +769,7 @@ onMounted(async () => {
           <div class="detail-grid">
             <div><span>政策</span><strong>{{ impactSelected.policyTitle }}</strong></div>
             <div><span>企业</span><strong>{{ impactSelected.enterpriseName }}</strong></div>
-            <div><span>影响等级</span><strong>{{ impactSelected.impactLevel }}</strong></div>
+            <div><span>关注程度（非适用结论）</span><strong>{{ impactSelected.impactLevel }}</strong></div>
             <div><span>状态</span><strong>{{ displayBusinessStatus(impactSelected.status) }}</strong></div>
             <div><span>分析方法</span><strong>{{ impactSelected.analysisMethod }}</strong></div>
             <div><span>证据片段</span><strong>{{ impactSelected.evidenceChunkIds.length }} 条</strong></div>
@@ -713,6 +777,13 @@ onMounted(async () => {
             <div><span>更新时间</span><strong>{{ formatDateTime(impactSelected.updatedAt) }}</strong></div>
           </div>
           <div class="modal-copy"><p>{{ impactSelected.summary }}</p></div>
+          <section v-if="impactSelected.evidenceDetails" class="modal-copy" aria-label="分析来源证据">
+            <h3>{{ impactSelected.evidenceDetails.basis === 'SUMMARY_REFERENCE' ? '摘要参考证据（非原文）' : '已归档原文证据' }}</h3>
+            <p>政策版本 {{ impactSelected.evidenceDetails.policyVersion }} · 企业资料版本 {{ impactSelected.evidenceDetails.enterpriseVersion }} · {{ formatDateTime(impactSelected.evidenceDetails.capturedAt) }} 留存</p>
+            <p v-if="impactSelected.evidenceDetails.basis === 'SUMMARY_REFERENCE'" role="status">仅凭摘要不可审核发布。补充已归档原文后点击“重新分析”，再进行人工审核。</p>
+            <details v-for="reference in impactSelected.evidenceDetails.references" :key="reference.id"><summary>{{ reference.kind === 'POLICY_SUMMARY' ? '政策摘要' : '原文片段' }} · {{ reference.title }}</summary><blockquote style="white-space: pre-wrap; overflow-wrap: anywhere">{{ reference.quote }}</blockquote><a v-if="safeExternalUrl(reference.sourceUrl)" :href="safeExternalUrl(reference.sourceUrl)!" target="_blank" rel="noopener noreferrer">核对来源 ↗</a></details>
+            <ul><li v-for="check in impactSelected.evidenceDetails.assessment.checks" :key="check.dimension">{{ check.dimension }}：{{ check.explanation }}</li></ul>
+          </section>
           <label v-if="canReviewHere && impactSelected.status === 'PENDING_REVIEW'" class="modal-copy">
             <span>审核意见</span>
             <textarea v-model="impactReviewComment" rows="3" maxlength="1000" placeholder="可填写审核依据或退回原因" />
@@ -720,7 +791,7 @@ onMounted(async () => {
           <div v-if="canReviewHere" class="form-actions policy-actions">
             <button class="secondary-button" type="button" :disabled="impactBusy" @click="reanalyzeImpact">重新分析</button>
             <button v-if="impactSelected.status === 'PENDING_REVIEW'" class="secondary-button" type="button" :disabled="impactBusy" @click="reviewImpact(false)">退回</button>
-            <button v-if="impactSelected.status === 'PENDING_REVIEW'" class="primary-button" type="button" :disabled="impactBusy" @click="reviewImpact(true)">审核通过</button>
+            <button v-if="impactSelected.status === 'PENDING_REVIEW'" class="primary-button" type="button" :disabled="impactBusy || impactSelected.evidenceDetails?.basis === 'SUMMARY_REFERENCE'" @click="reviewImpact(true)">审核通过</button>
           </div>
           <section class="impact-history-section">
             <h3>操作历史</h3>
@@ -766,15 +837,20 @@ onMounted(async () => {
       </section>
     </div>
 
-    <div v-if="impactCreateOpen && impactPolicy" class="modal-backdrop" @click.self="impactCreateOpen = false">
-      <form class="panel modal-card" @submit.prevent="createImpact">
+    <div v-if="impactCreateOpen && impactPolicy" class="modal-backdrop" @click.self="closeImpactCreate">
+      <form class="panel modal-card impact-create-card" role="dialog" aria-modal="true" aria-labelledby="impact-create-title" @submit.prevent="createImpact">
         <div class="modal-head">
-          <div><span class="eyebrow">NEW POLICY IMPACT</span><h2>分析《{{ impactPolicy.title }}》对企业的影响</h2></div>
-          <button type="button" class="icon-button" @click="impactCreateOpen = false">×</button>
+          <div><span class="eyebrow">NEW POLICY IMPACT</span><h2 id="impact-create-title">分析《{{ impactPolicy.title }}》对企业的影响</h2></div>
+          <button type="button" class="icon-button" @click="closeImpactCreate">×</button>
         </div>
-        <p>只列出当前协会正常存续的企业。生成前必须已有与该政策关联的已发布资料片段，系统不会在无证据时编造分析。</p>
-        <div class="search-box compact"><span>⌕</span><input v-model="impactMemberQuery" placeholder="搜索企业名称" /></div>
+        <p>只列出当前协会正常存续的企业。优先引用已发布原文片段；只有摘要时生成不可审核发布的参考分析，并保留来源与版本。摘要、原文均缺失时不生成。</p>
         <div v-if="impactMemberError" class="save-message" role="alert">{{ impactMemberError }}</div>
+        <div v-if="impactCandidate" class="save-message" role="status">
+          <strong>已选择：{{ impactCandidate.enterpriseName }}</strong>
+          <p>候选依据：{{ impactCandidate.evidence.map(item => item.topic).join('、') }}。确认后才会创建分析记录，不会自动通过审核或发送通知。</p>
+        </div>
+        <template v-else>
+        <div class="search-box compact"><span>⌕</span><input v-model="impactMemberQuery" placeholder="搜索企业名称" /></div>
         <div v-if="impactMemberLoading" class="empty-business-state"><b>正在加载企业…</b></div>
         <div v-else class="impact-member-list">
           <label v-for="member in impactMembers" :key="member.id" :class="{ selected: impactEnterpriseId === member.id }">
@@ -784,10 +860,12 @@ onMounted(async () => {
           <div v-if="!impactMembers.length && !impactMemberError" class="empty-business-state"><b>未找到可分析的正常企业</b></div>
           <PaginationBar :page="impactMemberPage" :size="impactMemberSize" :total="impactMemberTotal" :disabled="impactMemberLoading" @change="changeImpactMemberPage" @resize="resizeImpactMemberPage" />
         </div>
+        </template>
         <div class="form-actions">
-          <button type="button" class="secondary-button" @click="impactCreateOpen = false">取消</button>
-          <button class="primary-button" :disabled="impactBusy || !impactEnterpriseId">{{ impactBusy ? '正在生成…' : '生成并进入审核' }}</button>
+          <button type="button" class="secondary-button" @click="closeImpactCreate">取消</button>
+          <button class="primary-button" :disabled="impactBusy || impactMemberLoading || !impactEnterpriseId || !canReviewHere">{{ impactBusy ? '正在生成…' : '确认生成参考分析' }}</button>
         </div>
+        <p v-if="impactBusy">请求已提交，关闭窗口不会撤销服务端正在生成的分析。</p>
       </form>
     </div>
   </div>
@@ -815,4 +893,6 @@ onMounted(async () => {
 .impact-member-list > label.selected { border-color: var(--primary); background: var(--primary-soft); }
 .impact-member-list > label span { display: grid; gap: 3px; }
 .impact-member-list small { color: var(--muted); }
+.impact-create-card > p { margin: 16px 24px; line-height: 1.7; }
+.impact-create-card > .save-message, .impact-create-card > .search-box, .impact-create-card > .impact-member-list { margin-left: 24px; margin-right: 24px; }
 </style>

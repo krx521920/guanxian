@@ -2,103 +2,57 @@ package com.guanxian.platform.ai.impact;
 
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.AnalysisDraft;
 import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.AnalysisSource;
-import com.guanxian.platform.ai.impact.PolicyImpactAnalysisStore.SourceChunk;
+import com.guanxian.platform.policy.PolicyApplicability;
+import com.guanxian.platform.policy.PolicyCandidateMatcher;
+import com.guanxian.platform.policy.PolicyCandidateMatcher.Field;
 import org.springframework.stereotype.Component;
-
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.UUID;
 
 @Component
 final class DeterministicPolicyImpactAnalyzer {
-    private static final List<String> DOMAIN_KEYWORDS = List.of(
-            "燃气", "天然气", "供水", "自来水", "排水", "污水", "热力", "供热",
-            "矿山", "阀门", "球阀", "蝶阀", "管线", "管道", "施工", "地勘",
-            "监测", "报警", "泄漏", "巡检", "数字孪生", "信息汇交", "环境治理",
-            "安全", "应急", "测绘", "勘察", "检测", "修复", "运维", "数据");
-    private static final List<String> OBLIGATION_KEYWORDS = List.of(
-            "应当", "必须", "不得", "禁止", "要求", "责任", "期限", "报送",
-            "汇交", "检查", "巡检", "记录", "标准", "整改", "处罚", "风险", "隐患");
-
     AnalysisDraft analyze(AnalysisSource source) {
-        if (source.chunks().isEmpty()) {
-            throw new PolicyImpactException(
-                    PolicyImpactException.Reason.EVIDENCE_REQUIRED,
-                    "no published knowledge chunks are linked to this policy");
+        var metadata = source.metadata();
+        boolean summaryOnly = source.chunks().isEmpty();
+        if (summaryOnly && (metadata.summary() == null || metadata.summary().isBlank())) {
+            throw new PolicyImpactException(PolicyImpactException.Reason.EVIDENCE_REQUIRED,
+                    "政策缺少已归档原文及可追溯摘要，无法生成分析");
         }
-        String profile = normalize(source.enterpriseProfile());
-        Set<String> enterpriseKeywords = new LinkedHashSet<>();
-        for (String keyword : DOMAIN_KEYWORDS) {
-            if (profile.contains(keyword.toLowerCase(Locale.ROOT))) {
-                enterpriseKeywords.add(keyword);
-            }
-        }
-
-        List<ScoredChunk> ranked = source.chunks().stream()
-                .map(chunk -> score(chunk, enterpriseKeywords))
-                .sorted(Comparator.comparingInt(ScoredChunk::score).reversed()
-                        .thenComparing(chunk -> chunk.chunk().id()))
-                .toList();
-        List<ScoredChunk> evidence = ranked.stream().limit(5).toList();
-        Set<String> matchedKeywords = new LinkedHashSet<>();
-        int obligations = 0;
-        for (ScoredChunk chunk : evidence) {
-            matchedKeywords.addAll(chunk.matches());
-            obligations += chunk.obligations();
-        }
-
-        String level;
-        if (matchedKeywords.size() >= 2 || (matchedKeywords.size() == 1 && obligations >= 4)) {
-            level = "HIGH";
-        } else if (!matchedKeywords.isEmpty() || obligations >= 2) {
-            level = "MEDIUM";
-        } else {
-            level = "LOW";
-        }
-        List<UUID> evidenceIds = evidence.stream().map(item -> item.chunk().id()).toList();
-        String summary = summary(source, level, matchedKeywords, obligations, evidenceIds.size());
-        return new AnalysisDraft(
-                source.policyDocumentId(), source.policyTitle(), source.enterpriseId(), source.enterpriseName(),
-                source.associationId(), level, summary, evidenceIds);
-    }
-
-    private static ScoredChunk score(SourceChunk chunk, Set<String> enterpriseKeywords) {
-        String content = normalize(chunk.content());
-        Set<String> matches = new LinkedHashSet<>();
-        for (String keyword : enterpriseKeywords) {
-            if (content.contains(keyword.toLowerCase(Locale.ROOT))) {
-                matches.add(keyword);
-            }
-        }
-        int obligations = 0;
-        for (String keyword : OBLIGATION_KEYWORDS) {
-            if (content.contains(keyword)) {
-                obligations++;
-            }
-        }
-        return new ScoredChunk(chunk, matches.size() * 10 + obligations, Set.copyOf(matches), obligations);
-    }
-
-    private static String summary(
-            AnalysisSource source, String level, Set<String> matches, int obligations, int evidenceCount) {
-        String relation = switch (level) {
-            case "HIGH" -> "直接相关，建议优先核验合规与实施安排";
-            case "MEDIUM" -> "存在相关要求，建议由业务负责人进一步核验";
-            default -> "当前可见材料中的直接关联较弱，仍需关注后续细则";
-        };
-        String features = matches.isEmpty() ? "未命中特定业务关键词" : "命中企业特征：" + String.join("、", matches);
-        return "%s《%s》与企业“%s”%s；%s；识别到%d个义务/风险词，引用%d个已入库片段。本结果由确定性词法规则生成，需经协会审核。"
-                .formatted(level + "：", source.policyTitle(), source.enterpriseName(), relation,
-                        features, obligations, evidenceCount);
-    }
-
-    private static String normalize(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT);
-    }
-
-    private record ScoredChunk(SourceChunk chunk, int score, Set<String> matches, int obligations) {
+        var enterprise = List.of(new Field("企业业务资料", source.enterpriseProfile()));
+        var chunks = source.chunks().stream().sorted(Comparator
+                .<PolicyImpactAnalysisStore.SourceChunk>comparingInt(chunk -> PolicyCandidateMatcher.sharedEvidence(
+                        List.of(new Field("政策原文", chunk.content())), enterprise).size()).reversed()
+                .thenComparing(PolicyImpactAnalysisStore.SourceChunk::id)).limit(5).toList();
+        var fields = summaryOnly ? List.of(new Field("政策摘要（非原文）", metadata.summary()))
+                : chunks.stream().map(chunk -> new Field("政策原文", chunk.content())).toList();
+        var matches = PolicyCandidateMatcher.sharedEvidence(fields, enterprise);
+        var topics = matches.stream().map(PolicyCandidateMatcher.Evidence::topic).distinct().toList();
+        // Obligation words never increase relevance. Summaries cannot yield a high-impact conclusion.
+        String level = topics.isEmpty() ? "LOW" : topics.size() >= 2 && !summaryOnly ? "HIGH" : "MEDIUM";
+        var assessment = PolicyApplicability.assess(String.join("\n", fields.stream().map(Field::text).toList()),
+                metadata.audience(), metadata.region(), metadata.effectiveOn(), metadata.sourceStatus(),
+                LocalDate.now(ZoneId.of("Asia/Shanghai")), enterprise);
+        if (assessment.checks().stream().anyMatch(check -> "OBSOLETE_AT_SOURCE".equals(check.state())
+                || "NOT_YET_EFFECTIVE".equals(check.state()))) level = "LOW";
+        if ("HIGH".equals(level) && ("INDIRECT_BUSINESS_CLUE".equals(assessment.kind())
+                || "INDIRECT_OPPORTUNITY".equals(assessment.kind()))) level = "MEDIUM";
+        var references = summaryOnly ? List.of(new PolicyAnalysisEvidence.Reference("POLICY_SUMMARY",
+                source.policyDocumentId(), source.policyTitle(), metadata.sourceUrl(), metadata.summary()))
+                : chunks.stream().map(chunk -> new PolicyAnalysisEvidence.Reference("KNOWLEDGE_CHUNK", chunk.id(),
+                        source.policyTitle(), metadata.sourceUrl(), chunk.content())).toList();
+        var details = new PolicyAnalysisEvidence(summaryOnly ? "SUMMARY_REFERENCE" : "SOURCE_CHUNKS",
+                metadata.policyVersion(), metadata.enterpriseVersion(), Instant.now(), references, assessment);
+        String summary = (summaryOnly ? "摘要参考分析（非原文，不可审核发布）：" : "原文线索分析：")
+                + "《" + source.policyTitle() + "》与“" + source.enterpriseName() + "”"
+                + (topics.isEmpty() ? "未发现具体业务主题交集。" : "共享业务主题：" + String.join("、", topics) + "。")
+                + "关注程度 " + level + " 只代表主题线索，不代表法定适用或合规结论。"
+                + String.join("；", assessment.checks().stream().map(check -> check.dimension() + "：" + check.explanation()).toList())
+                + (summaryOnly ? "。须补归档原文后重新分析，再进行人工审核。" : "。需结合完整原文及企业实际情况人工核验。");
+        return new AnalysisDraft(source.policyDocumentId(), source.policyTitle(), source.enterpriseId(),
+                source.enterpriseName(), source.associationId(), level, summary,
+                chunks.stream().map(PolicyImpactAnalysisStore.SourceChunk::id).toList(), details);
     }
 }

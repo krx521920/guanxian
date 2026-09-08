@@ -144,7 +144,7 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
                 current.id(), current.policyDocumentId(), current.policyTitle(), current.enterpriseId(),
                 current.enterpriseName(), current.associationId(), current.impactLevel(), current.summary(),
                 current.evidenceChunkIds(), targetStatus, null, reviewerSubject, now,
-                current.version() + 1, current.createdAt(), now, null);
+                current.version() + 1, current.createdAt(), now, null, current.evidenceDetails());
         values.put(id, updated);
         return Optional.of(updated);
     }
@@ -209,7 +209,7 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
         return new PolicyImpactAnalysisView(
                 id, draft.policyDocumentId(), draft.policyTitle(), draft.enterpriseId(), draft.enterpriseName(),
                 draft.associationId(), draft.impactLevel(), draft.summary(), draft.evidenceChunkIds(), status,
-                null, reviewer, reviewedAt, version, createdAt, updatedAt, null);
+                null, reviewer, reviewedAt, version, createdAt, updatedAt, null, draft.evidenceDetails());
     }
 
     private static Map<String, Object> snapshot(PolicyImpactAnalysisView value, String comment) {
@@ -223,6 +223,7 @@ public class MemoryPolicyImpactAnalysisStore implements PolicyImpactAnalysisStor
         snapshot.put("status", value.status());
         snapshot.put("version", value.version());
         snapshot.put("analysisMethod", value.analysisMethod());
+        if (value.evidenceDetails() != null) snapshot.put("evidenceDetails", value.evidenceDetails());
         if (value.reviewedBySubject() != null) {
             snapshot.put("reviewedBySubject", value.reviewedBySubject());
         }

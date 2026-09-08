@@ -156,7 +156,9 @@ describe('生产界面交互契约', () => {
     expect(policiesView).toMatch(
       /platformApi\.members\(\s*impactMemberQuery\.value\.trim\(\),\s*'ACTIVE'/,
     )
-    expect(policiesView).toContain(':disabled="impactBusy || !impactEnterpriseId"')
+    expect(policiesView).toContain(':disabled="impactBusy || impactMemberLoading || !impactEnterpriseId || !canReviewHere"')
+    expect(policiesView).toContain('@analyze="prepareCandidateAnalysis"')
+    expect(policiesView).toContain('impactCreateRequestGate.isCurrent(epoch)')
     expect(policiesView).toContain('v-if="canReviewHere && impactSelected.status === \'PENDING_REVIEW\'"')
     expect(policiesView).toContain('<PaginationBar :page="impactPageIndex"')
     expect(policiesView).toContain('<PaginationBar :page="impactMemberPage"')
