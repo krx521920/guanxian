@@ -170,6 +170,11 @@ jobs:
         run: python -m unittest discover -s tests/operations -p 'test_*member*evidence.py' -v
       - name: Verify annual evidence import and rollback against isolated PostgreSQL
         run: python tests/operations/member_annual_evidence_postgres_check.py
+      - name: Verify remaining preparation tools and isolated SQL safety
+        run: |
+          python -m unittest discover -s tests/operations -p 'test_prepare_*.py' -v
+          python tests/operations/platform_corrections_postgres_check.py
+          python tests/operations/tender_leads_postgres_check.py
 
   web:
     runs-on: ubuntu-latest
