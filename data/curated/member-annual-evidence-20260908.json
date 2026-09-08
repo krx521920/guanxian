@@ -1,0 +1,3861 @@
+{
+  "schemaVersion": 1,
+  "batchId": "member-annual-evidence-20260908",
+  "status": "REVIEWED_NOT_APPLIED",
+  "checkedOn": "2026-09-08",
+  "window": {
+    "publicationFrom": "2025-09-08",
+    "publicationThrough": "2026-09-08",
+    "timezone": "Asia/Shanghai",
+    "note": "按公告发布日期选入；实际事件日期单列。未把文内更早业绩当成本年新事件。"
+  },
+  "enterpriseBaseline": {
+    "path": "D:/guanxian/tmp/platform-dataset-prepared-20260907.json",
+    "sha256": "f9c1243ac018e6a323c18f212ecac7f068ac09f84ce3d8fdcae60c250c370e24",
+    "count": 116,
+    "productionReRead": false
+  },
+  "productionApplied": false,
+  "priorQuarterCatalog": {
+    "path": "data/curated/member-public-evidence-20260908.json",
+    "sha256": "264a67756463f127e6574a15cc99734a4185f3f79863714a51b6d961f6c88234",
+    "records": 31
+  },
+  "records": [
+    {
+      "id": "EV-20260908-001",
+      "category": "TENDER",
+      "title": "人民大会堂三区热力站部分设备更换项目成交",
+      "publishedOn": "2026-07-14",
+      "status": "AWARDED",
+      "summary": "公告确认北京热力市政为成交供应商，工程工期82日历天。",
+      "sourceUrl": "https://www.ccgp.gov.cn/cggg/zygg/cjgg/202607/t20260714_26930521.htm",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-108",
+          "role": "AWARDED_SUPPLIER",
+          "enterpriseName": "北京热力市政工程建设有限公司",
+          "roleLabel": "中标/成交供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "RC-G26003",
+      "region": "北京市",
+      "buyer": "人民大会堂管理局",
+      "amount": {
+        "value": "2566940.85",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "成交公告",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-002",
+      "category": "TENDER",
+      "title": "北京市供水管网漏损治理和老旧更新改造二期工程设计中标",
+      "publishedOn": "2026-06-30",
+      "status": "AWARDED",
+      "summary": "自来水集团发起采购，自来水设计公司中标；这是一条名录内两家企业间有官方证据的业务关系。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260630/5602465.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-097",
+          "role": "BUYER",
+          "enterpriseName": "北京市自来水集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-020",
+          "role": "AWARDED_SUPPLIER",
+          "enterpriseName": "北京市自来水设计有限责任公司",
+          "roleLabel": "中标/成交供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044085001",
+      "region": "北京市丰台、石景山、大兴、房山、怀柔、密云等区域",
+      "buyer": "北京市自来水集团有限责任公司",
+      "amount": {
+        "value": "14715474.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "中标结果",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-003",
+      "category": "TENDER",
+      "title": "青塔村棚改配套热力管线工程中标",
+      "publishedOn": "2026-07-28",
+      "status": "AWARDED",
+      "summary": "北京热力市政获该热力管线工程中标；以7月28日结果公告更新7月23日候选人状态，不重复计为两个项目。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260728/5646049.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-108",
+          "role": "AWARDED_SUPPLIER",
+          "enterpriseName": "北京热力市政工程建设有限公司",
+          "roleLabel": "中标/成交供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044313001",
+      "region": "北京市丰台区青塔村",
+      "buyer": "北京建城丰汇置业有限公司",
+      "amount": {
+        "value": "2933773.07",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "中标结果",
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260723/5635693.html"
+      ],
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-004",
+      "category": "TENDER",
+      "title": "回天地区、治理类街乡镇接诉即办数据分析及成果转化成交",
+      "publishedOn": "2026-06-30",
+      "status": "AWARDED",
+      "summary": "北京零点市场调查为成交供应商，服务至2026年12月31日；属于城市治理数据服务，不是管道施工。",
+      "sourceUrl": "https://fgw.beijing.gov.cn/fzggzl/cgsxgk/zbjg/202606/t20260630_4738947.htm",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-115",
+          "role": "AWARDED_SUPPLIER",
+          "enterpriseName": "北京零点市场调查有限公司",
+          "roleLabel": "中标/成交供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "TC2603062",
+      "region": "北京市",
+      "buyer": "北京市发展和改革委员会",
+      "amount": {
+        "value": "388000.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "成交公告",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-005",
+      "category": "TENDER",
+      "title": "北京燃气2026年生产类物资第16包防爆照明设备采购结果",
+      "publishedOn": "2026-06-09",
+      "status": "AWARDED",
+      "summary": "名录企业北京燃气集团自行采购，公告中标人为深圳市海洋王照明工程有限公司。",
+      "sourceUrl": "https://www.365trade.com.cn/jhwzb/831387.jhtml",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-095",
+          "role": "BUYER",
+          "enterpriseName": "北京市燃气集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "ZZ60878HW01000044",
+      "region": "公告未明确实施地区",
+      "buyer": "北京市燃气集团有限责任公司",
+      "amount": {
+        "value": "318334.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "中标结果",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-006",
+      "category": "TENDER",
+      "title": "北京燃气2026年第30包流量计及计量仪表材料采购结果",
+      "publishedOn": "2026-08-17",
+      "status": "AWARDED",
+      "summary": "北京燃气集团采购计量仪表，中标人为北京北燃环能科技发展有限公司。该名称不同于名录ORG-076，不将二者自动合并。",
+      "sourceUrl": "https://365trade.com.cn/jhwzb/858107.jhtml",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-095",
+          "role": "BUYER",
+          "enterpriseName": "北京市燃气集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "ZZ61659HW01000098",
+      "region": "公告未明确实施地区",
+      "buyer": "北京市燃气集团有限责任公司",
+      "amount": {
+        "value": "8571040.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "中标结果",
+      "identityWarning": "中标方不是已核实的ORG-076主体",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-007",
+      "category": "TENDER",
+      "title": "清华附中潭柘寺学校（中学部）新建项目勘察中标",
+      "publishedOn": "2026-08-05",
+      "status": "AWARDED",
+      "summary": "北京城勘院中标，公告勘察工期30天。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260805/5656273.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-080",
+          "role": "AWARDED_SUPPLIER",
+          "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+          "roleLabel": "中标/成交供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044037002",
+      "region": "北京市门头沟区潭柘寺镇",
+      "buyer": "北京市门头沟区教育委员会",
+      "amount": {
+        "value": "1483300.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "noticeType": "中标结果",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-008",
+      "category": "TENDER",
+      "title": "通燕高速北关立交改造工程勘察合同",
+      "publishedOn": "2026-08-10",
+      "status": "CONTRACT_PUBLISHED",
+      "summary": "北京城勘院为合同中标人，合同于7月30日签署、期限60日历天。只确认合同公示，不推定已完工。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxgcjshtgs/20260810/5662722.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-080",
+          "role": "CONTRACT_SUPPLIER",
+          "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+          "roleLabel": "合同供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044007002",
+      "occurredOn": "2026-07-30",
+      "region": "通燕高速北关立交（详细范围见原公告）",
+      "buyer": "北京市首都公路发展集团有限公司",
+      "amount": {
+        "value": "903140.00",
+        "currency": "CNY",
+        "basis": "CONTRACT"
+      },
+      "noticeType": "合同公示",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "合同已公示",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-009",
+      "category": "TENDER",
+      "title": "东部发展带联络线道路工程第2标段勘察合同",
+      "publishedOn": "2026-08-10",
+      "status": "CONTRACT_PUBLISHED",
+      "summary": "北京城勘院为合同中标人，合同于8月5日签署、期限60日历天。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxgcjshtgs/20260810/5662724.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-080",
+          "role": "CONTRACT_SUPPLIER",
+          "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+          "roleLabel": "合同供应商",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001041285003",
+      "occurredOn": "2026-08-05",
+      "region": "京平高速至京哈高速联络线",
+      "buyer": "北京市首都公路发展集团有限公司",
+      "amount": {
+        "value": "7482380.00",
+        "currency": "CNY",
+        "basis": "CONTRACT"
+      },
+      "noticeType": "合同公示",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "合同已公示",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-010",
+      "category": "TENDER",
+      "title": "北燃集团老旧供热管网及智能化改造设计候选人",
+      "publishedOn": "2026-09-04",
+      "status": "CANDIDATE_NOTICE",
+      "summary": "北京燃气集团为建设单位；煤热院为第一候选人；公用工程设计监理公司出现在开标记录，但不是前三候选人。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260904/5698629.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-095",
+          "role": "BUYER",
+          "enterpriseName": "北京市燃气集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-093",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京市煤气热力工程设计院有限公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-084",
+          "role": "BID_PARTICIPANT",
+          "enterpriseName": "北京市公用工程设计监理有限公司",
+          "roleLabel": "投标参与方（非中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044613001",
+      "region": "北京市海淀、丰台、朝阳、昌平、西城、延庆、房山、大兴",
+      "noticeType": "中标候选人公示",
+      "candidateRanks": {
+        "ORG-093": 1
+      },
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [
+        "BID-049"
+      ],
+      "proposedAction": "ENRICH_EXISTING_SOURCE_WITH_EVIDENCE",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-011",
+      "category": "TENDER",
+      "title": "九棵树中路道路工程设计候选人",
+      "publishedOn": "2026-07-23",
+      "status": "CANDIDATE_NOTICE",
+      "summary": "北京市市政专业设计院股份公司列为第三中标候选人，不是已中标企业。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260723/5635346.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-088",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京市市政专业设计院股份公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044291001",
+      "region": "北京市通州区",
+      "buyer": "北京新城基业投资发展有限公司",
+      "noticeType": "中标候选人公示",
+      "candidateRanks": {
+        "ORG-088": 3
+      },
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-012",
+      "category": "TENDER",
+      "title": "京雄高速市内接线工程一标段勘察候选人",
+      "publishedOn": "2026-09-01",
+      "status": "CANDIDATE_NOTICE",
+      "summary": "北京城勘院第一候选、北京市勘察设计研究院第二候选；只确认本次公示所载排序。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260901/5691966.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-080",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-025",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京市勘察设计研究院有限公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044467002",
+      "region": "北京市大兴区、丰台区",
+      "noticeType": "中标候选人公示",
+      "candidateRanks": {
+        "ORG-080": 1,
+        "ORG-025": 2
+      },
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-013",
+      "category": "TENDER",
+      "title": "京雄高速市内接线工程二标段勘察候选人",
+      "publishedOn": "2026-08-31",
+      "status": "CANDIDATE_NOTICE",
+      "summary": "北京市勘察设计研究院第一候选、北京城勘院第二候选；与一标段分开，不把候选当最终中标。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260831/5690459.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-025",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京市勘察设计研究院有限公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-080",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044467003",
+      "region": "北京市大兴区、丰台区",
+      "noticeType": "中标候选人公示",
+      "candidateRanks": {
+        "ORG-025": 1,
+        "ORG-080": 2
+      },
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-014",
+      "category": "TENDER",
+      "title": "龙源新能源数据通信设备长协框架采购候选人",
+      "publishedOn": "2026-06-29",
+      "status": "CANDIDATE_NOTICE",
+      "summary": "长扬科技为第一中标候选人，投标报价458万元；这是投标报价，未核实最终中标及合同金额。",
+      "sourceUrl": "https://www.chnenergybidding.com.cn/bidweb/001/001005/001005001/20260629/a76f4118-e1b3-4bb8-ba4f-f12aa5dec0f5.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-017",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "长扬科技（北京）股份有限公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "CEZB260003807001",
+      "region": "公告未明确交付地区",
+      "buyer": "龙源（北京）新能源工程技术有限公司",
+      "noticeType": "中标候选人公示",
+      "candidateRanks": {
+        "ORG-017": 1
+      },
+      "amount": {
+        "value": "4580000.00",
+        "currency": "CNY",
+        "basis": "BID_QUOTE"
+      },
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-015",
+      "category": "TENDER",
+      "title": "排水集团2026年管线消隐工程二次设计候选人",
+      "publishedOn": "2026-09-04",
+      "status": "CANDIDATE_NOTICE",
+      "summary": "排水集团自行采购；北京市市政专业设计院在候选名单。此前首次设计采购已终止，二次采购编号不同。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260904/5697967.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-079",
+          "role": "BUYER",
+          "enterpriseName": "北京城市排水集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-088",
+          "role": "SHORTLISTED_CANDIDATE",
+          "enterpriseName": "北京市市政专业设计院股份公司",
+          "roleLabel": "中标候选人（非最终中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001043968003",
+      "region": "北京市东城、西城、海淀、丰台、石景山、昌平、朝阳",
+      "noticeType": "中标候选人公示",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-016",
+      "category": "TENDER",
+      "title": "顺义区雨污分流改造二期施工一标段投标记录",
+      "publishedOn": "2026-07-24",
+      "status": "PARTICIPATION_RECORDED",
+      "summary": "恒锋市政出现在开评标记录，但不在前三候选名单；仅记录实际投标参与，不记为合作成交。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260724/5641139.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-035",
+          "role": "BID_PARTICIPANT",
+          "enterpriseName": "北京市恒锋市政工程有限公司",
+          "roleLabel": "投标参与方（非中标）",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001043906003",
+      "region": "北京市顺义区光明街道",
+      "noticeType": "中标候选人公示",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "投标记录，非中标",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-017",
+      "category": "TENDER",
+      "title": "电磁综合试验中心建设项目施工资格预审",
+      "publishedOn": "2026-08-17",
+      "status": "SUBMISSION_WINDOW_ENDED",
+      "summary": "北京无线电计量测试研究所为招标人，涉及给排水、采暖及机电等；按公告资格预审已截止，不能现在新报名。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxggjtbyqs/20260817/5671776.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-103",
+          "role": "BUYER",
+          "enterpriseName": "北京无线电计量测试研究所",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044716001",
+      "region": "三〇四场（公告所载建设地点）",
+      "noticeType": "资格预审",
+      "acquisitionStart": "2026-08-17T17:00:00+08:00",
+      "acquisitionEnd": "2026-08-24T09:00:00+08:00",
+      "submissionEnd": "2026-08-31T09:00:00+08:00",
+      "submissionKind": "PREQUALIFICATION",
+      "amount": {
+        "value": "217628800.00",
+        "currency": "CNY",
+        "basis": "ESTIMATED_CONTRACT"
+      },
+      "requirements": "建筑总承包二级以上、规定房建业绩及一级项目经理等，不接受联合体。",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "所载提交期已结束",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-018",
+      "category": "TENDER",
+      "title": "酒仙桥第二再生水厂施工资格预审",
+      "publishedOn": "2026-08-27",
+      "status": "SUBMISSION_WINDOW_ENDED",
+      "summary": "排水集团建设日处理24万立方米再生水厂，范围含管线及设备；9月7日资格预审截止。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxggjtbyqs/20260827/5687022.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-079",
+          "role": "BUYER",
+          "enterpriseName": "北京城市排水集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044497006",
+      "region": "北京市朝阳区东风乡",
+      "noticeType": "资格预审",
+      "acquisitionStart": "2026-08-27T17:00:00+08:00",
+      "acquisitionEnd": "2026-09-01T17:00:00+08:00",
+      "submissionEnd": "2026-09-07T17:00:00+08:00",
+      "submissionKind": "PREQUALIFICATION",
+      "amount": {
+        "value": "1441389900.00",
+        "currency": "CNY",
+        "basis": "ESTIMATED_CONTRACT"
+      },
+      "requirements": "市政总承包一级以上、规定竣工业绩及一级项目经理等，不接受联合体。",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "所载提交期已结束",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-019",
+      "category": "TENDER",
+      "title": "丰台随路污水及再生水管网二期防洪评价采购",
+      "publishedOn": "2026-08-05",
+      "status": "SUBMISSION_WINDOW_ENDED",
+      "summary": "排水集团采购防洪影响评价报告编制及报批服务，8月26日已过投标截止。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxggjtbyqs/20260805/5656412.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-079",
+          "role": "BUYER",
+          "enterpriseName": "北京城市排水集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001043260005",
+      "alternateProjectNumbers": [
+        "FSF1A260084"
+      ],
+      "region": "北京市丰台区",
+      "noticeType": "招标公告",
+      "acquisitionStart": "2026-08-05T17:00:00+08:00",
+      "acquisitionEnd": "2026-08-10T17:00:00+08:00",
+      "submissionEnd": "2026-08-26T14:30:00+08:00",
+      "submissionKind": "BID",
+      "amount": {
+        "value": "1000000.00",
+        "currency": "CNY",
+        "basis": "ESTIMATED_PROCUREMENT"
+      },
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "所载提交期已结束",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-020",
+      "category": "TENDER",
+      "title": "酒仙桥第二再生水厂节能报告咨询采购（含更正）",
+      "publishedOn": "2026-08-14",
+      "status": "SUBMISSION_WINDOW_ENDED",
+      "summary": "排水集团采购节能报告咨询。8月17日更正信用条件的双重否定；投标截止仍为9月4日，不把更正误作延期。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxggjtbyqs/20260814/5668792.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-079",
+          "role": "BUYER",
+          "enterpriseName": "北京城市排水集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001044497005",
+      "alternateProjectNumbers": [
+        "FSF1A260092"
+      ],
+      "region": "北京市朝阳区",
+      "noticeType": "招标公告",
+      "acquisitionStart": "2026-08-14T17:00:00+08:00",
+      "acquisitionEnd": "2026-08-19T17:00:00+08:00",
+      "submissionEnd": "2026-09-04T14:30:00+08:00",
+      "submissionKind": "BID",
+      "amount": {
+        "value": "718500.00",
+        "currency": "CNY",
+        "basis": "ESTIMATED_PROCUREMENT"
+      },
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxgcjsgzgg/20260817/5671750.html"
+      ],
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "所载提交期已结束",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-021",
+      "category": "TENDER",
+      "title": "排水集团2026年管线消隐工程首次设计采购终止",
+      "publishedOn": "2026-08-04",
+      "status": "TERMINATED",
+      "summary": "7月15日发布的首次设计招标已有8月4日终止公告；保留历史，不列作正在招标。",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxgcjszzgg/20260804/5654221.html",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-079",
+          "role": "BUYER",
+          "enterpriseName": "北京城市排水集团有限责任公司",
+          "roleLabel": "采购人/建设单位",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "projectNumber": "S110000A001043968002",
+      "region": "北京市",
+      "noticeType": "终止公告",
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxggjtbyqs/20260715/5624065.html"
+      ],
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已终止",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-022",
+      "category": "ACTIVITY",
+      "title": "北京城勘院与北京大学勘察大模型合作签约",
+      "publishedOn": "2026-08-19",
+      "status": "COOPERATION_SIGNED",
+      "summary": "8月11日双方举行交流会并签署勘察垂类大模型和智能体研发技术咨询合同；不推定项目已经交付。",
+      "sourceUrl": "https://news.pku.edu.cn/xwzh/b0cb6560cc344deb81af38e09293a879.htm",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-080",
+          "role": "SIGNATORY",
+          "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+          "roleLabel": "合作签约方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "occurredOn": "2026-08-11",
+      "region": "北京大学地球与空间科学学院",
+      "counterparties": [
+        "北京大学地球与空间科学学院"
+      ],
+      "activityType": "校企合作",
+      "amount": null,
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已签约，未核实交付",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-023",
+      "category": "ACTIVITY",
+      "title": "地下管线专委会2026专家工作会",
+      "publishedOn": "2026-07-21",
+      "status": "HELD",
+      "summary": "7月17日在郑州举办，交流地下管线数智化和城市生命线技术，并赴汉威科技考察。只绑定被原文点名的主办机构，不推定其他会员参会。",
+      "sourceUrl": "https://www.csgpc.org/detail/27753.html",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "role": "ORGANIZER",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "roleLabel": "活动组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "occurredOn": "2026-07-17",
+      "region": "河南省郑州市",
+      "activityType": "技术交流与考察",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-024",
+      "category": "ACTIVITY",
+      "title": "地下管线专委会年会暨第九届生命线征文通知",
+      "publishedOn": "2026-07-23",
+      "status": "PLANNED",
+      "summary": "年会计划11月25—27日在南京召开，同期征集论文；未来活动不标为已经举行，投稿截止正文未明确。",
+      "sourceUrl": "https://www.csgpc.org/detail/27779.html",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "role": "ORGANIZER",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "roleLabel": "活动组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "startsOn": "2026-11-25",
+      "endsOn": "2026-11-27",
+      "registrationDeadline": null,
+      "region": "江苏省南京市",
+      "activityType": "年会与论文征集",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "拟举行/日期另行通知",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-025",
+      "category": "ACTIVITY",
+      "title": "地下管线专委会30周年行业老故事征集",
+      "publishedOn": "2026-08-12",
+      "status": "CALL_ANNOUNCED",
+      "summary": "面向行业征集历史图文、影像及实物资料；通知截止日期为10月1日，不是招标截止。",
+      "sourceUrl": "https://www.csgpc.org/detail/27890.html",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "role": "ORGANIZER",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "roleLabel": "活动组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "registrationDeadlineDate": "2026-10-01",
+      "region": "线上征集",
+      "activityType": "行业史料征集",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已发征集通知",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-026",
+      "category": "ACTIVITY",
+      "title": "北京市燃气协会6月燃气安全培训回顾",
+      "publishedOn": "2026-08-05",
+      "status": "HELD",
+      "summary": "官网披露6月下旬分两期培训，120余名从业者参与。具体日期和参训企业名单未公布，不虚构名单。",
+      "sourceUrl": "https://www.bjsrqxh.cn/article/8108",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-094",
+          "role": "ORGANIZER",
+          "enterpriseName": "北京市燃气协会",
+          "roleLabel": "活动组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "occurredOn": null,
+      "occurredPeriod": "2026年6月下旬",
+      "region": "北京市",
+      "activityType": "安全培训",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-027",
+      "category": "ACTIVITY",
+      "title": "北京市燃气安全基础知识分期培训通知",
+      "publishedOn": "2026-08-13",
+      "status": "PLANNED",
+      "summary": "累计报名达到开班条件后另行通知时间地点；没有固定开班日。450元/人的通知费用不能当投标预算。",
+      "sourceUrl": "https://www.bjsrqxh.cn/article/8110",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-094",
+          "role": "ORGANIZER",
+          "enterpriseName": "北京市燃气协会",
+          "roleLabel": "活动组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "startsOn": null,
+      "registrationDeadline": null,
+      "region": "北京市，具体地点另行通知",
+      "activityType": "培训报名",
+      "feeNote": "通知所载450元/人，以主办方最新通知为准",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "拟举行/日期另行通知",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-028",
+      "category": "ACTIVITY",
+      "title": "同心共筑安全线城管开放日",
+      "publishedOn": "2026-07-02",
+      "status": "HELD",
+      "summary": "6月24日城管部门、北京燃气集团与燃气协会联合举办实景和直播安全宣传活动。",
+      "sourceUrl": "https://www.bjsrqxh.cn/article/8106",
+      "evidenceClass": "PRIMARY_PARTICIPANT_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-094",
+          "role": "CO_ORGANIZER",
+          "enterpriseName": "北京市燃气协会",
+          "roleLabel": "联合组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-095",
+          "role": "CO_ORGANIZER",
+          "enterpriseName": "北京市燃气集团有限责任公司",
+          "roleLabel": "联合组织方",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "occurredOn": "2026-06-24",
+      "region": "北京燃气教育技能中心",
+      "activityType": "政企安全宣传",
+      "identityNote": "原文使用北京燃气集团简称，与名录北京市燃气集团对齐；不是子公司主体推定",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-029",
+      "category": "ACTIVITY",
+      "title": "煤热院公布五项工程咨询优秀成果获奖",
+      "publishedOn": "2026-08-05",
+      "status": "SELF_REPORTED_ACHIEVEMENT",
+      "summary": "企业官网披露工程咨询评选获一等奖3项、二等奖1项、三等奖1项；作为企业动态，不据此新增资质证书或投标资格。",
+      "sourceUrl": "https://gasheat.com.cn/newsdetial.aspx?NewsId=13140&cateid=98",
+      "evidenceClass": "SELF_REPORTED_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-093",
+          "role": "REPORTED_SUBJECT",
+          "enterpriseName": "北京市煤气热力工程设计院有限公司",
+          "roleLabel": "新闻所述企业",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "activityType": "成果动态",
+      "region": "北京市",
+      "occurredOn": null,
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "企业自述成果",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-030",
+      "category": "ACTIVITY",
+      "title": "长扬科技物联网安全平台入选行业遴选名单",
+      "publishedOn": "2026-07-07",
+      "status": "SELF_REPORTED_ACHIEVEMENT",
+      "summary": "企业官网披露物联网安全运营平台入选行业联盟第二批三新名单；未独立核验宣传中的性能指标，不写为合作成交。",
+      "sourceUrl": "https://www.cy-tech.net/article/792.html",
+      "evidenceClass": "SELF_REPORTED_NEWS",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-017",
+          "role": "REPORTED_SUBJECT",
+          "enterpriseName": "长扬科技（北京）股份有限公司",
+          "roleLabel": "新闻所述企业",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "activityType": "产品成果动态",
+      "region": "公告未明确活动地点",
+      "occurredOn": null,
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "企业自述成果",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "EV-20260908-031",
+      "category": "ACTIVITY",
+      "title": "上海铭控发布南京国际管网展邀约",
+      "publishedOn": "2026-08-18",
+      "status": "PROMOTION_PUBLISHED",
+      "summary": "来源标注上海铭控的行业平台稿件介绍11月25—27日南京管网展；仅能确认邀约宣传，未核实展位或最终参展名单。",
+      "sourceUrl": "https://chuanganqi.gkzhan.com/news/251761.html",
+      "evidenceClass": "ATTRIBUTED_COMPANY_REPRINT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-047",
+          "role": "PROMOTER",
+          "enterpriseName": "上海铭控传感技术有限公司",
+          "roleLabel": "发布邀约宣传",
+          "membershipEvidence": "APPLICATION_ONLY",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "startsOn": "2026-11-25",
+      "endsOn": "2026-11-27",
+      "region": "南京国际博览中心",
+      "activityType": "展会邀约",
+      "eligibilityNote": "该企业基线仅有入会申请证据，本次不升级会籍",
+      "checkedOn": "2026-09-08",
+      "checkedAt": "2026-09-08T14:01:54+08:00",
+      "statusLabel": "展会邀约，参展未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SCHEMA_AND_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "PRIOR_QUARTER_REVIEW"
+    },
+    {
+      "id": "AN-001",
+      "category": "TENDER",
+      "title": "北京华宇办公楼空调拆除移位和天津宿舍空调安装工程中标",
+      "publishedOn": "2026-04-16",
+      "status": "AWARDED",
+      "sourceUrl": "https://cg.ccteg.cn/cms/channel/ywgg4gc/75411.htm",
+      "projectNumber": "ZBXM-202603-20-0848",
+      "summary": "中国煤科采购平台确认北京高新大禹中标；公告未载金额，不推算合同额。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-061",
+          "enterpriseName": "北京高新大禹工程技术有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-002",
+      "category": "TENDER",
+      "title": "骨干网动环系统集成项目物资二次采购传感器包候选人",
+      "publishedOn": "2026-08-03",
+      "status": "CANDIDATE_NOTICE",
+      "sourceUrl": "https://thzb.crsc.cn/news/tsi_7267_9197_99139.html",
+      "projectNumber": "GTHC-202602-JT02/02",
+      "summary": "上海铭控列为02传感器包第一成交候选人。虽页面栏目写成交结果，正文仅为候选公示，不认定最终成交。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-047",
+          "enterpriseName": "上海铭控传感技术有限公司",
+          "membershipEvidence": "APPLICATION_ONLY",
+          "role": "SHORTLISTED_CANDIDATE",
+          "roleLabel": "中标候选人（非最终中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-003",
+      "category": "TENDER",
+      "title": "港区三水厂原水管线阀门采购中标",
+      "publishedOn": "2026-02-24",
+      "status": "AWARDED",
+      "sourceUrl": "https://www.hnhxzx.com/index.php?a=index&aid=10450&c=View&m=home",
+      "projectNumber": "KSJS-2026-ZH001",
+      "summary": "招标代理机构公告确认山东建华阀门中标，含税2096000元；收到订单后20日内交货。",
+      "amount": {
+        "value": "2096000.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-028",
+          "enterpriseName": "山东建华阀门制造有限公司",
+          "membershipEvidence": "APPLICATION_ONLY",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-004",
+      "category": "TENDER",
+      "title": "新奥京津冀2026—2027年度压力管道检验与定位防腐服务结果",
+      "publishedOn": "2026-06-28",
+      "status": "AWARDED",
+      "sourceUrl": "https://www.hlxzhjy.com/jieguo/23036.jhtml",
+      "projectNumber": "HLX-ZB-202606-0470",
+      "summary": "河北新奥能源发展采购，结果列新地数安和山东卓淼阳为中标人；未载各自金额及分包份额。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-037",
+          "enterpriseName": "新地数安（河北）管道检测有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-005",
+      "category": "ACTIVITY",
+      "title": "地下管线专委会与张家港建筑服务产业园战略合作签约",
+      "publishedOn": "2026-04-03",
+      "occurredOn": "2026-04-02",
+      "status": "COOPERATION_SIGNED",
+      "sourceUrl": "https://www.csgpc.org/detail/27069.html",
+      "summary": "签约覆盖管线研发、标准、人才培训和项目合作；只确认协议签署，不等于项目已交付。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "SIGNATORY",
+          "roleLabel": "合作签约方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已签约，未核实交付",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-006",
+      "category": "ACTIVITY",
+      "title": "地下管线专委会2026主任办公会暨走进会员福州站",
+      "publishedOn": "2026-01-27",
+      "occurredOn": "2026-01-23",
+      "status": "HELD",
+      "sourceUrl": "https://www.csgpc.org/detail/26740.html",
+      "summary": "举行主任办公会，走访水厂、供水实训基地和低空经济示范中心；不对未点名企业建立参会关系。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "ORGANIZER",
+          "roleLabel": "活动组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-007",
+      "category": "ACTIVITY",
+      "title": "水质安全与合规经营培训",
+      "publishedOn": "2026-01-26",
+      "occurredOn": "2026-01-23",
+      "status": "HELD",
+      "sourceUrl": "https://www.bjsx.cn/xhdt-c-566.html",
+      "summary": "供水协会与自来水集团联合举办，约120人参加，涉及水质标准、收费合规与设备技术交流。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-087",
+          "enterpriseName": "北京市城镇供水协会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "ORGANIZER",
+          "roleLabel": "活动组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-097",
+          "enterpriseName": "北京市自来水集团有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CO_ORGANIZER",
+          "roleLabel": "联合组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-008",
+      "category": "ACTIVITY",
+      "title": "京津冀节水产业协同大会暨产业联盟成立大会",
+      "publishedOn": "2025-12-02",
+      "occurredOn": "2025-11-28",
+      "status": "HELD",
+      "sourceUrl": "https://www.bjsx.cn/xhdt-c-563.html",
+      "summary": "北京水协与天津、河北相关协会共同启动节水产业联盟；不据此认定成员企业已签具体采购合同。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-087",
+          "enterpriseName": "北京市城镇供水协会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CO_ORGANIZER",
+          "roleLabel": "联合组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-009",
+      "category": "ACTIVITY",
+      "title": "智慧水务技术交流暨会员开放日走进青岛三利",
+      "publishedOn": "2025-10-27",
+      "occurredPeriod": {
+        "from": "2025-10-22",
+        "through": "2025-10-24"
+      },
+      "status": "HELD",
+      "sourceUrl": "https://www.bjsx.cn/xhdt-c-562.html",
+      "summary": "北京水协主办，文中明确自来水集团代表参会；包含水务技术分享、制造基地及设施参观。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-087",
+          "enterpriseName": "北京市城镇供水协会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "ORGANIZER",
+          "roleLabel": "活动组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-097",
+          "enterpriseName": "北京市自来水集团有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "PARTICIPANT",
+          "roleLabel": "活动参与方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-010",
+      "category": "ACTIVITY",
+      "title": "供水服务进社区与智慧用水宣传活动",
+      "publishedOn": "2026-03-20",
+      "occurredOn": "2026-03-19",
+      "status": "HELD",
+      "sourceUrl": "https://www.bjsx.cn/xhdt-c-593.html",
+      "summary": "北京水协联合自来水集团海淀营销分公司开展社区宣传。只关联北京水协，不把海淀营销分公司误认成管网管理分公司。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-087",
+          "enterpriseName": "北京市城镇供水协会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CO_ORGANIZER",
+          "roleLabel": "联合组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-011",
+      "category": "TENDER",
+      "title": "亮马河北路供水管线设计中标",
+      "publishedOn": "2026-03-25",
+      "status": "AWARDED",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260325/5472343.html",
+      "projectNumber": "S110000A001043208001",
+      "summary": "已找到3月25日最终结果，自来水设计公司中标3086048元；3月20日候选公告作为同项目过程证据，不另增项目。",
+      "amount": {
+        "value": "3086048.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "evidenceClass": "PRIMARY_NOTICE",
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260320/5467607.html"
+      ],
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-097",
+          "enterpriseName": "北京市自来水集团有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "BUYER",
+          "roleLabel": "采购人/建设单位",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-020",
+          "enterpriseName": "北京市自来水设计有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-012",
+      "category": "TENDER",
+      "title": "2026年北京市网格化城市管理系统维护第二次采购中标",
+      "publishedOn": "2026-07-01",
+      "status": "AWARDED",
+      "sourceUrl": "https://csglw.beijing.gov.cn/zwxx/zwtzgg/202607/t20260701_4742543.html",
+      "projectNumber": "11000026210200165917-XM003",
+      "summary": "北京市城市运行管理事务中心采购，数字政通中标307.6万元；为城管系统运维，不等于新增管线建设。",
+      "amount": {
+        "value": "3076000.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-101",
+          "enterpriseName": "北京数字政通科技股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-013",
+      "category": "TENDER",
+      "title": "亮马河北路污水及再生水管线设计中标",
+      "publishedOn": "2026-01-12",
+      "status": "AWARDED",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260112/5403311.html",
+      "projectNumber": "S110000A001042963001",
+      "summary": "排水集团采购，国咨（北京）规划设计中标3205300元；与亮马河北路供水设计是不同项目编号，不合并。",
+      "amount": {
+        "value": "3205300.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-079",
+          "enterpriseName": "北京城市排水集团有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "BUYER",
+          "roleLabel": "采购人/建设单位",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-014",
+      "category": "TENDER",
+      "title": "轨道交通3号线一期地下综合管廊东延设计中标",
+      "publishedOn": "2026-06-12",
+      "status": "AWARDED",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260612/5570771.html",
+      "projectNumber": "S110000A001043870001",
+      "summary": "京投城市管廊采购，城建设计发展集团中标4594338元；名录内双方直接业务关系。",
+      "amount": {
+        "value": "4594338.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "evidenceClass": "PRIMARY_NOTICE",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-071",
+          "enterpriseName": "北京京投城市管廊投资有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "BUYER",
+          "roleLabel": "采购人/建设单位",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-081",
+          "enterpriseName": "北京城建设计发展集团股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-015",
+      "category": "TENDER",
+      "title": "商河经济开发区智慧水务EPC联合体中标披露",
+      "publishedOn": "2025-11-10",
+      "status": "AWARD_DISCLOSED",
+      "sourceUrl": "https://www.egova.com.cn/Public/uploads/697fff2205926.pdf",
+      "projectNumber": "2025JSEC26Z5001001",
+      "summary": "数字政通正式披露子公司保定金迪参与联合体中标。总额108900604元；金迪工作量70.8%，公告称对应约7700万元，不能把全部总额算作其单独业绩。具体进度以最终签约为准。",
+      "amount": {
+        "value": "108900604.00",
+        "currency": "CNY",
+        "basis": "CONSORTIUM_TOTAL_AWARD"
+      },
+      "evidenceClass": "ISSUER_DISCLOSURE",
+      "enterpriseShare": {
+        "sourceId": "ORG-068",
+        "workloadPercent": "70.8",
+        "amountApproxYuan": "77000000",
+        "basis": "ISSUER_APPROXIMATION"
+      },
+      "signedFinalContractVerified": false,
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-068",
+          "enterpriseName": "保定金迪地下管线探测工程有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CONSORTIUM_AWARDED_MEMBER",
+          "roleLabel": "中标联合体成员",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-101",
+          "enterpriseName": "北京数字政通科技股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "DISCLOSING_PARENT",
+          "roleLabel": "信息披露母公司（非直接中标主体）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "发行人披露中标，正式合同未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-016",
+      "category": "TENDER",
+      "title": "海南省城市信息模型CIM基础平台A包中标及投标参与",
+      "publishedOn": "2025-12-15",
+      "status": "AWARDED",
+      "projectNumber": "[HNJY]20250700001[GK]/包1",
+      "sourceUrl": "https://www.ccgp.gov.cn/cggg/dfgg/zbgg/202512/t20251215_25924117.htm",
+      "summary": "数字政通属于中标联合体（牵头人为中国城市规划设计研究院）；辰安科技属于另一投标联合体，未中标。金额仅为A包联合体总额，各成员份额未披露，不能解读为两家企业之间的合作。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "amount": {
+        "value": "23195510.56",
+        "currency": "CNY",
+        "basis": "CONSORTIUM_TOTAL_AWARD"
+      },
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-101",
+          "enterpriseName": "北京数字政通科技股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CONSORTIUM_AWARDED_MEMBER",
+          "roleLabel": "中标联合体成员",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-114",
+          "enterpriseName": "北京辰安科技股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CONSORTIUM_BID_PARTICIPANT",
+          "roleLabel": "其他投标联合体成员（非中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-017",
+      "category": "TENDER",
+      "title": "武汉市智慧城管信息系统运维服务2025—2026年度中标",
+      "publishedOn": "2025-12-22",
+      "status": "AWARDED",
+      "projectNumber": "WHZC-2025-00170-GK00117",
+      "sourceUrl": "https://www.ccgp.gov.cn/cggg/dfgg/zbgg/202512/t20251222_25967828.htm",
+      "summary": "武汉市城市管理执法信息中心采购智慧城管系统运维服务，数字政通为中标供应商。读取政府采购网索引中的公告正文，直接打开原页返回403，需保留该访问限制。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "retrievalMethod": "PRIMARY_INDEXED_BODY_DIRECT_ACCESS_403",
+      "amount": {
+        "value": "2230000.00",
+        "currency": "CNY",
+        "basis": "AWARD"
+      },
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-101",
+          "enterpriseName": "北京数字政通科技股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-018",
+      "category": "ACTIVITY",
+      "title": "北京水协组织参与2025年服贸会与水务科技展示",
+      "publishedOn": "2025-09-16",
+      "occurredOn": "2025-09-11",
+      "status": "HELD",
+      "sourceUrl": "https://cuwa.org.cn/category/zonghexinwen/38842.html",
+      "summary": "协会来源报道记录北京水协组织企业参加服贸会，自来水集团展示智慧供水及水质监测技术。按参展与组织活动记录，不生成采购或已成交合作关系。",
+      "evidenceClass": "ASSOCIATION_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-087",
+          "enterpriseName": "北京市城镇供水协会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "ORGANIZER",
+          "roleLabel": "活动组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-097",
+          "enterpriseName": "北京市自来水集团有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "PARTICIPANT",
+          "roleLabel": "活动参与方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-019",
+      "category": "ACTIVITY",
+      "title": "2025成都国际管网展暨地下管线专委会年会开幕",
+      "publishedOn": "2025-11-27",
+      "occurredOn": "2025-11-26",
+      "startsOn": "2025-11-26",
+      "endsOn": "2025-11-28",
+      "status": "HELD",
+      "sourceUrl": "https://www.csgpc.org/detail/26341.html",
+      "supportingUrls": [
+        "https://www.csgpc.org/detail/26095.html"
+      ],
+      "summary": "主办方报道确认11月26日在成都开幕，专委会为主办方。会前通知归并为支持证据；截至该报道只证实开幕，11月28日为计划闭幕日期。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "ORGANIZER",
+          "roleLabel": "活动组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-020",
+      "category": "ACTIVITY",
+      "title": "地下管线专委会赴普查大队技术交流",
+      "publishedOn": "2026-01-20",
+      "occurredOn": "2026-01-13",
+      "status": "HELD",
+      "sourceUrl": "https://www.csgpc.org/detail/26697.html",
+      "summary": "专委会赴普查大队开展管线探测、供水检漏、非开挖修复与智慧运维交流。仅为已举行的技术交流，未见成交合同，不把合作意向写成签约。",
+      "evidenceClass": "ORGANIZER_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-062",
+          "enterpriseName": "中国测绘学会地下管线专业委员会",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "PARTICIPANT",
+          "roleLabel": "活动参与方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-021",
+      "category": "TENDER",
+      "title": "平谷马坊制加氢一体站设计联合体中标",
+      "publishedOn": "2025-12-04",
+      "status": "AWARDED",
+      "projectNumber": "S110000A001042591001",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20251204/5354230.html",
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20251127/5346553.html"
+      ],
+      "summary": "煤热院与河北英科组成中标联合体；公用工程设计监理在另一第三候选联合体中，不能标为中标。招标人为北京燃气绿源达，不自动关联为燃气集团直接采购。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "amount": {
+        "value": "3868200.00",
+        "currency": "CNY",
+        "basis": "CONSORTIUM_TOTAL_AWARD"
+      },
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-093",
+          "enterpriseName": "北京市煤气热力工程设计院有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CONSORTIUM_AWARDED_MEMBER",
+          "roleLabel": "中标联合体成员",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-084",
+          "enterpriseName": "北京市公用工程设计监理有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CONSORTIUM_BID_PARTICIPANT",
+          "roleLabel": "其他投标联合体成员（非中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-022",
+      "category": "ACTIVITY",
+      "title": "煤热院披露天然气掺氢联合研究成果",
+      "publishedOn": "2025-09-15",
+      "status": "SELF_REPORTED_ACHIEVEMENT",
+      "sourceUrl": "https://www.gasheat.com.cn/newsdetial.aspx?NewsId=13134&cateid=98",
+      "summary": "企业官网称与国家管网研究总院、北京理工大学等联合开展甲烷—氢气混合物研究并发表论文。记录为企业自述科研合作，不等同于独立技术验证或工程采购。",
+      "evidenceClass": "ENTERPRISE_SELF_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-093",
+          "enterpriseName": "北京市煤气热力工程设计院有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "REPORTED_SUBJECT",
+          "roleLabel": "新闻所述企业",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "企业自述成果",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-023",
+      "category": "TENDER",
+      "title": "朝阳区水源置换工程变更勘察投标参与",
+      "publishedOn": "2026-05-28",
+      "status": "PARTICIPATION_RECORDED",
+      "projectNumber": "S110000A001043840002",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260528/5550552.html",
+      "summary": "开标及评分表列有北京市勘察设计研究院，未列入前三候选。投标报价为费率98.8%，不是人民币金额，不生成中标记录。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-025",
+          "enterpriseName": "北京市勘察设计研究院有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "BID_PARTICIPANT",
+          "roleLabel": "投标参与方（非中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "投标记录，非中标",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-024",
+      "category": "TENDER",
+      "title": "北京石油学院附属小学改造投标经历（其他企业中标）",
+      "publishedOn": "2026-06-01",
+      "status": "PARTICIPATION_RECORDED",
+      "projectNumber": "S110000A001043633001",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260601/5554373.html",
+      "summary": "北京金通远曾列第二候选，投标报价18312656.20元；已核对6月8日结果公告，中标人为北京东方鼎诚。保留金通远的参投经历，不作为其中标项目。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_VERIFIED_OTHER_SUPPLIER",
+      "amount": {
+        "value": "18312656.20",
+        "currency": "CNY",
+        "basis": "BID_QUOTE"
+      },
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260608/5563766.html"
+      ],
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-045",
+          "enterpriseName": "北京金通远建筑工程公司",
+          "membershipEvidence": "APPLICATION_ONLY",
+          "role": "BID_PARTICIPANT",
+          "roleLabel": "投标参与方（非中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "投标记录，非中标",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-025",
+      "category": "ACTIVITY",
+      "title": "金房能源2026年度工作会议",
+      "publishedOn": "2026-05-24",
+      "occurredOn": "2026-05-15",
+      "status": "HELD",
+      "sourceUrl": "https://kingfore.net/news/details_50_1488.html",
+      "summary": "企业官网报道集团召开年度工作会议，讨论供热运营、热泵与数字化业务，并签署内部目标责任书。只作为企业活动，不把内部责任书当作对外合作合同。",
+      "evidenceClass": "ENTERPRISE_SELF_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-044",
+          "enterpriseName": "金房能源集团股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "ORGANIZER",
+          "roleLabel": "活动组织方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-026",
+      "category": "ACTIVITY",
+      "title": "煤热院参加2026年国际供热管网标准春季会议",
+      "publishedOn": "2026-05-09",
+      "occurredPeriod": {
+        "from": "2026-04-13",
+        "through": "2026-04-15"
+      },
+      "status": "HELD",
+      "sourceUrl": "https://www.gasheat.com.cn/newsdetial.aspx?NewsId=13139&cateid=98",
+      "summary": "企业官网记录其技术团队赴荷兰参加ISO/TC341工作组会议，参与供热管网标准研究。仅表示参会和研讨，不把草稿或研究工作解释为现行强制标准。",
+      "evidenceClass": "ENTERPRISE_SELF_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-093",
+          "enterpriseName": "北京市煤气热力工程设计院有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "PARTICIPANT",
+          "roleLabel": "活动参与方",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已举行",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-027",
+      "category": "ACTIVITY",
+      "title": "万泉新新家园多能耦合能源站改造设计成果披露",
+      "publishedOn": "2026-01-29",
+      "status": "SELF_REPORTED_ACHIEVEMENT",
+      "sourceUrl": "https://www.gasheat.com.cn/newsdetial.aspx?NewsId=13137&cateid=98",
+      "summary": "煤热院官网称2025年与业主纵横热力集团对接并完成锅炉房改造设计，披露2026年运行情况。设计发生日未明确，按本次成果披露日期收录；性能为企业自述，不生成独立验收结论。",
+      "evidenceClass": "ENTERPRISE_SELF_REPORT",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-093",
+          "enterpriseName": "北京市煤气热力工程设计院有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "REPORTED_SUBJECT",
+          "roleLabel": "新闻所述企业",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "企业自述成果",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_ACTIVITY_SOURCE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-028",
+      "category": "TENDER",
+      "title": "2026商业卫星数据第3包更正中标结果",
+      "publishedOn": "2026-07-16",
+      "status": "AWARDED",
+      "projectNumber": "WKZB2631BJT3004842/第3包",
+      "sourceUrl": "https://www.ccgp.gov.cn/cggg/zygg/gzgg/202607/t20260716_26948215.htm",
+      "summary": "采购结果更正公告将第3包中标人改为二十一世纪空间与北京集思数源联合体，金额为该包联合体总额。必须以更正结果覆盖旧中标人，不重复计算项目。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "amount": {
+        "value": "11110000.00",
+        "currency": "CNY",
+        "basis": "CONSORTIUM_TOTAL_AWARD"
+      },
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-052",
+          "enterpriseName": "二十一世纪空间技术应用股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "CONSORTIUM_AWARDED_MEMBER",
+          "roleLabel": "中标联合体成员",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-029",
+      "category": "TENDER",
+      "title": "2026第二批市管道路健康工程设计第2、3标段中标",
+      "publishedOn": "2026-08-17",
+      "status": "AWARDED",
+      "projectNumber": "S110000A001044472001",
+      "sourceUrl": "https://jtw.beijing.gov.cn/xxgk/ztbxx/202608/t20260817_4826018.html",
+      "supportingUrls": [
+        "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260811/5663973.html",
+        "https://ggzyfw.beijing.gov.cn/jyxxzbgg/20260817/5671664.html"
+      ],
+      "summary": "城建设计发展中标第2标段，市政专业设计院中标第3标段，分别为99%和98%费率；不同标段不得理解成同一联合体，也不是99元、98元。四标段公告归并为一个项目，仅关联明确命中的两家企业。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "lots": [
+        {
+          "lot": "第2标段",
+          "sourceId": "ORG-081",
+          "awardRatePercent": "99.00"
+        },
+        {
+          "lot": "第3标段",
+          "sourceId": "ORG-088",
+          "awardRatePercent": "98.00"
+        }
+      ],
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-081",
+          "enterpriseName": "北京城建设计发展集团股份有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-088",
+          "enterpriseName": "北京市市政专业设计院股份公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "AWARDED_SUPPLIER",
+          "roleLabel": "中标/成交供应商",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "已公告中标/成交",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-030",
+      "category": "TENDER",
+      "title": "KT二期算力租赁Ⅰ第5标段投标经历（其他企业中标）",
+      "publishedOn": "2026-06-01",
+      "status": "PARTICIPATION_RECORDED",
+      "projectNumber": "TC260H01R/标段5",
+      "sourceUrl": "https://www.cntcitc.com.cn/more.html?chanId=16&chanType=3&contentId=b2136fddbfc44005b18e2dc182e3f543",
+      "supportingUrls": [
+        "https://www.cntcitc.com.cn/more.html?chanId=13&chanType=3&contentId=b4c7f745ea1a4a548ad76a9955932af5"
+      ],
+      "summary": "北京智城联合曾列第5标段第二候选；6月8日最终结果确定开元云中标。保留参投经历，不把最终中标金额赋给智城联合。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_VERIFIED_OTHER_SUPPLIER",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-104",
+          "enterpriseName": "北京智城联合科技发展有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "BID_PARTICIPANT",
+          "roleLabel": "投标参与方（非中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "投标记录，非中标",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-031",
+      "category": "TENDER",
+      "title": "中航工程施工供应商框架入围候选",
+      "publishedOn": "2025-09-30",
+      "status": "CANDIDATE_NOTICE",
+      "projectNumber": "CGXM-CCAD-A-202515459",
+      "sourceUrl": "https://pur.airchina.com.cn/001/001003/20250930/e21cc8ea-b3b3-43b2-b6a8-49634c5fce95.html",
+      "summary": "采购平台列北京金通远为框架入围第4候选。属于供应商框架候选资格，不等同于已经获得具体施工订单，最终入围结果尚未核实。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-045",
+          "enterpriseName": "北京金通远建筑工程公司",
+          "membershipEvidence": "APPLICATION_ONLY",
+          "role": "SHORTLISTED_CANDIDATE",
+          "roleLabel": "中标候选人（非最终中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-032",
+      "category": "TENDER",
+      "title": "鲁谷街道五个老旧小区热力管线改造候选",
+      "publishedOn": "2026-06-04",
+      "status": "CANDIDATE_NOTICE",
+      "projectNumber": "S110000A001043530001",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260604/5559916.html",
+      "summary": "热力集团采购热力管线改造工程，热力市政为候选人。正文未标排名，2758230.94元为投标报价；第三方转载虽称已中标，暂不代替官方最终结果核验。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "amount": {
+        "value": "2758230.94",
+        "currency": "CNY",
+        "basis": "BID_QUOTE"
+      },
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-091",
+          "enterpriseName": "北京市热力集团有限责任公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "BUYER",
+          "roleLabel": "采购人/建设单位",
+          "participationEligibility": "NOT_ASSESSED"
+        },
+        {
+          "sourceId": "ORG-108",
+          "enterpriseName": "北京热力市政工程建设有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "SHORTLISTED_CANDIDATE",
+          "roleLabel": "中标候选人（非最终中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    },
+    {
+      "id": "AN-033",
+      "category": "TENDER",
+      "title": "丰台小屯西路棚改商品房地块四水工程候选",
+      "publishedOn": "2026-07-06",
+      "status": "CANDIDATE_NOTICE",
+      "projectNumber": "S110000A001026678024",
+      "sourceUrl": "https://ggzyfw.beijing.gov.cn/jyxxzbhxrgs/20260706/5611224.html",
+      "summary": "创源市政列第二候选，7032597.35元是投标报价。公告列出的2021—2023年历史业绩不作为本年度新增项目。",
+      "evidenceClass": "PRIMARY_NOTICE",
+      "latestOutcome": "FINAL_AWARD_NOT_VERIFIED",
+      "amount": {
+        "value": "7032597.35",
+        "currency": "CNY",
+        "basis": "BID_QUOTE"
+      },
+      "enterpriseRelations": [
+        {
+          "sourceId": "ORG-073",
+          "enterpriseName": "北京创源市政建设工程有限公司",
+          "membershipEvidence": "SOURCE_LISTED_NOT_INDEPENDENTLY_VERIFIED",
+          "role": "SHORTLISTED_CANDIDATE",
+          "roleLabel": "中标候选人（非最终中标）",
+          "participationEligibility": "NOT_ASSESSED"
+        }
+      ],
+      "checkedOn": "2026-09-08",
+      "statusLabel": "候选人公示，最终结果未核实",
+      "existingSourceIds": [],
+      "proposedAction": "ADD_AFTER_HISTORICAL_NOTICE_UI",
+      "memberAuthored": false,
+      "memberDemandCreated": false,
+      "confirmedPlatformCollaborationCreated": false,
+      "publicPublicationGranted": false,
+      "reviewBatch": "ANNUAL_EXPANSION"
+    }
+  ],
+  "heldForReview": [
+    {
+      "sourceUrl": "https://www.cecc.org.cn/yule/news/view/id/573769",
+      "relatedEnterpriseSourceIds": [
+        "ORG-051"
+      ],
+      "title": "2026北京国际消费电子技术博览会",
+      "reason": "主办方正文为首都会展（集团）股份有限公司，基线为首都会展（集团）有限公司。活动通知正文已读取，计划2026-11-20至22日；法人名称差异未核实，暂不绑定企业。",
+      "id": "H-Q-1",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "sourceUrl": "https://bid360.com.cn/zbgg/U-vzz07lP.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-036"
+      ],
+      "title": "新兴铸管北京销售分公司北京仓储服务招标",
+      "reason": "聚合站分别显示9月2日与9月8日，完整编号和原始发布平台未核实；有登录遮挡，不绕过访问限制。",
+      "id": "H-Q-2",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "sourceUrl": "https://hb.qianlima.com/zbcontent-613160822.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-003"
+      ],
+      "title": "中铁十一局城轨2026—2027河北混凝土管片框架采购",
+      "reason": "只定位到有脱敏内容的转载页面，尚未核对铁建原始公告及完整变更链。",
+      "id": "H-Q-3",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "sourceUrl": "https://www.bidcenter.com.cn/enterprise/ztsyjjtcsgdgcyxgs/",
+      "relatedEnterpriseSourceIds": [
+        "ORG-003"
+      ],
+      "title": "中铁十一局城轨柴油/管片等采购列表",
+      "reason": "企业聚合列表混入仅在附件提及企业的项目；不能将列表全部认定为该企业采购。",
+      "id": "H-Q-4",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "sourceUrl": "https://vip.stock.finance.sina.com.cn/corp/view/vCB_AllBulletinDetail.php?id=12562452&stockid=688509",
+      "relatedEnterpriseSourceIds": [
+        "ORG-038"
+      ],
+      "title": "正元地信半年度报告披露多项科研合作",
+      "reason": "检索摘要提到武汉大学等合作；本轮未核对交易所原始披露件、合作实际日期，不当作本年度新签项目。",
+      "id": "H-Q-5",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "sourceUrl": "https://hea.china.com/articles/20260813/202608131939463.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-114"
+      ],
+      "title": "科大立安参与两轮车安全产业合作",
+      "reason": "正文签约主体是科大立安等，不能直接写成名录母公司北京辰安科技签约；待核对一手主体关系。",
+      "id": "H-Q-6",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "sourceUrl": "https://zjj.luan.gov.cn/zwzx/gzdt/5491347.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-068"
+      ],
+      "title": "六安防汛动员会提到保定金迪",
+      "reason": "官方正文使用保定金迪公司简称，未明确完整法人主体；本轮不直接绑定到ORG-068。",
+      "id": "H-Q-7",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-001",
+      "title": "禹通2026材料供应商入围",
+      "sourceUrl": "https://www.yfbzb.com/winbid/detail/20251223_565102064.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-099",
+        "ORG-004",
+        "ORG-028",
+        "ORG-034",
+        "ORG-039",
+        "ORG-029",
+        "ORG-015"
+      ],
+      "reason": "公开转载显示多个名录企业涉及供应商入围；未找到原始发布平台完整结果。即使核实，也只能记供应商入围，不等于已采购或实际合同金额。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-002",
+      "title": "污水处理站运行服务2026成交",
+      "sourceUrl": "https://www.sohu.com/a/993293942_122434053",
+      "relatedEnterpriseSourceIds": [
+        "ORG-105"
+      ],
+      "reason": "转载称河沐生态成交；找到官方采购公告但未核实官方结果，暂不认定中标。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-003",
+      "title": "九华地信天津道路检测项目",
+      "sourceUrl": "https://m.sohu.com/a/973464233_122434053",
+      "relatedEnterpriseSourceIds": [
+        "ORG-067"
+      ],
+      "reason": "JTZX-2025-A103项目只有转载中标文本，尚缺原始结果。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-004",
+      "title": "安卓律所与中国企业报战略合作",
+      "sourceUrl": "https://mtz.china.com/touzi/2026/0521/235332.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-083"
+      ],
+      "reason": "媒体线索，尚缺律所或签约对方的一手日期与协议角色核实。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-005",
+      "title": "安卓律所高校合作活动",
+      "sourceUrl": "https://cn.chinadaily.com.cn/a/202604/16/WS69e09897a310942cc49a7f00.html",
+      "relatedEnterpriseSourceIds": [
+        "ORG-083"
+      ],
+      "reason": "媒体报道，尚未核实签约主体和活动原始记录。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-006",
+      "title": "新航城与天普活动",
+      "sourceUrl": "https://www.tianpu.com/nd.jsp?id=237",
+      "relatedEnterpriseSourceIds": [
+        "ORG-102"
+      ],
+      "reason": "官网连接失败，无法核验正文和主体，不采用搜索摘要代替。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-007",
+      "title": "中科云创智联网圆桌",
+      "sourceUrl": "https://hy.cace.org.cn/Msg/Msginfo?nkey=5f79469ab983df0a9dd92416aedd3bef",
+      "relatedEnterpriseSourceIds": [
+        "ORG-065"
+      ],
+      "reason": "需要核准正文年份、实际参会主体，暂不收录年度活动。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-008",
+      "title": "普洛兰广州站活动",
+      "sourceUrl": "https://puluolan.com/hangyexinwen/84",
+      "relatedEnterpriseSourceIds": [
+        "ORG-007"
+      ],
+      "reason": "活动日期与举办状态尚未完成原文核查；不自动认定举行。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-009",
+      "title": "北京燃气与港华合作",
+      "sourceUrl": "https://finance.sina.com.cn/wm/2026-03-26/doc-inhsikav8963706.shtml",
+      "relatedEnterpriseSourceIds": [
+        "ORG-095"
+      ],
+      "reason": "媒体报道，待签约主体的一手公告佐证，区分集团与子公司。",
+      "status": "HELD_NOT_IMPORTABLE"
+    },
+    {
+      "id": "H-AN-010",
+      "title": "鲁谷热力管线改造最终结果",
+      "sourceUrl": "https://www.sohu.com/a/1037895289_122434053",
+      "relatedEnterpriseSourceIds": [
+        "ORG-091",
+        "ORG-108"
+      ],
+      "reason": "已收录官方候选公告AN-032；本转载不足以升级为最终中标。",
+      "status": "HELD_NOT_IMPORTABLE"
+    }
+  ],
+  "coverage": {
+    "enterpriseCount": 116,
+    "exactNameQueries": 116,
+    "rawSearchArtifact": "D:/guanxian/tmp/member-annual-web-sweep-20260908.json",
+    "scope": "在已完成近三个月检索基础上，逐企业补查此前九个月，并核对命中的原始公告、官网活动及后续结果。",
+    "enterprises": [
+      {
+        "sourceId": "ORG-002",
+        "enterpriseName": "北京爱索智通新材料有限公司",
+        "exactNameQuery": "\"北京爱索智通新材料有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-003",
+        "enterpriseName": "中铁十一局集团城市轨道工程有限公司",
+        "exactNameQuery": "\"中铁十一局集团城市轨道工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-Q-3",
+          "H-Q-4"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-004",
+        "enterpriseName": "北京市京水兴寿上水材料有限公司",
+        "exactNameQuery": "\"北京市京水兴寿上水材料有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-005",
+        "enterpriseName": "北京人人平安科技有限公司",
+        "exactNameQuery": "\"北京人人平安科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-007",
+        "enterpriseName": "安徽普洛兰管道修复技术股份公司",
+        "exactNameQuery": "\"安徽普洛兰管道修复技术股份公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-008"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-008",
+        "enterpriseName": "北京市公用事业科学研究所有限公司",
+        "exactNameQuery": "\"北京市公用事业科学研究所有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-009",
+        "enterpriseName": "廊坊兴尔仪器有限公司",
+        "exactNameQuery": "\"廊坊兴尔仪器有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-010",
+        "enterpriseName": "北京华林源工程咨询有限公司",
+        "exactNameQuery": "\"北京华林源工程咨询有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-012",
+        "enterpriseName": "河北九华勘查测绘有限责任公司",
+        "exactNameQuery": "\"河北九华勘查测绘有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-013",
+        "enterpriseName": "北京埃德尔黛威新技术有限公司",
+        "exactNameQuery": "\"北京埃德尔黛威新技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-014",
+        "enterpriseName": "北京瀚博林遥感测图信息工程研究院",
+        "exactNameQuery": "\"北京瀚博林遥感测图信息工程研究院\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-015",
+        "enterpriseName": "深圳拓安信物联股份有限公司",
+        "exactNameQuery": "\"深圳拓安信物联股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-016",
+        "enterpriseName": "高平市泫氏铸管有限公司",
+        "exactNameQuery": "\"高平市泫氏铸管有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-017",
+        "enterpriseName": "长扬科技（北京）股份有限公司",
+        "exactNameQuery": "\"长扬科技（北京）股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-014",
+          "EV-20260908-030"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-018",
+        "enterpriseName": "北京瑞景上智环保技术有限公司",
+        "exactNameQuery": "\"北京瑞景上智环保技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-019",
+        "enterpriseName": "贝姆热能科技集团有限公司",
+        "exactNameQuery": "\"贝姆热能科技集团有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-020",
+        "enterpriseName": "北京市自来水设计有限责任公司",
+        "exactNameQuery": "\"北京市自来水设计有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-002",
+          "AN-011"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-021",
+        "enterpriseName": "北京建谊投资发展（集团）有限公司",
+        "exactNameQuery": "\"北京建谊投资发展（集团）有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-023",
+        "enterpriseName": "北京睿缔伟业建筑工程有限公司",
+        "exactNameQuery": "\"北京睿缔伟业建筑工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-024",
+        "enterpriseName": "北京科业工程技术研究院有限公司",
+        "exactNameQuery": "\"北京科业工程技术研究院有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-025",
+        "enterpriseName": "北京市勘察设计研究院有限公司",
+        "exactNameQuery": "\"北京市勘察设计研究院有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-012",
+          "EV-20260908-013",
+          "AN-023"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-026",
+        "enterpriseName": "北京中科金财科技股份有限公司",
+        "exactNameQuery": "\"北京中科金财科技股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-027",
+        "enterpriseName": "北京万业鸿达商贸有限公司",
+        "exactNameQuery": "\"北京万业鸿达商贸有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-028",
+        "enterpriseName": "山东建华阀门制造有限公司",
+        "exactNameQuery": "\"山东建华阀门制造有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-003"
+        ],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-029",
+        "enterpriseName": "福建泉牌阀门科技股份有限公司",
+        "exactNameQuery": "\"福建泉牌阀门科技股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-030",
+        "enterpriseName": "北京松田程科技有限公司",
+        "exactNameQuery": "\"北京松田程科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-031",
+        "enterpriseName": "北京北控智慧城市科技发展集团有限公司",
+        "exactNameQuery": "\"北京北控智慧城市科技发展集团有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-032",
+        "enterpriseName": "北京世纪燎燃燃气设备技术开发有限公司",
+        "exactNameQuery": "\"北京世纪燎燃燃气设备技术开发有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-033",
+        "enterpriseName": "北京建华水务有限公司",
+        "exactNameQuery": "\"北京建华水务有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-034",
+        "enterpriseName": "山龙泛林（北京）商贸有限公司",
+        "exactNameQuery": "\"山龙泛林（北京）商贸有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-035",
+        "enterpriseName": "北京市恒锋市政工程有限公司",
+        "exactNameQuery": "\"北京市恒锋市政工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-016"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-036",
+        "enterpriseName": "新兴铸管股份有限公司北京销售分公司",
+        "exactNameQuery": "\"新兴铸管股份有限公司北京销售分公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-Q-2"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-037",
+        "enterpriseName": "新地数安（河北）管道检测有限公司",
+        "exactNameQuery": "\"新地数安（河北）管道检测有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-004"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-038",
+        "enterpriseName": "正元地理信息集团股份有限公司",
+        "exactNameQuery": "\"正元地理信息集团股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-Q-5"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-039",
+        "enterpriseName": "北京水兴源商贸有限公司",
+        "exactNameQuery": "\"北京水兴源商贸有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-040",
+        "enterpriseName": "河北鸿胜荣通新型建材科技有限公司",
+        "exactNameQuery": "\"河北鸿胜荣通新型建材科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-041",
+        "enterpriseName": "河南驰诚电气股份有限公司",
+        "exactNameQuery": "\"河南驰诚电气股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-042",
+        "enterpriseName": "北京泰策科技有限公司",
+        "exactNameQuery": "\"北京泰策科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-043",
+        "enterpriseName": "北京燕房力源建筑工程有限公司",
+        "exactNameQuery": "\"北京燕房力源建筑工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-044",
+        "enterpriseName": "金房能源集团股份有限公司",
+        "exactNameQuery": "\"金房能源集团股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-025"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-045",
+        "enterpriseName": "北京金通远建筑工程公司",
+        "exactNameQuery": "\"北京金通远建筑工程公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-024",
+          "AN-031"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-046",
+        "enterpriseName": "北京鑫鼎通科技有限公司",
+        "exactNameQuery": "\"北京鑫鼎通科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-047",
+        "enterpriseName": "上海铭控传感技术有限公司",
+        "exactNameQuery": "\"上海铭控传感技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-031",
+          "AN-002"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-048",
+        "enterpriseName": "北京铭控仪器仪表有限公司",
+        "exactNameQuery": "\"北京铭控仪器仪表有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-049",
+        "enterpriseName": "锦绣河山（北京）环境科技有限公司",
+        "exactNameQuery": "\"锦绣河山（北京）环境科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-050",
+        "enterpriseName": "北京首能创源科技有限公司",
+        "exactNameQuery": "\"北京首能创源科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-051",
+        "enterpriseName": "首都会展（集团）有限公司",
+        "exactNameQuery": "\"首都会展（集团）有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-Q-1"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-052",
+        "enterpriseName": "二十一世纪空间技术应用股份有限公司",
+        "exactNameQuery": "\"二十一世纪空间技术应用股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-028"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-053",
+        "enterpriseName": "北京正元数科信息技术有限公司",
+        "exactNameQuery": "\"北京正元数科信息技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-054",
+        "enterpriseName": "北京京仪仪器仪表研究总院有限公司",
+        "exactNameQuery": "\"北京京仪仪器仪表研究总院有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-055",
+        "enterpriseName": "北京宜扬工程管理有限公司",
+        "exactNameQuery": "\"北京宜扬工程管理有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-056",
+        "enterpriseName": "国家管网集团北京管道有限公司",
+        "exactNameQuery": "\"国家管网集团北京管道有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-057",
+        "enterpriseName": "安徽欧泰祺智慧水务科技有限公司北京办事处",
+        "exactNameQuery": "\"安徽欧泰祺智慧水务科技有限公司北京办事处\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-058",
+        "enterpriseName": "武汉昊诚锂电科技股份有限公司",
+        "exactNameQuery": "\"武汉昊诚锂电科技股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-059",
+        "enterpriseName": "深圳市吉凯达科技有限公司",
+        "exactNameQuery": "\"深圳市吉凯达科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-060",
+        "enterpriseName": "北京路盛沥青混凝土有限公司",
+        "exactNameQuery": "\"北京路盛沥青混凝土有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-061",
+        "enterpriseName": "北京高新大禹工程技术有限公司",
+        "exactNameQuery": "\"北京高新大禹工程技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-001"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-062",
+        "enterpriseName": "中国测绘学会地下管线专业委员会",
+        "exactNameQuery": "\"中国测绘学会地下管线专业委员会\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-023",
+          "EV-20260908-024",
+          "EV-20260908-025",
+          "AN-005",
+          "AN-006",
+          "AN-019",
+          "AN-020"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-063",
+        "enterpriseName": "中国石化销售股份有限公司北京石油分公司",
+        "exactNameQuery": "\"中国石化销售股份有限公司北京石油分公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-064",
+        "enterpriseName": "中国联合网络通信有限公司北京市分公司",
+        "exactNameQuery": "\"中国联合网络通信有限公司北京市分公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-065",
+        "enterpriseName": "中科云创（北京）科技有限公司",
+        "exactNameQuery": "\"中科云创（北京）科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-007"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-066",
+        "enterpriseName": "中铂（北京）新材料科技有限公司",
+        "exactNameQuery": "\"中铂（北京）新材料科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-067",
+        "enterpriseName": "九华地信空间（天津）科技有限责任公司",
+        "exactNameQuery": "\"九华地信空间（天津）科技有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-003"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-068",
+        "enterpriseName": "保定金迪地下管线探测工程有限公司",
+        "exactNameQuery": "\"保定金迪地下管线探测工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-015"
+        ],
+        "heldRecordIds": [
+          "H-Q-7"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-069",
+        "enterpriseName": "北京东方中远市政工程有限责任公司",
+        "exactNameQuery": "\"北京东方中远市政工程有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-070",
+        "enterpriseName": "北京东方通捷燃气有限责任公司",
+        "exactNameQuery": "\"北京东方通捷燃气有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-071",
+        "enterpriseName": "北京京投城市管廊投资有限公司",
+        "exactNameQuery": "\"北京京投城市管廊投资有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-014"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-072",
+        "enterpriseName": "北京公共交通控股（集团）有限公司电车供电所",
+        "exactNameQuery": "\"北京公共交通控股（集团）有限公司电车供电所\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-073",
+        "enterpriseName": "北京创源市政建设工程有限公司",
+        "exactNameQuery": "\"北京创源市政建设工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-033"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-074",
+        "enterpriseName": "北京北投城市运营管理有限公司",
+        "exactNameQuery": "\"北京北投城市运营管理有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-075",
+        "enterpriseName": "北京北燃港华燃气有限公司",
+        "exactNameQuery": "\"北京北燃港华燃气有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-076",
+        "enterpriseName": "北京北燃环能工程科技有限公司",
+        "exactNameQuery": "\"北京北燃环能工程科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-077",
+        "enterpriseName": "北京华馨源科技有限公司",
+        "exactNameQuery": "\"北京华馨源科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-078",
+        "enterpriseName": "北京启迪注安技术服务有限公司",
+        "exactNameQuery": "\"北京启迪注安技术服务有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-079",
+        "enterpriseName": "北京城市排水集团有限责任公司",
+        "exactNameQuery": "\"北京城市排水集团有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-015",
+          "EV-20260908-018",
+          "EV-20260908-019",
+          "EV-20260908-020",
+          "EV-20260908-021",
+          "AN-013"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-080",
+        "enterpriseName": "北京城建勘测设计研究院有限责任公司",
+        "exactNameQuery": "\"北京城建勘测设计研究院有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-007",
+          "EV-20260908-008",
+          "EV-20260908-009",
+          "EV-20260908-012",
+          "EV-20260908-013",
+          "EV-20260908-022"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-081",
+        "enterpriseName": "北京城建设计发展集团股份有限公司",
+        "exactNameQuery": "\"北京城建设计发展集团股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-014",
+          "AN-029"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-082",
+        "enterpriseName": "北京天恒建设集团有限公司",
+        "exactNameQuery": "\"北京天恒建设集团有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-083",
+        "enterpriseName": "北京安卓律师事务所",
+        "exactNameQuery": "\"北京安卓律师事务所\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-004",
+          "H-AN-005"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-084",
+        "enterpriseName": "北京市公用工程设计监理有限公司",
+        "exactNameQuery": "\"北京市公用工程设计监理有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-010",
+          "AN-021"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-085",
+        "enterpriseName": "北京市公联公路联络线有限责任公司",
+        "exactNameQuery": "\"北京市公联公路联络线有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-086",
+        "enterpriseName": "北京市城市照明协会",
+        "exactNameQuery": "\"北京市城市照明协会\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-087",
+        "enterpriseName": "北京市城镇供水协会",
+        "exactNameQuery": "\"北京市城镇供水协会\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-007",
+          "AN-008",
+          "AN-009",
+          "AN-010",
+          "AN-018"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-088",
+        "enterpriseName": "北京市市政专业设计院股份公司",
+        "exactNameQuery": "\"北京市市政专业设计院股份公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-011",
+          "EV-20260908-015",
+          "AN-029"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-089",
+        "enterpriseName": "北京市建设工程质量第三检测所有限责任公司",
+        "exactNameQuery": "\"北京市建设工程质量第三检测所有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-090",
+        "enterpriseName": "北京市建设工程质量第四检测所有限公司",
+        "exactNameQuery": "\"北京市建设工程质量第四检测所有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-091",
+        "enterpriseName": "北京市热力集团有限责任公司",
+        "exactNameQuery": "\"北京市热力集团有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-032"
+        ],
+        "heldRecordIds": [
+          "H-AN-010"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-092",
+        "enterpriseName": "北京市煤气工程有限公司",
+        "exactNameQuery": "\"北京市煤气工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-093",
+        "enterpriseName": "北京市煤气热力工程设计院有限公司",
+        "exactNameQuery": "\"北京市煤气热力工程设计院有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-010",
+          "EV-20260908-029",
+          "AN-021",
+          "AN-022",
+          "AN-026",
+          "AN-027"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-094",
+        "enterpriseName": "北京市燃气协会",
+        "exactNameQuery": "\"北京市燃气协会\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-026",
+          "EV-20260908-027",
+          "EV-20260908-028"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-095",
+        "enterpriseName": "北京市燃气集团有限责任公司",
+        "exactNameQuery": "\"北京市燃气集团有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-005",
+          "EV-20260908-006",
+          "EV-20260908-010",
+          "EV-20260908-028"
+        ],
+        "heldRecordIds": [
+          "H-AN-009"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-096",
+        "enterpriseName": "北京市科学技术研究院城市系统研究所",
+        "exactNameQuery": "\"北京市科学技术研究院城市系统研究所\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-097",
+        "enterpriseName": "北京市自来水集团有限责任公司",
+        "exactNameQuery": "\"北京市自来水集团有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-002",
+          "AN-007",
+          "AN-009",
+          "AN-011",
+          "AN-018"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-098",
+        "enterpriseName": "北京市自来水集团有限责任公司管网管理分公司",
+        "exactNameQuery": "\"北京市自来水集团有限责任公司管网管理分公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-099",
+        "enterpriseName": "北京市自来水集团禹通市政工程有限公司",
+        "exactNameQuery": "\"北京市自来水集团禹通市政工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-001"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-100",
+        "enterpriseName": "北京房地集团有限公司",
+        "exactNameQuery": "\"北京房地集团有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-101",
+        "enterpriseName": "北京数字政通科技股份有限公司",
+        "exactNameQuery": "\"北京数字政通科技股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-012",
+          "AN-015",
+          "AN-016",
+          "AN-017"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-102",
+        "enterpriseName": "北京新航城城市运营管理有限公司",
+        "exactNameQuery": "\"北京新航城城市运营管理有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-006"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-103",
+        "enterpriseName": "北京无线电计量测试研究所",
+        "exactNameQuery": "\"北京无线电计量测试研究所\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-017"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-104",
+        "enterpriseName": "北京智城联合科技发展有限公司",
+        "exactNameQuery": "\"北京智城联合科技发展有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-030"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-105",
+        "enterpriseName": "北京河沐生态科技有限公司",
+        "exactNameQuery": "\"北京河沐生态科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [
+          "H-AN-002"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-106",
+        "enterpriseName": "北京洪庆伟业汽车技术服务有限公司",
+        "exactNameQuery": "\"北京洪庆伟业汽车技术服务有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-107",
+        "enterpriseName": "北京浩华电气设备安装工程有限公司",
+        "exactNameQuery": "\"北京浩华电气设备安装工程有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-108",
+        "enterpriseName": "北京热力市政工程建设有限公司",
+        "exactNameQuery": "\"北京热力市政工程建设有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-001",
+          "EV-20260908-003",
+          "AN-032"
+        ],
+        "heldRecordIds": [
+          "H-AN-010"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-109",
+        "enterpriseName": "北京焕发管道修复有限公司",
+        "exactNameQuery": "\"北京焕发管道修复有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-110",
+        "enterpriseName": "北京盛典博览国际会展有限公司",
+        "exactNameQuery": "\"北京盛典博览国际会展有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-111",
+        "enterpriseName": "北京盛德致远工程技术有限公司",
+        "exactNameQuery": "\"北京盛德致远工程技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-112",
+        "enterpriseName": "北京致远工程建设监理有限责任公司",
+        "exactNameQuery": "\"北京致远工程建设监理有限责任公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-113",
+        "enterpriseName": "北京诺成新科技有限公司",
+        "exactNameQuery": "\"北京诺成新科技有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-114",
+        "enterpriseName": "北京辰安科技股份有限公司",
+        "exactNameQuery": "\"北京辰安科技股份有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "AN-016"
+        ],
+        "heldRecordIds": [
+          "H-Q-6"
+        ],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-115",
+        "enterpriseName": "北京零点市场调查有限公司",
+        "exactNameQuery": "\"北京零点市场调查有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [
+          "EV-20260908-004"
+        ],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-116",
+        "enterpriseName": "北京顾地塑胶有限公司",
+        "exactNameQuery": "\"北京顾地塑胶有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-117",
+        "enterpriseName": "国网北京市电力公司电缆分公司",
+        "exactNameQuery": "\"国网北京市电力公司电缆分公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-118",
+        "enterpriseName": "建元未来城市投资发展有限公司",
+        "exactNameQuery": "\"建元未来城市投资发展有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-119",
+        "enterpriseName": "沈阳精益液压技术有限公司",
+        "exactNameQuery": "\"沈阳精益液压技术有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      },
+      {
+        "sourceId": "ORG-120",
+        "enterpriseName": "盘锦龙油管道服务有限公司",
+        "exactNameQuery": "\"盘锦龙油管道服务有限公司\" (招标 OR 中标 OR 合作 OR 签约 OR 活动) after:2025-09-07 before:2026-06-08",
+        "searchStatus": "EXACT_NAME_INITIAL_SCREEN_COMPLETED",
+        "reviewedRecordIds": [],
+        "heldRecordIds": [],
+        "exhaustive": false
+      }
+    ]
+  },
+  "limitations": [
+    "116条名称均完成公开网页初筛，不等于穷尽全网或各企业全部交易。搜索结果的索引日期不能替代正文日期。",
+    "71条基线未填写官网；本轮用企业全称和业务关键词检索，但未逐一完成企业官网归属认证。",
+    "未检索登录后、付费、未公开私下合作或未被索引的完整公众号内容；未注册、付费、联络企业或提交投标。",
+    "所有直接关系仅确认所列公开材料中的角色，不新增已认证会员、企业账号、资质、合作意愿或平台合作状态。",
+    "公告链未穷尽；候选人/提交期结束等是已读文书状态，最终结果或后续变更可能尚未核实。",
+    "企业新闻保留自述/来源标识，不将宣传性能、荣誉等当作独立验证的投标资格。",
+    "与原50条来源按已知URL/项目编号比较；缺少有效编号的原记录以及生产库之后新增资料需入库前再次去重。",
+    "生产维护sudo仅允许固定guanxian-maintain动作，不含任意数据库执行或导入；未尝试绕过权限。",
+    "这是本轮可访问公开来源的分批核查成果，不是全网穷尽清单。116个查询覆盖不等于116家均有可验证命中，也不代表未命中企业没有业务。",
+    "年度扩展仍有媒体线索、原站403/证书失败、企业名/法人差异、后续公告未核查等缺口；heldForReview绝不作为已核实记录导入。",
+    "活动/科研成果/联合体披露须保留证据类型；来源目录需支持活动及历史状态后再入库，不能伪装为正在招标的开放需求。",
+    "本次仅检索、整理和本地校验；未导入生产数据库，未部署，也未修改企业会员认证与发布授权。"
+  ],
+  "pdfReview": {
+    "sourceUrl": "https://www.egova.com.cn/Public/uploads/697fff2205926.pdf",
+    "localPath": "D:/guanxian/tmp/pdfs/egova-2025-048.pdf",
+    "visualPages": [
+      1,
+      2,
+      4
+    ],
+    "note": "PDF技能用于逐页核实金额、联合体份额、落款日期；正文已读取，截图不作为新增业务记录。"
+  }
+}

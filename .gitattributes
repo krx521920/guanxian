@@ -1,0 +1,3 @@
+# Reviewed evidence checksums must remain identical across Windows and Linux checkouts.
+data/curated/member-annual-evidence-20260908.json text eol=lf
+data/curated/member-public-evidence-20260908.json text eol=lf

@@ -50,11 +50,11 @@ def main():
             raise AssertionError("Isolated PostgreSQL did not become ready")
         psql("CREATE TABLE flyway_schema_history(installed_rank integer primary key,version varchar(50),success boolean)")
         migrations = sorted((ROOT / "apps/server/bootstrap/src/main/resources/db/migration").glob("V*__*.sql"),
-                            key=lambda p: int(p.name.split("__")[0][1:]))
-        for migration in migrations:
-            version = int(migration.name.split("__")[0][1:])
+                            key=lambda p: tuple(map(int, p.name.split("__")[0][1:].split('_'))))
+        for rank, migration in enumerate(migrations, 1):
+            version = migration.name.split("__")[0][1:].replace('_', '.')
             psql("BEGIN;\n" + migration.read_text(encoding="utf-8") +
-                 f"\nINSERT INTO flyway_schema_history VALUES({version},'{version}',true); COMMIT;")
+                 f"\nINSERT INTO flyway_schema_history VALUES({rank},'{version}',true); COMMIT;")
         for i, id_ in enumerate(COMPANIES):
             psql(f"INSERT INTO enterprise(id,association_id,name,category,status,version) VALUES('{id_}','{ASSOCIATION}',"
                  f"'验收测试企业{i+1:02d}（虚构）','测试','ACTIVE',{4 if i==4 else 2})")

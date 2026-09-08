@@ -24,7 +24,7 @@ import { apiActionMessage, displayBusinessStatus, formatDateTime, nullableText, 
 const auth = useAuth()
 const route = useRoute()
 const ownOnly = computed(() => route.path === '/enterprise/catalog')
-const tab = ref<'offerings' | 'demands' | 'sources' | 'tenders'>('offerings')
+const tab = ref<'offerings' | 'demands' | 'sources' | 'tenders' | 'activities'>('offerings')
 watch(ownOnly, () => { tab.value = 'offerings' })
 const offerings = ref<Offering[]>([])
 const demands = ref<Demand[]>([])
@@ -336,12 +336,13 @@ onMounted(async () => {
     <div v-if="message" class="save-message page-message" aria-live="polite">{{ message }}</div>
     <section class="panel filter-panel">
       <div class="segmented"><button :class="{ active: tab === 'offerings' }" @click="tab = 'offerings'">产品与服务（{{ offeringTotal }}）</button><button :class="{ active: tab === 'demands' }" @click="tab = 'demands'">合作需求（{{ demandTotal }}）</button></div>
-      <div v-if="!ownOnly && auth.user.value?.role !== 'OBSERVER'" class="segmented"><button :class="{ active: tab === 'sources' }" @click="tab = 'sources'">企业供给资料</button><button :class="{ active: tab === 'tenders' }" @click="tab = 'tenders'">外部招投标</button></div>
+      <div v-if="!ownOnly && auth.user.value?.role !== 'OBSERVER'" class="segmented"><button :class="{ active: tab === 'sources' }" @click="tab = 'sources'">企业供给资料</button><button :class="{ active: tab === 'tenders' }" @click="tab = 'tenders'">外部招投标</button><button :class="{ active: tab === 'activities' }" @click="tab = 'activities'">企业活动与公开动态</button></div>
       <div v-if="tab === 'offerings' || tab === 'demands'" class="search-box compact"><span>⌕</span><input v-model="keyword" :placeholder="tab === 'offerings' ? '搜索产品、企业或场景' : '搜索需求、企业或场景'" /></div>
       <label v-if="canViewDeleted && (tab === 'offerings' || tab === 'demands')" class="checkbox-row"><input v-model="showDeleted" type="checkbox" @change="toggleDeleted" /> 显示已删除</label>
     </section>
     <SourceDirectory v-if="tab === 'sources' && !ownOnly" kind="ENTERPRISE" />
     <SourceDirectory v-else-if="tab === 'tenders' && !ownOnly" kind="TENDER" />
+    <SourceDirectory v-else-if="tab === 'activities' && !ownOnly" kind="ACTIVITY" />
     <AsyncResourceState v-else-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <section v-else-if="tab === 'offerings'" class="asset-grid">
       <article v-for="item in filteredOfferings" :key="item.id" class="panel asset-card">
