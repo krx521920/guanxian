@@ -10,6 +10,27 @@ describe('server business data contract', () => {
     expect(parseBusinessResults([receipt])[0]).toMatchObject({ total: 12, items: receipt.items })
     expect(parseBusinessResults([{ ...receipt, associationId: null }])).toHaveLength(1)
   })
+  it('normalizes an omitted nullable scope from NON_NULL servers without changing the receipt or granting authority', () => {
+    const { associationId: _scope, ...wire } = businessFixture()
+    const parsed = parseBusinessResults([wire])[0]
+    expect(parsed.associationId).toBeNull()
+    expect(parsed.scope).toBe(wire.scope)
+    expect(parsed.items).toEqual(wire.items)
+    expect(wire).not.toHaveProperty('associationId')
+    expect(parseBusinessResults([{ ...wire, status: 'FORBIDDEN', total: 0, items: [] }])[0].status).toBe('FORBIDDEN')
+  })
+  it.each(['LOCAL_BUSINESS_QUERY', 'SPRING_AI_AGENT'])('completes %s with omitted scope and preserves normalized receipts', async mode => {
+    const { associationId: _scope, ...wire } = businessFixture()
+    const receive = vi.fn()
+    const stream = assistantStreamConsumer('test', vi.fn(), vi.fn(), receive)
+    await stream.accept({ type: 'start', conversationId: 'test' })
+    await stream.accept({ type: 'status', conversationId: 'test', status: { phase: 'GENERATING', mode }, businessResults: [wire] })
+    await stream.accept({ type: 'delta', conversationId: 'test', delta: '已查询。' })
+    const answer = { conversationId: 'test', answer: '已查询。', mode, modelConnected: mode === 'SPRING_AI_AGENT', traceId: 'test', citations: [], businessResults: [{ ...wire, associationId: null }] }
+    expect(await stream.accept({ type: 'complete', conversationId: 'test', answer })).toBe(true)
+    expect(receive).toHaveBeenCalledWith([{ ...wire, associationId: null }])
+    expect(stream.result().businessResults?.[0].associationId).toBeNull()
+  })
   it.each([
     { schemaVersion: 2 }, { id: 'javascript:bad' }, { associationId: '' }, { total: -1 }, { total: 1 },
     { status: 'FORBIDDEN' }, { queriedAt: 'not-a-date' }, { items: [{ ...businessFixture().items[0], fields: { contactPhone: 'secret' } }] },

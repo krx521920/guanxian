@@ -1,5 +1,6 @@
 package com.guanxian.platform.ai.assistant;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.*;
 import org.springframework.ai.chat.model.ToolContext;
@@ -22,7 +23,7 @@ public final class AssistantBusinessResults {
     }
     public record Evidence(String criterion, String state, String field, String observed, String explanation) {}
     public record SourceReference(String kind, String sourceId, String evidenceRecordId, String checkedOn,
-                                  String sourceUrl, List<String> supportingUrls) {
+                                  @JsonInclude(JsonInclude.Include.ALWAYS) String sourceUrl, List<String> supportingUrls) {
         public SourceReference { supportingUrls = List.copyOf(supportingUrls); }
     }
     public record Item(UUID id, String name, String target, Map<String, String> fields, List<Evidence> evidence,
@@ -33,7 +34,7 @@ public final class AssistantBusinessResults {
         public Item { fields = Map.copyOf(fields); evidence = List.copyOf(evidence); }
     }
     public record Result(int schemaVersion, UUID id, String kind, String status, String label,
-                         UUID associationId, String scope, Map<String, String> filters, Instant queriedAt,
+                         @JsonInclude(JsonInclude.Include.ALWAYS) UUID associationId, String scope, Map<String, String> filters, Instant queriedAt,
                          long total, List<Item> items) {
         public Result { filters = Map.copyOf(filters); items = List.copyOf(items); }
         public static Result create(String kind, String status, String label, UUID associationId,

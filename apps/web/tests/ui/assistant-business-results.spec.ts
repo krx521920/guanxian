@@ -6,6 +6,21 @@ async function query(page: Page, text = '查询监测企业') {
   await page.getByLabel('向管线智能助手提问').fill(text)
   await page.getByRole('button', { name: '发送问题' }).click()
 }
+test('unselected association NON_NULL receipts render cards and a completed answer', async ({ page }) => {
+  await query(page, '未选择协会，查询会员企业')
+  await expect(page.locator('.business-card')).toHaveCount(3)
+  await expect(page.locator('.query-receipt')).toContainText('全部协会（仅限当前账号有权查看的资料）')
+  await expect(page.locator('.query-receipt summary')).toContainText('共 12 条 · 展示 3 条')
+  await expect(page.locator('.assistant-trace')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+})
+test('a missing source link does not interrupt an unselected association answer', async ({ page }) => {
+  await query(page, '未选择协会，查询招标，无原文链接')
+  await expect(page.locator('.query-receipt')).toContainText('全部协会（仅限当前账号有权查看的资料）')
+  await expect(page.locator('.assistant-trace')).toBeVisible()
+  await expect(page.getByRole('alert')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: '来源原文 ↗', exact: true })).toHaveCount(0)
+})
 test('cards expose actual scope/counts, fresh authorized details and keyboard return', async ({ page }) => {
   await query(page)
   await expect(page.locator('.business-card')).toHaveCount(3)

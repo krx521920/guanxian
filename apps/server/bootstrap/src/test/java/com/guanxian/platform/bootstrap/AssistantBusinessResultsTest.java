@@ -66,6 +66,22 @@ class AssistantBusinessResultsTest {
         verifyNoMoreInteractions(members);
     }
 
+    @Test void genericAssociationCountQuestionIsNotACompanyNameFilter() {
+        for (String question : List.of("现在协会有多少家企业", "我们协会有哪些会员企业", "本协会有多少家企业")) {
+            var result = tools.answer(new AssistantLocalQueryProvider.LocalQueryRequest(
+                    new AssistantAccessContext(actor, Set.of("MEMBER_READ")), question, "协会工作台", "/"));
+            assertThat(result).isPresent();
+            assertThat(result.orElseThrow().businessResults().getFirst().total()).isZero();
+        }
+        verify(members, times(3)).findAll(null, null, false, actor);
+    }
+
+    @Test void namedAssociationInAKeywordIsNotSilentlyRemoved() {
+        tools.answer(new AssistantLocalQueryProvider.LocalQueryRequest(
+                new AssistantAccessContext(actor, Set.of("MEMBER_READ")), "查找北京协会监测企业", "会员企业", "/members"));
+        verify(members).findAll("北京协会监测", null, false, actor);
+    }
+
     @Test void sayingAllAssociationsDoesNotExpandAnOrdinaryAccountsScope() {
         when(members.findAll(null, null, false, actor)).thenReturn(List.of());
         var local = tools.answer(new AssistantLocalQueryProvider.LocalQueryRequest(
