@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests/ui',
-  testMatch: ['personal-model.spec.ts', 'assistant-output.spec.ts', 'assistant-business-results.spec.ts', 'assistant-followup.spec.ts', 'assistant-fit-check.spec.ts', 'assistant-workspace.spec.ts'],
+  testMatch: ['personal-model.spec.ts', 'assistant-output.spec.ts', 'assistant-business-results.spec.ts', 'assistant-followup.spec.ts', 'assistant-fit-check.spec.ts', 'assistant-workspace.spec.ts', 'assistant-source-evidence.spec.ts'],
   outputDir: '../../test-results/personal-model-ui',
   workers: 1,
   timeout: 30000,

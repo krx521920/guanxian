@@ -327,6 +327,7 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
 
     private static QueryKind queryKind(String value, String pagePath) {
         String message = value == null ? "" : value.strip();
+        if (AssistantSourceEvidenceTools.sourceIntent(message)) return null;
         if (message.isEmpty() || containsAny(message, KNOWLEDGE_MARKERS)) return null;
 
         if (containsAny(message, List.of("协作事项", "合作事项", "协作进展", "待办事项"))) {

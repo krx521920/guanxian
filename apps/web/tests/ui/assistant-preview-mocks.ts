@@ -2,21 +2,23 @@ import type { ModelSettings } from '../../src/services/personal-model'
 import { businessFixture, fixtureMembers } from './business-fixtures'
 import { selectedEnterpriseIds } from '../../src/services/assistant-business-results'
 import { normalizeFitCriteria } from '../../src/services/assistant-fit-check'
+import { sourceEvidenceFixture } from './source-evidence-fixtures'
 
 // Dev-only synthetic transport. No keys are stored and no business/model request leaves the page.
 export const previewRequests: Array<Record<string, unknown>> = []
 export const previewMemberReads: string[] = []
 export const previewFitRequests: Array<Record<string, unknown>> = []
+export const previewSourceReads: string[] = []
 export const unavailableMembers = new Set<string>()
 declare global {
-  interface Window { __guanxianPreview: { requests: typeof previewRequests; memberReads: string[]; unavailableMembers: Set<string>; members: typeof fixtureMembers; fitRequests: typeof previewFitRequests; fitDelayMs?: number; fitMalformed?: boolean; modelReadDelayMs?: number; switchRole?: () => void } }
+  interface Window { __guanxianPreview: { requests: typeof previewRequests; memberReads: string[]; unavailableMembers: Set<string>; members: typeof fixtureMembers; fitRequests: typeof previewFitRequests; sourceReads: string[]; sourceUnavailable?: boolean; fitDelayMs?: number; fitMalformed?: boolean; modelReadDelayMs?: number; switchRole?: () => void } }
 }
 export function installPreviewTransport() {
   if (!import.meta.env.DEV || import.meta.env.VITE_AUTH_MODE !== 'demo' || !['127.0.0.1', 'localhost'].includes(location.hostname)) {
     throw new Error('Preview is restricted to local demo development')
   }
   // Observe the installed transport, not a second module instance created by Vite HMR URLs.
-  window.__guanxianPreview = { requests: previewRequests, memberReads: previewMemberReads, unavailableMembers, members: fixtureMembers, fitRequests: previewFitRequests }
+  window.__guanxianPreview = { requests: previewRequests, memberReads: previewMemberReads, unavailableMembers, members: fixtureMembers, fitRequests: previewFitRequests, sourceReads: previewSourceReads }
   const originalFetch = window.fetch.bind(window)
   const settings: ModelSettings = { storageAvailable: true, egressAllowed: true, saved: null, providers: [
     { id: 'DOUBAO', label: '豆包 · 火山方舟', endpoint: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions', modelHint: '填写模型 ID', documentationUrl: 'https://www.volcengine.com/docs/82379/1330626' },
@@ -68,6 +70,14 @@ export function installPreviewTransport() {
       return Response.json({ code: 'OK', data: member }, { headers: { ETag: '"1"' } })
     }
     if (url.pathname.endsWith('/dashboards/association')) return response({ metrics: [], activities: [], sceneDistribution: [], pendingTasks: [] })
+    if (url.pathname.endsWith('/source-directory')) {
+      previewSourceReads.push(url.search)
+      if (window.__guanxianPreview.sourceUnavailable) return response({ items: [], total: 0, page: 0, size: 20 })
+      const item = sourceEvidenceFixture(url.searchParams.get('kind') === 'ACTIVITY' ? 'ACTIVITY' : 'TENDER').items[0]
+      return response({ items: [{ id: item.id, sourceId: item.source!.sourceId, title: item.name, fields: {
+        记录状态: item.fields.来源记录状态, 记录状态代码: 'CANDIDATE_NOTICE', 发布日期: '2026-08-01', 证据摘要: '重新读取的虚构公开资料', 原文链接: item.source!.sourceUrl,
+      }, importedAt: '2026-09-08T00:00:00Z', evidence: { recordId: 'EV-FIXTURE', title: item.name, checkedOn: '2026-09-08', sourceUrl: item.source!.sourceUrl, supportingUrls: [] } }], total: 1, page: 0, size: 20 })
+    }
     if (url.pathname.endsWith('/system-context/associations') || url.pathname.endsWith('/system-context/enterprises')) return response([])
     if (!url.pathname.endsWith('/assistant/chat/stream')) return response({ items: [], total: 0 })
     previewRequests.push(body)
@@ -76,8 +86,9 @@ export function installPreviewTransport() {
     const long = question.includes('长回答') || question.includes('停止')
     const fault = question.includes('断流') && previewRequests.filter(item => item.message === question).length === 1
     const selected = selectedEnterpriseIds(body.selectedEnterpriseIds)
-    const business = selected.length > 0 || question.includes('企业') || question.includes('推荐')
-    const receipt = businessFixture(selected.length ? 'SELECTED_MEMBERS' : question.includes('推荐') ? 'RECOMMENDATIONS' : 'MEMBERS')
+    const source = question.includes('招标') || question.includes('活动')
+    const business = source || selected.length > 0 || question.includes('企业') || question.includes('推荐')
+    const receipt = source ? sourceEvidenceFixture(question.includes('活动') ? 'ACTIVITY' : 'TENDER') : businessFixture(selected.length ? 'SELECTED_MEMBERS' : question.includes('推荐') ? 'RECOMMENDATIONS' : 'MEMBERS')
     receipt.id = crypto.randomUUID()
     receipt.queriedAt = new Date().toISOString()
     if (selected.length) {
@@ -93,7 +104,7 @@ export function installPreviewTransport() {
     if (question.includes('损坏')) receipt.schemaVersion = 99 as 1
     if (question.includes('注入')) receipt.items[0].name = '<img src=x onerror="window.__fixtureXss=true">'
     const businessResults = business && !question.includes('旧版服务') ? [receipt] : []
-    const answer = selected.length ? receipt.status === 'OK'
+    const answer = source ? '本地模拟：已展示公开资料来源卡片，未查询生产数据；候选不等于中标，活动不等于已确认合作。' : selected.length ? receipt.status === 'OK'
       ? `本地模拟回答：已重新核对所选 ${selected.length} 家虚构企业，未连接真实模型或正式数据库。`
       : '本地模拟：所选资料已不可用或权限发生变化；本轮未调用模型，也未沿用旧企业资料。'
       : brief ? '本地模拟：已展示简洁回答样式，未查询真实业务数据。'

@@ -117,3 +117,26 @@ ON CONFLICT (id) DO UPDATE SET
   status = 'DELIVERED',
   delivered_at = now(),
   read_at = NULL;
+
+-- Synthetic, local/CI-only source receipts. This file is mounted exclusively by compose.e2e.yaml.
+-- Never import these examples, fixture accounts or fixture credentials into production.
+INSERT INTO platform_dataset_import(id, association_id, source_sha256, source_filename, actor_subject, report)
+SELECT 'e2e-source-evidence-' || suffix, association_id, repeat('e', 64), 'synthetic-e2e-only', 'ci-fixture', '{}'::jsonb
+FROM (VALUES ('own', '00000000-0000-0000-0000-000000000106'::uuid),
+             ('foreign', '00000000-0000-0000-0000-000000000107'::uuid)) AS f(suffix, association_id)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO platform_source_record(id, import_id, association_id, kind, source_id, title, payload)
+SELECT id::uuid, 'e2e-source-evidence-' || scope, association_id::uuid, kind, source_id, title,
+       jsonb_build_object('source', jsonb_build_object('联系人', 'DO_NOT_EXPOSE_E2E_PRIVATE'),
+         'publicEvidence', jsonb_build_object('record', jsonb_build_object('id', 'EV-' || source_id, 'title', title,
+           'checkedOn', current_date::text, 'sourceUrl', 'https://example.test/e2e/' || source_id),
+         'fields', jsonb_build_object('发布日期', current_date::text, '记录状态', state,
+           '证据摘要', '本地验收虚构公开来源资料，不是真实公告', '关联企业及角色', role,
+           '金额及口径', '项目总额100万元；企业份额未披露'), 'supportingUrls', '[]'::jsonb))
+FROM (VALUES
+  ('60000000-0000-4000-8000-000000000001', 'own', '00000000-0000-0000-0000-000000000106', 'TENDER', 'E2E-SRC-TENDER', 'E2E证据联调·虚构候选公示', '候选公示', 'E2E京城管网：候选单位，不等于中标'),
+  ('60000000-0000-4000-8000-000000000002', 'own', '00000000-0000-0000-0000-000000000106', 'ACTIVITY', 'E2E-SRC-ACTIVITY', 'E2E证据联调·虚构企业活动', '企业自述', 'E2E京城管网：报道主体，不是平台确认合作'),
+  ('60000000-0000-4000-8000-000000000003', 'foreign', '00000000-0000-0000-0000-000000000107', 'TENDER', 'E2E-SRC-FOREIGN', 'E2E证据联调·不可跨协会展示', '历史公告', '外协会企业'))
+AS f(id, scope, association_id, kind, source_id, title, state, role)
+ON CONFLICT (id) DO UPDATE SET payload = EXCLUDED.payload;

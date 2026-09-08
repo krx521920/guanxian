@@ -21,7 +21,15 @@ public final class AssistantBusinessResults {
         return text.length() <= 300 ? text : text.substring(0, 280) + "…（已截短）";
     }
     public record Evidence(String criterion, String state, String field, String observed, String explanation) {}
-    public record Item(UUID id, String name, String target, Map<String, String> fields, List<Evidence> evidence) {
+    public record SourceReference(String kind, String sourceId, String evidenceRecordId, String checkedOn,
+                                  String sourceUrl, List<String> supportingUrls) {
+        public SourceReference { supportingUrls = List.copyOf(supportingUrls); }
+    }
+    public record Item(UUID id, String name, String target, Map<String, String> fields, List<Evidence> evidence,
+                       SourceReference source) {
+        public Item(UUID id, String name, String target, Map<String, String> fields, List<Evidence> evidence) {
+            this(id, name, target, fields, evidence, null);
+        }
         public Item { fields = Map.copyOf(fields); evidence = List.copyOf(evidence); }
     }
     public record Result(int schemaVersion, UUID id, String kind, String status, String label,
