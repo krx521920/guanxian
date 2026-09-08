@@ -43,6 +43,7 @@ export function assistantStreamConsumer(
     }
     if (receipts.size > 8) throw invalid()
     if (parsed.length) onBusinessResults?.(parsed)
+    return parsed
   }
 
   return {
@@ -77,10 +78,10 @@ export function assistantStreamConsumer(
           || !result.citations.every(citation => record(citation) && typeof citation.chunkId === 'string'
             && typeof citation.documentName === 'string' && typeof citation.quote === 'string'
             && (citation.source == null || typeof citation.source === 'string'))) throw invalid()
-        results(result.businessResults)
-        if (selection.length && (!selectionReceiptId || !parseBusinessResults(result.businessResults).some(r => r.id === selectionReceiptId)
+        const businessResults = results(result.businessResults)
+        if (selection.length && (!selectionReceiptId || !businessResults.some(r => r.id === selectionReceiptId)
           || (selectionDenied && result.modelConnected))) throw unverified()
-        answer = result as unknown as AssistantChatAnswer
+        answer = (result.businessResults == null ? result : { ...result, businessResults }) as unknown as AssistantChatAnswer
         return true
       } else {
         throw invalid()

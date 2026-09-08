@@ -20,7 +20,7 @@ const sourceFields = ['发布日期', '来源记录状态', '关联企业及角�
 const validUrl = (v: unknown) => text(v, 2048) && sourceLink(v) !== null
 function validSource(v: unknown): v is BusinessSource {
   return object(v) && ['TENDER', 'ACTIVITY'].includes(String(v.kind)) && text(v.sourceId, 100)
-    && text(v.evidenceRecordId, 100) && text(v.checkedOn, 40) && (v.sourceUrl === null || validUrl(v.sourceUrl))
+    && text(v.evidenceRecordId, 100) && text(v.checkedOn, 40) && (v.sourceUrl == null || validUrl(v.sourceUrl))
     && Array.isArray(v.supportingUrls) && v.supportingUrls.length <= 3 && v.supportingUrls.every(validUrl)
 }
 function validItem(v: unknown): v is BusinessItem {
@@ -36,7 +36,7 @@ export function parseBusinessResults(value: unknown): BusinessResult[] {
   if (value == null) return [] // Older servers remain usable as text-only chat.
   if (!Array.isArray(value) || value.length > 8 || !value.every(v => object(v) && v.schemaVersion === 1 && uuid(v.id)
     && kinds.includes(String(v.kind)) && ['OK', 'FORBIDDEN', 'FAILED', 'INVALID', 'UNAVAILABLE'].includes(String(v.status))
-    && (v.associationId === null || uuid(v.associationId)) && text(v.label, 100) && text(v.scope) && stringMap(v.filters) && date(v.queriedAt)
+    && (v.associationId == null || uuid(v.associationId)) && text(v.label, 100) && text(v.scope) && stringMap(v.filters) && date(v.queriedAt)
     && Number.isSafeInteger(v.total) && (v.total as number) >= 0 && Array.isArray(v.items) && v.items.length <= 10
     && v.items.every(validItem) && new Set(v.items.map(i => i.id)).size === v.items.length && (v.total as number) >= v.items.length
     && (['TENDER_EVIDENCE', 'ACTIVITY_EVIDENCE'].includes(String(v.kind))
@@ -49,7 +49,16 @@ export function parseBusinessResults(value: unknown): BusinessResult[] {
     throw new Error('INVALID_BUSINESS_RESULTS')
   }
   if (new Set(value.map(v => v.id)).size !== value.length) throw new Error('INVALID_BUSINESS_RESULTS')
-  return value as BusinessResult[]
+  // NON_NULL servers omit nullable properties. Normalize only those fields; scope/authority
+  // remain server-authored. Stable placement also makes omitted and explicit null receipts equal.
+  return (value as BusinessResult[]).map(({ associationId, items, ...receipt }) => ({
+    ...receipt, associationId: associationId ?? null,
+    items: items.map(item => {
+      if (!item.source) return item
+      const { sourceUrl, ...source } = item.source
+      return { ...item, source: { ...source, sourceUrl: sourceUrl ?? null } }
+    }),
+  }))
 }
 export const memberFields: Record<string, string> = { category: '企业分类', capabilities: '核心能力', products: '产品', services: '服务', status: '审核状态', updatedAt: '档案更新时间' }
 export const memberStatus = (value: string) => ({ ACTIVE: '已认证', PENDING_REVIEW: '待审核', INCOMPLETE: '待完善', DISABLED: '已停用', DELETED: '已删除' }[value] || value || '未提供')

@@ -116,7 +116,13 @@ export function installPreviewTransport() {
     let stop = () => {}
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
-        const send = (type: string, data: object = {}) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, conversationId: body.conversationId, ...data })}\n\n`))
+        // Exercise the actual NON_NULL wire shape instead of only explicit-null fixtures.
+        const send = (type: string, data: object = {}) => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type, conversationId: body.conversationId, ...data }, (key, value) => {
+          if (question.includes('未选择协会') && key === 'associationId') return undefined
+          if (question.includes('无原文链接') && key === 'sourceUrl') return undefined
+          if (question.includes('未选择协会') && key === 'scope') return '全部协会（仅限当前账号有权查看的资料）'
+          return value
+        })}\n\n`))
         stop = () => { if (ended) return; ended = true; clearTimeout(timer); controller.close() }
         init?.signal?.addEventListener('abort', stop, { once: true })
         send('start', { status: { phase: 'PREPARING', mode: 'AUTO' } })

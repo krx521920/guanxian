@@ -15,6 +15,15 @@ describe('source receipts are validated server data, not model Markdown', () => 
     const receipt = sourceEvidenceFixture(); receipt.items[0].source!.sourceUrl = sourceUrl
     expect(() => parseBusinessResults([receipt])).toThrow('INVALID_BUSINESS_RESULTS')
   })
+  it('normalizes omitted optional source URLs without inventing a link or changing the wire object', () => {
+    const receipt = sourceEvidenceFixture()
+    const { sourceUrl: _link, ...source } = receipt.items[0].source!
+    const wire = { ...receipt, items: [{ ...receipt.items[0], source }] }
+    const parsed = parseBusinessResults([wire])[0]
+    expect(parsed.items[0].source?.sourceUrl).toBeNull()
+    expect(source).not.toHaveProperty('sourceUrl')
+    expect(businessResultText(parsed, false)).toContain('无安全可用链接')
+  })
   it('rejects private fields, mismatched kinds and sources disguised as member cards', () => {
     const changed = sourceEvidenceFixture(); changed.items[0].fields = { contactPhone: 'secret' }
     expect(() => parseBusinessResults([changed])).toThrow()

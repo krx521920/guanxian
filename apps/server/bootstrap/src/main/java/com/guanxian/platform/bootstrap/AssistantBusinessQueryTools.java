@@ -385,6 +385,11 @@ public class AssistantBusinessQueryTools implements AssistantToolProvider, Assis
         for (String token : List.of("请帮我", "帮我", "请", "查询", "查找", "搜索", "列出", "看看", "当前", "现在", "目前", "情况", "状态", "一下")) {
             normalized = normalized.replace(token, "");
         }
+        // "协会有多少家企业" asks about the actor's scope, not a company named "协会".
+        // Only strip a generic leading scope phrase; retain named associations and quoted keywords.
+        if (kind == QueryKind.MEMBERS) {
+            normalized = normalized.replaceFirst("^(?:我们|咱们)?(?:这个|本|该)?协会(?=有|多少|哪些)", "");
+        }
         for (String token : noise) normalized = normalized.replace(token, "");
         normalized = normalized.replaceAll("[\\p{P}\\p{S}\\s]+", "").strip();
         return normalized.length() < 2 ? null : normalizeQuery(normalized);
