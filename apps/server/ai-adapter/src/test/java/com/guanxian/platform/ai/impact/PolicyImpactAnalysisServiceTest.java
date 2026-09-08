@@ -31,7 +31,7 @@ class PolicyImpactAnalysisServiceTest {
 
         assertEquals("HIGH", created.impactLevel());
         assertEquals("PENDING_REVIEW", created.status());
-        assertEquals("DETERMINISTIC_LEXICAL", created.analysisMethod());
+        assertEquals("DETERMINISTIC_TOPIC_V2", created.analysisMethod());
         assertFalse(created.evidenceChunkIds().isEmpty());
         assertNull(created.modelExecutionId());
         assertEquals(0, created.version());

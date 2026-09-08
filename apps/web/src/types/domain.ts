@@ -263,6 +263,12 @@ export interface PolicyNotificationResult {
   duplicate: boolean
 }
 
+export interface PolicyAssessment {
+  kind: string
+  applicability: 'UNVERIFIED'
+  checks: { dimension: string; state: string; explanation: string }[]
+}
+
 export interface PolicyImpactAnalysis {
   id: string
   policyDocumentId: string
@@ -281,6 +287,12 @@ export interface PolicyImpactAnalysis {
   createdAt: string
   updatedAt: string
   analysisMethod: string
+  evidenceDetails?: {
+    basis: 'SUMMARY_REFERENCE' | 'SOURCE_CHUNKS'
+    policyVersion: number; enterpriseVersion: number; capturedAt: string
+    references: { kind: 'POLICY_SUMMARY' | 'KNOWLEDGE_CHUNK'; id: string; title: string; sourceUrl: string | null; quote: string }[]
+    assessment: PolicyAssessment
+  } | null
 }
 
 export interface PolicyImpactHistory {

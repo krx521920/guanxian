@@ -35,6 +35,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
             SELECT analysis.id, analysis.policy_document_id, policy.title AS policy_title,
                    analysis.enterprise_id, enterprise.name AS enterprise_name, enterprise.association_id,
                    analysis.impact_level, analysis.summary, analysis.evidence_chunk_ids::text AS evidence_chunk_ids,
+                   analysis.evidence_details::text AS evidence_details,
                    analysis.status, analysis.model_execution_id, analysis.reviewed_by_subject,
                    analysis.reviewed_at, analysis.version, analysis.created_at, analysis.updated_at
               FROM policy_impact_analysis analysis
@@ -58,14 +59,30 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                 .addValue("enterpriseId", enterpriseId);
         List<AnalysisSourceHeader> headers = jdbc.query("""
                 SELECT policy.id AS policy_id, policy.title AS policy_title, policy.source_url,
+                       policy.summary AS policy_summary, policy.version AS policy_version, policy.effective_on,
+                       enterprise.version AS enterprise_version,
+                       imported.payload->'source'->>'适用对象' AS audience,
+                       imported.payload->'source'->>'适用地区' AS region,
+                       imported.payload->'source'->>'当前状态' AS source_status,
                        enterprise.id AS enterprise_id, enterprise.name AS enterprise_name,
                        enterprise.association_id,
-                       CONCAT_WS(' ', enterprise.name, enterprise.category, enterprise.description,
+                       CONCAT_WS(' ', enterprise.category, enterprise.description,
                            enterprise.enterprise_roles::text, enterprise.service_scenarios::text,
-                           enterprise.capabilities::text, enterprise.products::text,
-                           enterprise.cooperation_needs::text) AS enterprise_profile
+                           enterprise.capabilities::text, enterprise.products::text) AS enterprise_profile
                   FROM policy_document policy
                   JOIN enterprise enterprise ON enterprise.id = :enterpriseId
+                  LEFT JOIN LATERAL (
+                      SELECT s.payload FROM platform_source_record s
+                       WHERE s.policy_id=policy.id AND s.association_id=policy.association_id AND s.kind='POLICY'
+                         AND s.payload->>'title'=policy.title
+                         AND s.payload->>'summary' IS NOT DISTINCT FROM policy.summary
+                         AND s.payload->>'sourceUrl' IS NOT DISTINCT FROM policy.source_url
+                         AND s.payload->>'category' IS NOT DISTINCT FROM policy.category
+                         AND s.payload->>'region' IS NOT DISTINCT FROM policy.policy_level
+                         AND s.payload->>'effectiveOn' IS NOT DISTINCT FROM policy.effective_on::text
+                         AND policy.tags=jsonb_build_array(s.payload->'source'->>'涉及领域')
+                       ORDER BY s.created_at DESC,s.id LIMIT 1
+                  ) imported ON TRUE
                  WHERE policy.id = :policyDocumentId
                    AND policy.association_id = enterprise.association_id
                    AND policy.status = 'PUBLISHED'
@@ -73,10 +90,14 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    AND policy.deleted_at IS NULL
                    AND enterprise.status = 'ACTIVE'
                    AND enterprise.deleted_at IS NULL
+                 FOR SHARE OF policy, enterprise
                 """, params, (rs, row) -> new AnalysisSourceHeader(
                 rs.getObject("policy_id", UUID.class), rs.getString("policy_title"), rs.getString("source_url"),
                 rs.getObject("enterprise_id", UUID.class), rs.getString("enterprise_name"),
-                rs.getObject("association_id", UUID.class), rs.getString("enterprise_profile")));
+                rs.getObject("association_id", UUID.class), rs.getString("enterprise_profile"),
+                new PolicyAnalysisEvidence.Metadata(rs.getString("policy_summary"), rs.getString("source_url"),
+                        rs.getLong("policy_version"), rs.getLong("enterprise_version"), rs.getString("audience"),
+                        rs.getString("region"), rs.getObject("effective_on", java.time.LocalDate.class), rs.getString("source_status"))));
         if (headers.isEmpty()) {
             return Optional.empty();
         }
@@ -85,6 +106,19 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                 .addValue("policyTitle", header.policyTitle())
                 .addValue("sourceUrl", header.sourceUrl());
         List<SourceChunk> chunks = jdbc.query("""
+                WITH eligible_documents AS (
+                    SELECT candidate.id
+                      FROM knowledge_document candidate
+                     WHERE candidate.association_id = :associationId
+                       AND candidate.document_type = 'POLICY' AND candidate.status = 'PUBLISHED'
+                       AND candidate.deleted_at IS NULL
+                       AND LOWER(BTRIM(candidate.title)) = LOWER(BTRIM(:policyTitle))
+                       AND (NULLIF(BTRIM(CAST(:sourceUrl AS text)), '') IS NULL
+                            OR candidate.source_url = :sourceUrl)
+                       AND EXISTS (SELECT 1 FROM knowledge_document_version ready
+                                    WHERE ready.document_id=candidate.id
+                                      AND ready.version=candidate.current_version AND ready.status='READY')
+                )
                 SELECT chunk.id, chunk.content
                   FROM knowledge_chunk chunk
                   JOIN knowledge_document_version document_version
@@ -96,17 +130,17 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    AND document.deleted_at IS NULL
                    AND document_version.status = 'READY'
                    AND document_version.version = document.current_version
-                   AND (
-                       LOWER(BTRIM(document.title)) = LOWER(BTRIM(:policyTitle))
-                       OR (CAST(:sourceUrl AS TEXT) IS NOT NULL AND document.source_url = :sourceUrl)
-                   )
+                   AND BTRIM(chunk.content) <> ''
+                   AND document.id IN (SELECT id FROM eligible_documents)
+                   AND (SELECT count(*) FROM eligible_documents) = 1
                  ORDER BY document.updated_at DESC, chunk.chunk_index
                  LIMIT 200
+                 FOR SHARE OF document, document_version, chunk
                 """, params, (rs, row) -> new SourceChunk(
                 rs.getObject("id", UUID.class), rs.getString("content")));
         return Optional.of(new AnalysisSource(
                 header.policyDocumentId(), header.policyTitle(), header.enterpriseId(), header.enterpriseName(),
-                header.associationId(), header.enterpriseProfile(), chunks));
+                header.associationId(), header.enterpriseProfile(), chunks, header.metadata()));
     }
 
     @Override
@@ -150,9 +184,9 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
             return jdbc.query("""
                     INSERT INTO policy_impact_analysis (
                         policy_document_id, enterprise_id, impact_level, summary,
-                        evidence_chunk_ids, status, version)
+                        evidence_chunk_ids, evidence_details, status, version)
                     VALUES (:policyDocumentId, :enterpriseId, :impactLevel, :summary,
-                            CAST(:evidenceChunkIds AS jsonb), 'PENDING_REVIEW', 0)
+                            CAST(:evidenceChunkIds AS jsonb), CAST(:evidenceDetails AS jsonb), 'PENDING_REVIEW', 0)
                     RETURNING id
                     """, draftParams(draft), (rs, row) -> rs.getObject("id", UUID.class)).stream()
                     .findFirst().flatMap(this::find).orElseThrow();
@@ -173,6 +207,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                    SET impact_level = :impactLevel,
                        summary = :summary,
                        evidence_chunk_ids = CAST(:evidenceChunkIds AS jsonb),
+                       evidence_details = CAST(:evidenceDetails AS jsonb),
                        status = 'PENDING_REVIEW', model_execution_id = NULL,
                        reviewed_by_subject = NULL, reviewed_at = NULL,
                        version = version + 1, updated_at = now()
@@ -263,7 +298,8 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                 readUuidList(rs.getString("evidence_chunk_ids")), rs.getString("status"),
                 rs.getObject("model_execution_id", UUID.class), rs.getString("reviewed_by_subject"),
                 instant(rs.getTimestamp("reviewed_at")), rs.getLong("version"),
-                rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), null);
+                rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(), null,
+                readEvidence(rs.getString("evidence_details")));
     }
 
     private MapSqlParameterSource draftParams(AnalysisDraft draft) {
@@ -272,7 +308,8 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
                 .addValue("enterpriseId", draft.enterpriseId())
                 .addValue("impactLevel", draft.impactLevel())
                 .addValue("summary", draft.summary())
-                .addValue("evidenceChunkIds", writeJson(draft.evidenceChunkIds()));
+                .addValue("evidenceChunkIds", writeJson(draft.evidenceChunkIds()))
+                .addValue("evidenceDetails", draft.evidenceDetails() == null ? null : writeJson(draft.evidenceDetails()));
     }
 
     private static MapSqlParameterSource filters(
@@ -325,6 +362,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
         snapshot.put("status", value.status());
         snapshot.put("version", value.version());
         snapshot.put("analysisMethod", value.analysisMethod());
+        if (value.evidenceDetails() != null) snapshot.put("evidenceDetails", value.evidenceDetails());
         if (value.reviewedBySubject() != null) snapshot.put("reviewedBySubject", value.reviewedBySubject());
         if (comment != null && !comment.isBlank()) snapshot.put("comment", comment.trim());
         return Map.copyOf(snapshot);
@@ -361,6 +399,12 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
         }
     }
 
+    private PolicyAnalysisEvidence readEvidence(String json) {
+        if (json == null) return null;
+        try { return objectMapper.readValue(json, PolicyAnalysisEvidence.class); }
+        catch (JsonProcessingException exception) { throw new IllegalStateException("stored policy evidence is invalid", exception); }
+    }
+
     private Map<String, Object> readMap(String json) {
         try {
             return objectMapper.readValue(json, MAP);
@@ -380,6 +424,7 @@ public class PostgresPolicyImpactAnalysisStore implements PolicyImpactAnalysisSt
             UUID enterpriseId,
             String enterpriseName,
             UUID associationId,
-            String enterpriseProfile) {
+            String enterpriseProfile,
+            PolicyAnalysisEvidence.Metadata metadata) {
     }
 }
