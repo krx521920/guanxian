@@ -13,8 +13,8 @@ export interface SourceEntry {
   evidence?: { recordId: string; title: string; checkedOn: string; sourceUrl: string; supportingUrls: string[] } | null
 }
 export interface SourcePage { items: SourceEntry[]; total: number; page: number; size: number }
-export const sourceDirectory = (kind: SourceKind, q = '', page = 0, size = 20) =>
-  request<SourcePage>(`/source-directory?kind=${kind}&q=${encodeURIComponent(q)}&page=${page}&size=${size}`)
+export const sourceDirectory = (kind: SourceKind, q = '', page = 0, size = 20, recordId?: string) =>
+  request<SourcePage>(`/source-directory?kind=${kind}&q=${encodeURIComponent(q)}&page=${page}&size=${size}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ''}`)
 
 export function sourceLink(value?: string): string | null {
   if (!value || !/^https?:\/\//i.test(value) || /[\s\\\u0000-\u001f\u007f]/.test(value)

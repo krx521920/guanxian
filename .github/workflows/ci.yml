@@ -143,7 +143,7 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest', 'PostgresEcosystemSystemContextIntegrationTest', 'ManagedEnterpriseAccountsPostgresTest', 'PersonalModelPostgresTest', 'PostgresAssistantAllAssociationsIntegrationTest', 'SourceDirectoryPostgresTest', 'PolicyCandidatesPostgresTest', 'PostgresPolicyImpactIntegrationTest', 'PostgresPolicyEvidenceUpgradeIntegrationTest'):
+          for name in ('ProfileWorkflowPostgresTest', 'EnterpriseInvitationPostgresTest', 'PostgresEcosystemSystemContextIntegrationTest', 'ManagedEnterpriseAccountsPostgresTest', 'PersonalModelPostgresTest', 'PostgresAssistantAllAssociationsIntegrationTest', 'SourceDirectoryPostgresTest', 'PolicyCandidatesPostgresTest', 'PostgresPolicyImpactIntegrationTest', 'PostgresPolicyEvidenceUpgradeIntegrationTest', 'AssistantSourceEvidencePostgresTest'):
               reports = list(Path('bootstrap/target/surefire-reports').glob(f'TEST-*{name}.xml'))
               assert len(reports) == 1, f'Missing real database report: {name}'
               suite = ET.parse(reports[0]).getroot()

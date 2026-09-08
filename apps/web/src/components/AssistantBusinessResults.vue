@@ -8,9 +8,11 @@ import BusinessResultDialog from './BusinessResultDialog.vue'
 import MemberProfileDialog from './MemberProfileDialog.vue'
 import MemberFitCheckDialog from './MemberFitCheckDialog.vue'
 import { criteriaFromResult, type FitCriterion } from '../services/assistant-fit-check'
+import SourceDirectory from './SourceDirectory.vue'
 const props = defineProps<{ results: BusinessResult[]; incomplete: boolean; followupDisabled?: boolean }>()
 const emit = defineEmits<{ followup: [items: SelectedEnterprise[]] }>()
 const copied = ref<string | null>(null)
+const expandedSource = ref<string | null>(null)
 const selected = ref<string[]>([])
 const comparison = ref<BusinessItem[]>([])
 const comparedAt = ref('')
@@ -85,6 +87,17 @@ const canCompare = (result: BusinessResult) => result.kind === 'COMPARISON' || (
         <button v-if="canCompare(result)" type="button" :disabled="busy" @click="compare(result.items.map(i => i.id))">打开对比表（重新查询）</button>
         <article v-for="item in result.items" :key="item.id" class="business-card">
           <strong class="business-name">{{ item.name }}</strong>
+          <section v-if="item.target === 'SOURCE' && item.source" class="source-receipt" aria-label="公开资料来源">
+            <p>{{ item.source.kind === 'TENDER' ? '外部招采或历史结果' : '企业活动与公开动态' }} · 来源 {{ item.source.sourceId }}<template v-if="item.source.evidenceRecordId"> · 证据 {{ item.source.evidenceRecordId }}</template></p>
+            <p>来源核验截至 {{ item.source.checkedOn || '未登记' }}，不是今日实时复核。角色、金额口径和状态需结合原文核对。</p>
+            <div class="source-receipt-actions">
+              <a v-if="item.source.sourceUrl" :href="item.source.sourceUrl" target="_blank" rel="noopener noreferrer">来源原文 ↗</a>
+              <span v-else>暂无安全可用的原文链接</span>
+              <a v-for="(url, index) in item.source.supportingUrls" :key="url" :href="url" target="_blank" rel="noopener noreferrer">补充依据 {{ index + 1 }} ↗</a>
+              <button type="button" :aria-expanded="expandedSource === item.id" @click="expandedSource = expandedSource === item.id ? null : item.id">{{ expandedSource === item.id ? '收起资料' : '重新核对资料' }}</button>
+            </div>
+            <SourceDirectory v-if="expandedSource === item.id" :kind="item.source.kind" :record-id="item.id" />
+          </section>
           <dl v-if="item.target === 'MEMBER'" class="card-fields"><div v-for="(label, key) in memberFields" :key="key"><dt>{{ label }}</dt><dd>{{ fieldValue(item, String(key)) }}</dd></div></dl>
           <dl v-else class="card-fields"><div v-for="(value, key) in item.fields" :key="key"><dt>{{ key }}</dt><dd>{{ value || '未提供' }}</dd></div></dl>
           <section v-if="item.evidence.length" class="fit-evidence" aria-label="推荐条件核对"><p>条件来自本轮工具参数，请核对是否与您的要求一致。这里只核对已登记资料。</p><div v-for="(evidence, index) in item.evidence" :key="index" :class="`evidence-${evidence.state.toLowerCase()}`"><strong>{{ evidenceText(evidence.state) }} · {{ evidence.criterion }}</strong><p>依据字段：{{ memberFields[evidence.field] }}；登记值：{{ evidence.observed || '未提供' }}</p><p>{{ evidence.explanation }}</p></div></section>
@@ -108,6 +121,9 @@ const canCompare = (result: BusinessResult) => result.kind === 'COMPARISON' || (
   </section>
 </template>
 <style scoped>
+.source-receipt { margin: 12px 0; padding: 12px; border: 1px solid #dce5ef; border-radius: 8px; font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.source-receipt-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.source-receipt a { color: #24558c; }
 .followup-button{margin-top:8px}
 .business-results{border-top:1px solid #d8e2ed;margin-top:18px;padding-top:14px;font-size:13px;line-height:1.6}.business-results-heading{display:grid;gap:3px}.business-results-heading small,.receipt-scope,.receipt-id{color:#65768a}.query-receipt{margin-top:14px}.query-receipt summary{cursor:pointer;font-weight:650;color:#254d75}.query-receipt summary span{font-size:12px;font-weight:400}.receipt-scope{font-size:12px;margin:8px 0}.receipt-meta{margin:8px 0;font-size:12px}.receipt-meta div{display:flex;gap:10px}.receipt-meta dt{color:#65768a;min-width:56px}dd{margin:0;overflow-wrap:anywhere}.business-card{border:1px solid #d9e3ed;background:#fff;border-radius:12px;padding:13px;margin:10px 0}.business-name{font-size:15px;color:#163c62;overflow-wrap:anywhere}.card-fields{margin:10px 0;display:grid;gap:6px}.card-fields div{display:grid;grid-template-columns:86px minmax(0,1fr);gap:8px}.card-fields dt{color:#61758c}.card-actions,.comparison-action{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.comparison-action{border-top:1px solid #d8e2ed;padding-top:12px;justify-content:space-between}button{font:inherit;border:1px solid #bdcfe1;border-radius:8px;background:white;color:#245a90;padding:6px 10px;cursor:pointer}button[aria-pressed=true]{background:#e8f1fc}button:disabled{opacity:.5;cursor:default}.receipt-note{background:#fff8e6;color:#715515;padding:8px;border-radius:8px}.receipt-error{color:#a52f35}.receipt-id{font-size:10px;overflow-wrap:anywhere}.fit-evidence{margin:12px 0;font-size:12px}.fit-evidence>div{border-left:3px solid #b8c6d5;padding-left:8px;margin:12px 0}.fit-evidence .evidence-matched{border-color:#39877c}.fit-evidence .evidence-unmet{border-color:#b86265}.fit-evidence p{margin:5px 0;overflow-wrap:anywhere}.comparison-scroll{overflow-x:auto}.comparison-scroll table{border-collapse:collapse;width:100%;font-size:14px}.comparison-scroll th,.comparison-scroll td{min-width:180px;max-width:300px;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #dce5ef;padding:14px;vertical-align:top;text-align:left}.comparison-scroll th:first-child{min-width:108px}.comparison-scroll thead{background:#edf3fa}
 </style>

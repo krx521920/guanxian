@@ -1,7 +1,9 @@
 import type { MemberProfile } from '../types/domain'
+import { sourceLink } from './source-directory'
 
 export interface BusinessEvidence { criterion: string; state: 'MATCHED' | 'UNMET' | 'INSUFFICIENT'; field: string; observed: string; explanation: string }
-export interface BusinessItem { id: string; name: string; target: 'MEMBER' | 'NONE'; fields: Record<string, string>; evidence: BusinessEvidence[] }
+export interface BusinessSource { kind: 'TENDER' | 'ACTIVITY'; sourceId: string; evidenceRecordId: string; checkedOn: string; sourceUrl: string | null; supportingUrls: string[] }
+export interface BusinessItem { id: string; name: string; target: 'MEMBER' | 'NONE' | 'SOURCE'; fields: Record<string, string>; evidence: BusinessEvidence[]; source?: BusinessSource | null }
 export interface BusinessResult {
   schemaVersion: 1; id: string; kind: string; status: 'OK' | 'FORBIDDEN' | 'FAILED' | 'INVALID' | 'UNAVAILABLE'; label: string;
   associationId: string | null; scope: string; filters: Record<string, string>; queriedAt: string; total: number; items: BusinessItem[]
@@ -12,11 +14,19 @@ const text = (v: unknown, max = 400): v is string => typeof v === 'string' && v.
 const date = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && Number.isFinite(Date.parse(v))
 const stringMap = (v: unknown): v is Record<string, string> => object(v) && Object.keys(v).length <= 10
   && Object.entries(v).every(([k, val]) => text(k, 50) && text(val) && !['__proto__', 'constructor', 'prototype'].includes(k))
-const kinds = ['MEMBERS', 'SELECTED_MEMBERS', 'COMPARISON', 'RECOMMENDATIONS', 'MEMBER_FIT_CHECK', 'OFFERINGS', 'DEMANDS', 'MATCHES', 'COLLABORATIONS']
+const kinds = ['MEMBERS', 'SELECTED_MEMBERS', 'COMPARISON', 'RECOMMENDATIONS', 'MEMBER_FIT_CHECK', 'OFFERINGS', 'DEMANDS', 'MATCHES', 'COLLABORATIONS', 'TENDER_EVIDENCE', 'ACTIVITY_EVIDENCE']
 const fields = ['category', 'capabilities', 'products', 'services', 'status', 'updatedAt']
+const sourceFields = ['发布日期', '来源记录状态', '关联企业及角色', '内容摘要', '项目地区', '金额及口径', '所载截止或开标时间', '所载活动时间', '所载要求', '后续结果', '核验边界']
+const validUrl = (v: unknown) => text(v, 2048) && sourceLink(v) !== null
+function validSource(v: unknown): v is BusinessSource {
+  return object(v) && ['TENDER', 'ACTIVITY'].includes(String(v.kind)) && text(v.sourceId, 100)
+    && text(v.evidenceRecordId, 100) && text(v.checkedOn, 40) && (v.sourceUrl === null || validUrl(v.sourceUrl))
+    && Array.isArray(v.supportingUrls) && v.supportingUrls.length <= 3 && v.supportingUrls.every(validUrl)
+}
 function validItem(v: unknown): v is BusinessItem {
-  return object(v) && uuid(v.id) && text(v.name) && ['MEMBER', 'NONE'].includes(String(v.target)) && stringMap(v.fields)
+  return object(v) && uuid(v.id) && text(v.name) && ['MEMBER', 'NONE', 'SOURCE'].includes(String(v.target)) && stringMap(v.fields)
     && (v.target !== 'MEMBER' || Object.keys(v.fields).every(key => fields.includes(key)))
+    && (v.target === 'SOURCE' ? validSource(v.source) && Object.keys(v.fields).every(key => sourceFields.includes(key)) : v.source == null)
     && Array.isArray(v.evidence) && v.evidence.length <= 8 && v.evidence.every(e => object(e)
       && text(e.criterion, 80) && ['MATCHED', 'UNMET', 'INSUFFICIENT'].includes(String(e.state))
       && fields.includes(String(e.field)) && text(e.observed) && text(e.explanation))
@@ -29,6 +39,9 @@ export function parseBusinessResults(value: unknown): BusinessResult[] {
     && (v.associationId === null || uuid(v.associationId)) && text(v.label, 100) && text(v.scope) && stringMap(v.filters) && date(v.queriedAt)
     && Number.isSafeInteger(v.total) && (v.total as number) >= 0 && Array.isArray(v.items) && v.items.length <= 10
     && v.items.every(validItem) && new Set(v.items.map(i => i.id)).size === v.items.length && (v.total as number) >= v.items.length
+    && (['TENDER_EVIDENCE', 'ACTIVITY_EVIDENCE'].includes(String(v.kind))
+      ? v.items.every(i => i.target === 'SOURCE' && i.source?.kind === String(v.kind).replace('_EVIDENCE', '') && i.evidence.length === 0)
+      : v.items.every(i => i.target !== 'SOURCE'))
     && (v.status === 'OK' || (v.items.length === 0 && v.total === 0))
     && (v.status !== 'OK' || !['SELECTED_MEMBERS', 'COMPARISON', 'RECOMMENDATIONS', 'MEMBER_FIT_CHECK'].includes(String(v.kind))
       || (v.total === v.items.length && v.items.length <= 4 && v.items.length >= (v.kind === 'COMPARISON' ? 2 : 1)))
@@ -81,6 +94,9 @@ export function businessResultText(result: BusinessResult, incomplete: boolean):
     lines.push('', `${item.name}（ID：${item.id}）`)
     const labels = item.target === 'MEMBER' ? memberFields : Object.fromEntries(Object.keys(item.fields).map(key => [key, key]))
     for (const [key, label] of Object.entries(labels)) lines.push(`${label}：${fieldValue(item, key)}`)
+    if (item.source) lines.push(`来源资料编号：${item.source.sourceId}`, `证据编号：${item.source.evidenceRecordId || '未登记'}`,
+      `来源核验截至：${item.source.checkedOn || '未登记'}（非实时复核）`, `原文：${item.source.sourceUrl || '无安全可用链接'}`,
+      ...item.source.supportingUrls.map(url => `补充依据：${url}`))
     for (const e of item.evidence) lines.push(`条件“${e.criterion}”：${{ MATCHED: '符合登记条件', UNMET: '登记值不符合', INSUFFICIENT: '资料不足' }[e.state]}；依据 ${memberFields[e.field]}=${e.observed || '未提供'}；${e.explanation}`)
   }
   lines.push('', '以上为查询时快照，不代表当前最新状态；资料不足不等于没有能力，登记内容仍需人工核验。')

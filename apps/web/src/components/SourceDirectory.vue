@@ -6,7 +6,7 @@ import { safePageResourceError, type PageResourceError } from '../composables/us
 import AsyncResourceState from './AsyncResourceState.vue'
 import PaginationBar from './PaginationBar.vue'
 
-const props = defineProps<{ kind: SourceKind }>()
+const props = defineProps<{ kind: SourceKind; recordId?: string }>()
 const auth = useAuth()
 const items = ref<SourceEntry[]>([])
 const q = ref(''); const page = ref(0); const size = ref(20); const total = ref(0)
@@ -35,7 +35,7 @@ async function load() {
   const current = ++sequence
   loading.value = true; error.value = null; items.value = []; total.value = 0
   try {
-    const result = await sourceDirectory(props.kind, q.value, page.value, size.value)
+    const result = await sourceDirectory(props.kind, q.value, page.value, size.value, props.recordId)
     if (sequence !== current) return
     items.value = result.items; total.value = result.total
   } catch (reason) { if (sequence === current) error.value = safePageResourceError(reason) }
@@ -44,14 +44,14 @@ async function load() {
 function search() { page.value = 0; void load() }
 function changePage(value: number) { page.value = value; void load() }
 function resize(value: number) { size.value = value; search() }
-watch(() => [props.kind, auth.user.value?.id, auth.user.value?.associationId, auth.user.value?.enterpriseId, auth.user.value?.role], () => {
+watch(() => [props.kind, props.recordId, auth.user.value?.id, auth.user.value?.associationId, auth.user.value?.enterpriseId, auth.user.value?.role], () => {
   q.value = ''; page.value = 0; void load()
 }, { immediate: true })
 onBeforeUnmount(() => { sequence++; clearInterval(clockTimer) })
 </script>
 
 <template>
-  <section class="source-directory" :aria-label="title">
+  <section class="source-directory" :class="{ 'source-directory--inline': recordId }" :aria-label="title">
     <div class="panel source-toolbar">
       <div><h2>{{ title }}</h2>
         <p v-if="kind === 'TENDER'">外部招采线索与历史记录，不是会员发布的合作需求。候选不等于中标，历史公告不代表仍可报名；资格、标段范围和更正情况以官方文件为准。</p>
@@ -60,11 +60,12 @@ onBeforeUnmount(() => { sequence++; clearInterval(clockTimer) })
         <p v-else-if="kind === 'POLICY'">来源资料与已记录的元数据更正；日期和编号更正不等于现行效力或企业适用性已核验。</p>
         <p v-else>导入时的资料快照；当前企业资料及修改入口见企业详情。空缺信息待负责人补充。</p>
       </div>
-      <form class="source-search" @submit.prevent="search"><input v-model="q" maxlength="200" :aria-label="`搜索${title}`" placeholder="搜索名称或资料内容" /><button class="secondary-button" type="submit">搜索</button></form>
+      <button v-if="recordId" type="button" class="secondary-button" @click="load">重新核对当前资料</button>
+      <form v-else class="source-search" @submit.prevent="search"><input v-model="q" maxlength="200" :aria-label="`搜索${title}`" placeholder="搜索名称或资料内容" /><button class="secondary-button" type="submit">搜索</button></form>
     </div>
     <AsyncResourceState v-if="loading || error" :loading="loading" :error="error" @retry="load" />
     <template v-else>
-      <div class="source-grid">
+      <div class="source-grid" :class="{ 'source-single': recordId }">
         <article v-for="item in items" :key="item.id" class="panel source-card">
           <small>{{ item.sourceId }}<template v-if="kind === 'TENDER'"> · {{ tenderStageLabel(item.fields, now) }}</template><template v-else-if="kind === 'ACTIVITY'"> · {{ item.fields['记录状态'] || '状态待核实' }}</template></small>
           <h3>{{ item.evidence?.title || item.title }}</h3>
@@ -85,8 +86,8 @@ onBeforeUnmount(() => { sequence++; clearInterval(clockTimer) })
           <div v-if="evidenceLinks(item).length" class="source-actions"><a v-for="(url, index) in evidenceLinks(item)" :key="url" :href="url" target="_blank" rel="noopener noreferrer">补充证据 {{ index + 1 }} ↗</a></div>
         </article>
       </div>
-      <p v-if="!items.length" class="panel source-toolbar">当前范围暂无资料。</p>
-      <PaginationBar :page="page" :size="size" :total="total" @change="changePage" @resize="resize" />
+      <p v-if="!items.length" class="panel source-toolbar">{{ recordId ? '资料已不可用或当前身份无权查看，请重新查询。' : '当前范围暂无资料。' }}</p>
+      <PaginationBar v-if="!recordId" :page="page" :size="size" :total="total" @change="changePage" @resize="resize" />
     </template>
   </section>
 </template>
@@ -99,6 +100,7 @@ onBeforeUnmount(() => { sequence++; clearInterval(clockTimer) })
 .source-search { display: flex; gap: 8px; flex-shrink: 0; }
 .source-search input { min-width: 0; padding: 10px; border: 1px solid #ccd5df; border-radius: 8px; }
 .source-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.source-grid.source-single { grid-template-columns: minmax(0, 1fr); }
 .source-card { padding: 22px; min-width: 0; }
 .source-card h3 { font-size: 18px; line-height: 1.5; margin: 10px 0 18px; overflow-wrap: anywhere; }
 .source-card small { color: #526174; }
@@ -109,6 +111,12 @@ dt { color: #526174; } dd { margin: 0; white-space: pre-wrap; overflow-wrap: any
 .source-correction { margin-top: 18px; padding: 14px; border: 1px solid #ccd5df; border-radius: 8px; font-size: 14px; }
 .source-correction summary { cursor: pointer; font-weight: 600; }
 .source-correction p { line-height: 1.6; }
+.source-directory--inline .source-toolbar { flex-direction: column; align-items: stretch; gap: 12px; padding: 12px; }
+.source-directory--inline .source-toolbar h2 { font-size: 17px; }
+.source-directory--inline .source-toolbar p { font-size: 12px; }
+.source-directory--inline .source-card { padding: 12px; }
+.source-directory--inline dl { grid-template-columns: 1fr; gap: 4px; font-size: 12px; }
+.source-directory--inline dd { margin-bottom: 8px; }
 @media (max-width: 1000px) { .source-grid { grid-template-columns: 1fr; } .source-toolbar { align-items: stretch; flex-direction: column; } }
 @media (max-width: 520px) { dl { grid-template-columns: 1fr; gap: 4px; } dd { margin-bottom: 10px; } .source-search input { width: 100%; } }
 </style>
