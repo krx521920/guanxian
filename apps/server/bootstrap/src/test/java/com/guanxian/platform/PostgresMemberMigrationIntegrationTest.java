@@ -68,8 +68,10 @@ class PostgresMemberMigrationIntegrationTest {
     void baselinesExistingSchemaMigratesColumnsAndPreservesMemberData() throws Exception {
         Integer migrationCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        // Baseline 0 + V1..V23 + V25..V30. Source directories add schema, never production data.
-        org.junit.jupiter.api.Assertions.assertEquals(30, migrationCount);
+        // Baseline 0 plus every checked-in migration, including minor versions such as V30.1.
+        int schemaFiles = new org.springframework.core.io.support.PathMatchingResourcePatternResolver()
+                .getResources("classpath:db/migration/V*__*.sql").length;
+        org.junit.jupiter.api.Assertions.assertEquals(schemaFiles + 1, migrationCount);
         org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM platform_dataset_import", Integer.class));
         org.junit.jupiter.api.Assertions.assertEquals(0, jdbcTemplate.queryForObject(

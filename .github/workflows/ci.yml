@@ -166,6 +166,10 @@ jobs:
           python-version: "3.12"
       - name: Verify guarded source import against isolated PostgreSQL
         run: python tests/operations/platform_dataset_postgres_check.py
+      - name: Verify reviewed annual evidence and classification guards
+        run: python -m unittest discover -s tests/operations -p 'test_*member*evidence.py' -v
+      - name: Verify annual evidence import and rollback against isolated PostgreSQL
+        run: python tests/operations/member_annual_evidence_postgres_check.py
 
   web:
     runs-on: ubuntu-latest
